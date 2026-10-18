@@ -152,7 +152,8 @@
     // (the cloud's engine leaves the later drops' code out on purpose, window.__factsOnly: it never draws them, and their
     // facts are all it needs; cloud/build.mjs checks facts.js against the art itself)
     for (const g in extra) win[g] = window[g] !== extra[g] ? window[g] : window.__factsOnly ? extra[g] : null;
-    const now = JSON.stringify(factsOf(real, realPFP !== pfp ? realPFP : null, window.PrintsCatalogue, win));
+    // (the cloud's engine leaves Drop 02's code out too, 2026-10-18: its stand-ins are its facts)
+    const now = JSON.stringify(factsOf(real, realPFP !== pfp ? realPFP : window.__factsOnly ? pfp : null, window.PrintsCatalogue, win));
     B.stale = now !== known;
     if (B.stale) console.error('art/facts.js does not match the art: run node server/tools/art-facts.mjs');
     take(main, real, 'index');
