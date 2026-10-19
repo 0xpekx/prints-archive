@@ -1773,7 +1773,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 476
   },
   {
    "key": "pfp1-002",
@@ -1792,7 +1793,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 429
   },
   {
    "key": "pfp1-003",
@@ -1811,7 +1813,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-004",
@@ -1830,7 +1833,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 333
   },
   {
    "key": "pfp1-005",
@@ -1849,7 +1853,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-007",
@@ -1868,7 +1873,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 500
   },
   {
    "key": "pfp1-008",
@@ -1887,7 +1893,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 500
   },
   {
    "key": "pfp1-009",
@@ -1906,7 +1913,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 500
   },
   {
    "key": "pfp1-036",
@@ -1925,7 +1933,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 420
   },
   {
    "key": "pfp1-041",
@@ -1944,7 +1953,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 435
   },
   {
    "key": "pfp1-044",
@@ -1963,7 +1973,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 333
   },
   {
    "key": "pfp1-047",
@@ -1982,7 +1993,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 417
   },
   {
    "key": "pfp1-051",
@@ -2001,7 +2013,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 385
   },
   {
    "key": "pfp1-056",
@@ -2020,7 +2033,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 400
   },
   {
    "key": "pfp1-057",
@@ -2039,7 +2053,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 400
   },
   {
    "key": "pfp1-058",
@@ -2058,7 +2073,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 450
   },
   {
    "key": "pfp1-061",
@@ -2077,7 +2093,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 400
   },
   {
    "key": "pfp1-069",
@@ -2096,7 +2113,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 400
   },
   {
    "key": "pfp1-082",
@@ -2115,7 +2133,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 500
   },
   {
    "key": "pfp1-083",
@@ -2134,7 +2153,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 367
   },
   {
    "key": "pfp1-085",
@@ -2153,7 +2173,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 500
   },
   {
    "key": "pfp1-101",
@@ -2172,7 +2193,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-102",
@@ -2191,7 +2213,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-103",
@@ -2210,7 +2233,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-105",
@@ -2229,7 +2253,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-107",
@@ -2248,7 +2273,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-110",
@@ -2267,7 +2293,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 455
   },
   {
    "key": "pfp1-201",
@@ -2286,7 +2313,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 370
   },
   {
    "key": "pfp1-204",
@@ -2305,7 +2333,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 370
   },
   {
    "key": "pfp1-205",
@@ -2324,7 +2353,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 385
   },
   {
    "key": "pfp1-206",
@@ -2343,7 +2373,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 370
   },
   {
    "key": "pfp1-208",
@@ -2362,7 +2393,8 @@ window.PrintsCatalogue = {
    ],
    "rt": "pfp1",
    "touch": 1,
-   "music": 1
+   "music": 1,
+   "lg": 385
   },
   {
    "key": "drop03-001",
