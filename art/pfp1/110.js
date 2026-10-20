@@ -615,6 +615,437 @@ Proto.add({
     const home = 64 + Math.floor(wr() * 6), accent = wr() < 0.5 ? 12 : 7;
     let heard = [], lastTap = -9, song = null, gape = 0, hov = null, legAt = -9, keyTurns = 0;
 
+    // ---------- the legendaries: each leaves the broadcast page behind for a medium of its own ----------
+    // the Phoenix is a demoscene fire effect with copper bars, the Dodo a handheld-console game in four greens, the
+    // Clockwork bird its own blueprint patent drawing. Each draws into its own small bitmap, shown hard-edged. Every trait
+    // it lists shows: on the Dodo all in the picture, on the Phoenix and the Clockwork named whole, one at a time.
+    const LGRID = { Phoenix: 96, Dodo: 64, Clockwork: 80 }[legend] || 96;
+    let lgB = null;
+    const ABGR = h => (0xff000000 | ((h & 255) << 16) | (h & 0xff00) | ((h >> 16) & 255)) >>> 0;
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+    const bay = (x, y) => BAYER[(x & 3) + ((y & 3) << 2)];
+    // a 3 x 5 letter set for the small writing (each letter five rows of three)
+    const F3 = {};
+    "A.#.#.#####.##.#|B##.#.###.#.###.|C.###..#..#...##|D##.#.##.##.###.|E####..##.#..###|F####..##.#..#..|G.###..#.##.#.##|H#.##.#####.##.#|I###.#..#..#.###|J..#..#..##.#.#.|K#.##.###.#.##.#|L#..#..#..#..###|M#.########.##.#|N##.#.##.##.##.#|O.#.#.##.##.#.#.|P##.#.###.#..#..|Q.#.#.##.###..##|R##.#.###.#.##.#|S.###...#...###.|T###.#..#..#..#.|U#.##.##.##.####|V#.##.##.##.#.#.|W#.##.########.#|X#.##.#.#.#.##.#|Y#.##.#.#..#..#.|Z###..#.#.#..###|0####.##.##.####|1.#.##..#..#.###|2##...#.#.#..###|3##...#.#...###.|4#.##.####..#..#|5####..##...###.|6.###..####.####|7###..#.#..#..#.|8####.#####.####|9####.####..###.|:....#.....#....|..............#.|-......###......|/..#..#.#.#..#..|&.#.#.#.#.#.#.##|'.#..#..........|!.#..#..#.....#.".split('|').forEach(e => { F3[e[0]] = e.slice(1); });
+    const W = s => String(s).toUpperCase();
+    function lgBuf(R) {
+      const can = document.createElement('canvas'); can.width = can.height = R;
+      const g = can.getContext('2d'), id = g.createImageData(R, R);
+      return { R, can, g, id, d: new Uint32Array(id.data.buffer), prev: new Uint32Array(R * R) };
+    }
+    const lpx = (x, y, c) => { x |= 0; y |= 0; if (x >= 0 && y >= 0 && x < lgB.R && y < lgB.R) lgB.d[y * lgB.R + x] = c; };
+    const lrect = (x0, y0, x1, y1, c) => { for (let y = Math.max(0, y0 | 0); y <= Math.min(lgB.R - 1, y1); y++) for (let x = Math.max(0, x0 | 0); x <= Math.min(lgB.R - 1, x1); x++) lgB.d[y * lgB.R + x] = c; };
+    const lline = (x0, y0, x1, y1, c) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) || 1; for (let k = 0; k <= n; k++) lpx(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), c); };
+    const ltext3 = (str, x, y, c, clip) => { str = W(str); for (let i = 0; i < str.length; i++) { const g = F3[str[i]]; if (!g) continue; for (let r = 0; r < 5; r++) for (let q = 0; q < 3; q++) if (g[r * 3 + q] === '#') { const xx = x + i * 4 + q; if (!clip || (xx >= clip[0] && xx <= clip[1])) lpx(xx, y + r, c); } } };
+    const ltext5 = (str, x, y, c) => { for (let i = 0; i < str.length; i++) { const g = FONT[str[i]]; if (!g) continue; for (let r = 0; r < 7; r++) for (let k = 0; k < 5; k++) if (g[r] >> (4 - k) & 1) lpx(x + i * 6 + k, y + r, c); } };
+    // the traits it lists, as words to write on it
+    const LT = [['PERCH', perch], ['HOLDING', holding], ['POSE', pose], ['HAT', headwear], ['NECK', neckwear], ['PAGE', page], ['SCREEN', screen], ['FACING', faceName], ['FLASHING', flashName]];
+    function lgPresent() {
+      const B = lgB, n = B.R * B.R;
+      if (screen === 'Black & White') for (let i = 0; i < n; i++) { const v = B.d[i], l = Math.round((v & 255) * 0.3 + (v >> 8 & 255) * 0.59 + (v >> 16 & 255) * 0.11); B.d[i] = (0xff000000 | (l << 16) | (l << 8) | l) >>> 0; }
+      if (screen === 'Ghosting') {
+        // the set's ghost: what was there a moment ago lingers, a little to the right
+        for (let y = 0; y < B.R; y++) for (let x = B.R - 1; x >= 2; x--) { const i = y * B.R + x, p = B.prev[i - 2], v = B.d[i]; if (((p & 255) + (p >> 8 & 255)) > ((v & 255) + (v >> 8 & 255)) + 120) B.d[i] = (0xff000000 | (((p >> 16 & 255) + (v >> 16 & 255)) >> 1 << 16) | (((p >> 8 & 255) + (v >> 8 & 255)) >> 1 << 8) | (((p & 255) + (v & 255)) >> 1)) >>> 0; }
+        B.prev.set(B.d);
+      }
+      B.g.putImageData(B.id, 0, 0);
+      cx.imageSmoothingEnabled = false;
+      cx.drawImage(B.can, 0, 0, B.R, B.R, 0, 0, S, S);
+    }
+    // ---------- the toys' state ----------
+    const ph = { heat: 0, burnAt: -9 };
+    const dd = { x: facing > 0 ? 36 : 28, face: facing, fruits: [], eatAt: -9, fed: 0, jumpAt: -9, msgAt: 0 };
+    const cw = { wind: 0, ang: null, acc: 0, spin: 0, nextAt: 0, step: 0, noteAt: -9, notes: [], I: null };
+    const MEL = [0, 2, 4, 2, 5, 4, 2, 0, 3, 4, 5, 7, 5, 4, 2, 1].map((d, k) => (d + (k % 4 === 3 && embers[k % 10][1] < 0.5 ? 1 : 0)) % 8);
+    let lgLast = 0, lgPress = null;
+    function legendFrame(t, inp) {
+      if (!lgB) lgB = lgBuf(LGRID);
+      const dt = Math.min(0.1, Math.max(0, t - lgLast)); lgLast = t;
+      // a tap counts on a short, still release (each press reports a tap); holds and drags are the other toys
+      const taps = [];
+      for (const tp of inp.taps()) { if (inp.down) lgPress = { x: tp.x, y: tp.y, at: t, moved: 0, lx: tp.x, ly: tp.y }; else taps.push(tp); }
+      if (lgPress) {
+        if (inp.down && inp.inside) { lgPress.moved += Math.hypot(inp.x - lgPress.lx, inp.y - lgPress.ly); lgPress.lx = inp.x; lgPress.ly = inp.y; }
+        else { if (t - lgPress.at < 0.35 && lgPress.moved < 0.04) taps.push({ x: lgPress.x, y: lgPress.y }); lgPress = null; }
+      }
+      const held = inp.inside && inp.down;
+      if (legend === 'Phoenix') fire(t, dt, held, inp);
+      else if (legend === 'Dodo') console8(t, dt, taps, inp);
+      else blueprint(t, dt, held, taps, inp);
+      lgPresent();
+    }
+    // ---------- the Phoenix: a demoscene fire effect, Amiga-style fire rising through the bird, copper bars behind ----------
+    const FIREP = [0, 0, 0, 0x3c0404, 0x3c0404, 0x3c0404, 0x8a1004, 0x8a1004, 0x8a1004, 0xd03008, 0xd03008, 0xd03008, 0xff7010, 0xff7010, 0xff7010, 0xffb020, 0xffb020, 0xffb020, 0xffe060, 0xffe060, 0xffe060, 0xfff6c0, 0xfff6c0, 0xffffff];
+    const COPPER = [[0x2a0a5a, 0x5a2ab0, 0xa070f0, 0xe8d8ff], [0x0a2a5a, 0x1a64b0, 0x50b0f0, 0xd8f4ff], [0x4a0a3a, 0x9a1a7a, 0xe060c0, 0xffd8f4], [0x0a3a2a, 0x1a8a5a, 0x50e0a0, 0xd8ffec]];
+    const rnd3 = (x, y, n) => { let h = Math.imul(x * 374761393 + y * 668265263 + n * 2246822519, 1274126177); h ^= h >>> 13; h = Math.imul(h, 1103515245); return ((h >>> 8) & 1023) / 1024; };
+    // the bird's shape, drawn into a mask: 1 its body, 2 the lines of its feathers, 3 its eye, 4 its beak
+    function phoenixMask(M, R, cx, cy, sc, flap, fs, t) {
+      const put = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < R && y < R && (v > M[y * R + x] || v === 3)) M[y * R + x] = v; };
+      const disc = (x0, y0, r, v) => { for (let y = Math.floor(y0 - r); y <= y0 + r; y++) for (let x = Math.floor(x0 - r); x <= x0 + r; x++) if ((x - x0) ** 2 + (y - y0) ** 2 <= r * r) put(x, y, v); };
+      const cap = (x0, y0, x1, y1, r0, r1, line, v = 1) => {
+        const L = Math.hypot(x1 - x0, y1 - y0) || 1, n = Math.ceil(L * 1.5);
+        for (let q = 0; q <= n; q++) { const u = q / n, x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u; disc(x, y, Math.max(0.5, r0 + (r1 - r0) * u), v); }
+        if (line) for (let q = Math.floor(n * 0.35); q <= n * 0.9; q++) { const u = q / n; put(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, 2); }
+      };
+      const P = (x, y) => [cx + x * sc, cy + y * sc];
+      const C = (a, b, c2, d2, r0, r1, line, v) => { const [x0, y0] = P(a, b), [x1, y1] = P(c2, d2); cap(x0, y0, x1, y1, r0 * sc, r1 * sc, line, v); };
+      // wings spread wide and up, each of six long feathers from the shoulder
+      for (const s of [-1, 1]) {
+        C(s * 4, -6, s * 15, -15, 6, 4.5);
+        for (let k = 0; k < 6; k++) { const a = 0.06 + k * 0.19 + flap, L = 24 + 11 * Math.sin(k / 5 * Math.PI); C(s * 7, -8, s * (7 + Math.cos(a) * L), -8 - Math.sin(a) * L, 3.4, 1.4, true); }
+      }
+      // a tail of three long flames
+      for (let k = -1; k <= 1; k++) C(0, 8, k * 8 + Math.sin(t * 5 + k * 2) * 1.5, 30 + (k === 0 ? 4 : 0), 3, 1, true);
+      C(0, -8, fs * 2, -17, 3.6, 3.4, false, 5); C(0, 0, 0, 0, 7, 7, false, 5);
+      { const [x, y] = P(0, 0); for (let yy = Math.floor(y - 11 * sc); yy <= y + 11 * sc; yy++) for (let xx = Math.floor(x - 6.5 * sc); xx <= x + 6.5 * sc; xx++) if (((xx - x) / (6.5 * sc)) ** 2 + ((yy - y) / (11 * sc)) ** 2 <= 1) put(xx, yy, 5); }
+      { const [x, y] = P(fs * 2, -18); disc(x, y, 5 * sc, 5); }
+      for (let k = 0; k < 3; k++) C(fs * (1 - k), -22, -fs * (2 + k * 3), -31 + k * 2, 1.6, 0.6);
+      { const [x0, y0] = P(fs * 6, -17.5), [x1, y1] = P(fs * 12.5, -16.5); const n = 10; for (let q = 0; q <= n; q++) { const u = q / n; for (let w = -2.2 * (1 - u) * sc; w <= 2.2 * (1 - u) * sc; w += 0.5) put(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u + w, 4); } }
+      if (sc > 0.6) { const [x, y] = P(fs * 3.2, -19); put(x, y, 3); }
+    }
+    function fire(t, dt, held, inp) {
+      const R = lgB.R, d = lgB.d;
+      const cyc = t - ph.burnAt;
+      if (cyc > 4.2) {
+        const was = ph.heat;
+        ph.heat = Math.max(0, Math.min(1, ph.heat + (held ? dt / 1.6 : -dt)));
+        if (held && Math.floor(was * 8) !== Math.floor(ph.heat * 8)) c.sound.hit('noise', 0.05 + ph.heat * 0.15, { cutoff: 3000 + ph.heat * 4000, dur: 0.2 });
+        if (ph.heat >= 1) {
+          ph.burnAt = t; ph.heat = 0;
+          c.sound.hit('noise', 0.5, { cutoff: 1500, dur: 1.4 });
+          for (let k = 0; k < 5; k++) c.sound.note(home + ladder[k] + 12, { at: 2.2 + k * 0.12, dur: 0.6, vel: 0.12, wave: 'triangle' });
+          c.sound.note(home + 36, { at: 3.6, dur: 1, vel: 0.12, wave: 'triangle' });
+        }
+      }
+      const burning = cyc < 4.2, heat = Math.max(ph.heat, cyc < 0.9 ? 1 : 0);
+      if (!ph.F) { ph.F = new Float32Array(R * (R + 2)); ph.M = new Uint8Array(R * R); ph.n = 0; }
+      const F = ph.F, M = ph.M, n = ++ph.n, fs = facing > 0 ? -1 : 1, BX = 48, BY = 42;
+      // the bird (whole, burning away, gone to ash, or a chick rising from the ash)
+      M.fill(0);
+      const flap = Math.sin(t * (2 + heat * 7)) * (0.06 + heat * 0.08);
+      let showBird = true, line = -1;
+      if (burning && cyc < 0.9) line = 82 - (cyc / 0.9) * 76;
+      if (burning && cyc >= 0.9 && cyc < 2.2) showBird = false;
+      if (burning && cyc >= 2.2 && cyc < 3.4) { const u = (cyc - 2.2) / 1.2; phoenixMask(M, R, BX, 74 - u * 22, 0.22 + u * 0.38, Math.sin(t * 9) * 0.1, fs, t); showBird = false; }
+      if (showBird) phoenixMask(M, R, BX, BY, 1, flap, fs, t);
+      // the fire: seeded from the bird itself (and, as it burns, from all that is burning), rising and cooling
+      const seedHot = 150 + heat * 105;
+      for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
+        const i = y * R + x;
+        if (M[i] && (line < 0 || y < line)) { if (rnd3(x, y, n) < 0.55) F[i] = Math.max(F[i], seedHot * (0.7 + 0.3 * rnd3(y, x, n))); }
+        else if (M[i] && y >= line) { F[i] = 255; M[i] = 0; }
+      }
+      if (burning && cyc >= 0.9 && cyc < 3.4) for (let x = 30; x < 67; x++) { const top = 79 - Math.round(Math.sqrt(Math.max(0, 1 - ((x - 48) / 18) ** 2)) * 5); if (rnd3(x, 0, n) < 0.4) F[top * R + x] = Math.max(F[top * R + x], 120 + 80 * rnd3(x, 1, n)); }
+      const decay = 0.93 + heat * 0.04;
+      for (let y = 0; y < R - 1; y++) { const a = y * R, b = (y + 1) * R, c2 = Math.min(R - 1, y + 2) * R; for (let x = 1; x < R - 1; x++) {
+        const v = (F[b + x - 1] + F[b + x] + F[b + x + 1] + F[c2 + x]) * 0.25 * decay - 1.6 * rnd3(x, y, n);
+        F[a + x] = v > 0 ? v : 0;
+      } }
+      // the copper bars behind: four raster bars rising and falling in their own colours (reddening with the heat)
+      const sec = Math.floor(t) % 2 === 1, rows = ph.rows || (ph.rows = new Uint32Array(R));
+      for (let y = 0; y < R; y++) rows[y] = 0;
+      for (let k = 0; k < 4; k++) {
+        const cy = 36 + Math.sin(t * 1.1 + k * 1.6) * 28, hot = heat > 0.5 || (burning && cyc < 2.2);
+        for (let y = Math.floor(cy - 5); y <= cy + 5; y++) { if (y < 0 || y >= 80) continue; const lv = Math.min(3, Math.floor((1 - Math.abs(y - cy) / 5.5) * 4)); if (lv >= 0) rows[y] = ABGR((hot ? [0x3a0804, 0x8a1a08, 0xe05010, 0xffd0a0] : COPPER[k])[lv]); }
+      }
+      const BG = ABGR(0x05030c), STAR = ABGR(0x8a8ab0);
+      for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
+        const i = y * R + x, m = M[i];
+        if (m) {
+          const f = F[i];
+          const fi = Math.min(23, Math.floor(f / 256 * 24));
+          if (m === 1 && (M[i - 1] === 5 || M[i + 1] === 5 || M[i - R] === 5 || M[i + R] === 5)) { d[i] = ABGR(0x3a0602); continue; }
+          d[i] = m === 3 ? ABGR(0x200400) : m === 4 ? ABGR(0xffe060) : m === 2 ? ABGR(heat > 0.6 ? 0xffd040 : 0xe85a10) : ABGR(FIREP[Math.max(m === 5 ? 20 + Math.round(heat * 3) : 15 + Math.round(heat * 4), fi)]);
+          continue;
+        }
+        if (M[i - 1] || M[i + 1] || (i >= R && M[i - R]) || M[i + R]) { d[i] = ABGR(0x2a0402); continue; }
+        const fi = Math.min(23, Math.floor(F[i] / 256 * 24));
+        if (fi >= 3) { d[i] = ABGR(FIREP[fi]); continue; }
+        d[i] = y < 80 && rows[y] ? rows[y] : BG;
+      }
+      // its night: stars streaming past behind (a Night Page)
+      for (const [a, b2, c2] of embers) for (const oy of [0, 37]) { const x = Math.floor(((a * 96 - t * (6 + c2 * 14)) % 96 + 96) % 96), y = Math.floor((b2 * 76 + oy) % 76) + 2, i = y * R + x; if (d[i] === BG) d[i] = STAR; }
+      // the ash, and the ring of the rebirth
+      if (burning && cyc >= 0.9 && cyc < 3.4) for (let x = 30; x < 67; x++) { const top = 79 - Math.round(Math.sqrt(Math.max(0, 1 - ((x - 48) / 18) ** 2)) * 5); for (let y = top; y <= 80; y++) lpx(x, y, bay(x, y) < 0.35 ? ABGR(0x6a625a) : rnd3(x, y, Math.floor(t * 6)) < 0.05 ? ABGR(0xff8a20) : ABGR(0x2e2824)); }
+      if (burning && cyc > 3.4) { const rr = (cyc - 3.4) * 60; for (let k = 0; k < 160; k++) { const a = k / 160 * 6.283; lpx(BX + Math.cos(a) * rr, BY + Math.sin(a) * rr, ABGR(0xffffff)); lpx(BX + Math.cos(a) * (rr - 1), BY + Math.sin(a) * (rr - 1), ABGR(0xffd848)); } }
+      // the foot: a copper line, then its traits in a bobbing demo font, whole, a trait at a time
+      lrect(0, 81, R - 1, R - 1, BG);
+      for (let x = 0; x < R; x++) lpx(x, 81, flashName === 'Header Bar' && sec ? ABGR(0xffffff) : ABGR(hexRain(x * 4 + t * 120)));
+      const [lab, val] = LT[Math.floor(t / 2.8) % LT.length];
+      const wave = (str, y, cols) => { str = W(str).slice(0, 23); const x0 = Math.round(48 - (str.length * 4 - 1) / 2); for (let i = 0; i < str.length; i++) { const g = F3[str[i]]; if (!g) continue; const oy = Math.round(Math.sin(t * 5 + i * 0.7)); for (let r = 0; r < 5; r++) for (let q = 0; q < 3; q++) if (g[r * 3 + q] === '#') lpx(x0 + i * 4 + q, y + r + oy, cols[r]); } };
+      wave(lab, 83, (flashName === 'Title' && sec ? [0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff] : [0xb090f0, 0x9070e0, 0x7a58d0, 0x6448c0, 0x5038a8]).map(ABGR));
+      wave(val, 89, [0xffffff, 0xfff0a0, 0xffc848, 0xff8a20, 0xe04a10].map(ABGR));
+      if (flashName === 'Clock') { const secs = (clock0 + Math.floor(t)) % 86400; ltext3(two(Math.floor(secs / 3600)) + (sec ? ':' : ' ') + two(Math.floor(secs / 60) % 60), 2, 2, ABGR(0xc8c8f0)); }
+    }
+    const hexRain = v => { const h = ((v % 360) + 360) % 360 / 60, k = Math.floor(h), f = h - k, q = Math.round(255 * (1 - f)), p2 = Math.round(255 * f); return [[255, p2, 0], [q, 255, 0], [0, 255, p2], [0, q, 255], [p2, 0, 255], [255, 0, q]][k % 6].reduce((a, b2) => (a << 8) | b2, 0); };
+    // ---------- the Dodo: a handheld-console game in four greens ----------
+    // the dodo big on its island (a nest with its egg, rocks, the sea lapping), its page as the sky and the level's name,
+    // what it wears and holds drawn on it, its perch standing by the palm; drop it fruit and it waddles over and eats
+    function console8(t, dt, taps, inp) {
+      const R = lgB.R, d = lgB.d;
+      const G = screen === 'Black & White' ? [0x1c1c1c, 0x585858, 0xa8a8a8, 0xe8e8e8] : [0x0f380f, 0x306230, 0x8bac0f, 0x9bbc0f];
+      const P = G.map(ABGR), fcH = facing;   // facing Left (1): its beak points left
+      const GROUND = 58, PUFF = pose === 'Puffed Up' ? 2 : 0;
+      // (where it may stand: always whole in the frame, beak and tail)
+      const XMIN = () => facing > 0 ? (dd.face > 0 ? 28 : 23 + PUFF) : (dd.face > 0 ? 23 : 19 + PUFF), XMAX = () => facing > 0 ? (dd.face > 0 ? 44 - PUFF : 40) : (dd.face > 0 ? 40 - PUFF : 35);
+      for (const tp of taps) {
+        const x = tp.x * R, y = tp.y * R;
+        if (Math.abs(x - dd.x) < 12 && y > 30 && y < 62 && t - dd.jumpAt > 0.7) { dd.jumpAt = t; c.sound.note(home + ladder[0] + 12, { dur: 0.06, vel: 0.15, wave: 'square', cutoff: 2400 }); c.sound.note(home + ladder[4] + 12, { at: 0.06, dur: 0.12, vel: 0.15, wave: 'square', cutoff: 2400 }); }
+        else if (dd.fruits.length < 3) { dd.fruits.push({ x: Math.max(8, Math.min(56, x)), y: Math.max(4, Math.min(GROUND - 6, y)), vy: 0, at: t, kind: (dd.fed + dd.fruits.length) % 3 }); c.sound.note(home + ladder[5] + 12, { dur: 0.05, vel: 0.12, wave: 'square', cutoff: 2400 }); }
+      }
+      // the fruit falls to the sand; the dodo turns, waddles over, grabs it, gulps it down, a heart, a burp
+      for (const f of dd.fruits) { if (f.down) continue; f.vy += 260 * dt; f.y += f.vy * dt; if (f.y >= GROUND - 1) { f.y = GROUND - 1; f.vy = -f.vy * 0.45; if (Math.abs(f.vy) < 18) { f.down = true; f.vy = 0; } } }
+      const eat = t - dd.eatAt;
+      const target = dd.fruits.find(q => q.down);
+      let walking = false;
+      if (target && eat > 1.9) {
+        dd.face = target.x < dd.x ? 1 : -1;
+        const beakX = dd.x - dd.face * 22, dist = target.x - beakX;
+        if (Math.abs(dist) < 1.5 || (Math.abs(dist) < 9 && (dd.x <= XMIN() + 0.01 || dd.x >= XMAX() - 0.01))) {
+          dd.eatAt = t; dd.fed++; dd.fruits.splice(dd.fruits.indexOf(target), 1);
+          c.sound.note(home + ladder[2], { dur: 0.06, vel: 0.15, wave: 'square', cutoff: 2000 });
+          c.sound.note(home + ladder[0] - 12, { at: 0.4, dur: 0.18, vel: 0.15, wave: 'triangle' });
+          for (let k = 0; k < 3; k++) c.sound.note(home + ladder[2 + k * 2] + 12, { at: 0.85 + k * 0.07, dur: 0.08, vel: 0.12, wave: 'square', cutoff: 2400 });
+          c.sound.note(home + ladder[0] - 17, { at: 1.35, dur: 0.22, vel: 0.16, wave: 'square', cutoff: 500 });
+        } else { dd.x = Math.max(XMIN(), Math.min(XMAX(), dd.x + Math.sign(dist) * Math.min(Math.abs(dist), dt * 20))); walking = true; }
+      }
+      const sec = Math.floor(t) % 2 === 1;
+      // ---- the sky: its page ----
+      const SKY0 = 0, SEA = 22, SAND = 47;
+      const night = page === 'Night Page' || page === 'Fireworks';
+      for (let y = SKY0; y < SEA; y++) for (let x = 0; x < R; x++) {
+        let v = night ? (y < 10 ? 0 : 1) : 2;
+        if (page === 'Sky Bands') v = ((y - SKY0) >> 2) % 2 ? 2 : 3;
+        if (page === 'Sunset Page') v = y > 16 ? 3 : y > 10 ? (bay(x, y) < 0.5 ? 2 : 3) : 2;
+        if (page === 'Colour Bars' && y < 19) v = [3, 2, 1, 0, 3, 2, 1, 0][Math.floor(x / 8)];
+        d[y * R + x] = P[v];
+      }
+      const hr = ((clock0 + t) / 3600) % 24, clockSky = flashName === 'Clock', dayT = clockSky ? (hr >= 6 && hr < 18 ? (hr - 6) / 12 : ((hr + 6) % 24) / 12) : 0;
+      const sunX = clockSky ? Math.round(6 + dayT * 52) : facing > 0 ? 50 : 13, sunY = clockSky ? Math.round(14 - Math.sin(dayT * Math.PI) * 8) : 9;
+      const moonUp = page === 'Night Page' || (clockSky && !(hr >= 6 && hr < 18)), rays = !clockSky || sec;
+      if (night) {
+        for (const [a, b2] of embers) { const x = Math.floor(a * 63), y = SKY0 + 1 + Math.floor(b2 * 19); lpx(x, y, Math.sin(t * 2 + a * 9) > -0.3 ? P[3] : P[2]); }
+        if (page !== 'Fireworks' || moonUp) { for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= 16 && (x + 2) ** 2 + (y - 1) ** 2 > 9) lpx(sunX + x, sunY + y, P[3]); }
+        else for (let k = 0; k < 2; k++) { const ph2 = (t * 0.6 + k * 0.5) % 1, cx2 = k ? 16 : 46, cy2 = k ? 13 : 17, rr = ph2 * 9; if (ph2 < 0.75) for (let q = 0; q < 12; q++) { const a = q / 12 * 6.283; lpx(cx2 + Math.cos(a) * rr, cy2 + Math.sin(a) * rr, q % 2 ? P[3] : P[2]); } }
+      } else if (page === 'Sunset Page') {
+        for (let y = -9; y <= 0; y++) for (let x = -9; x <= 9; x++) if (x * x + y * y <= 81) lpx(32 + x, SEA - 1 + y, (y + 9) % 3 === 2 ? P[2] : P[3]);
+      }
+      if (!night && (page !== 'Sunset Page' || clockSky)) {
+        if (moonUp) { for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= 16 && (x + 2) ** 2 + (y - 1) ** 2 > 9) lpx(sunX + x, sunY + y, P[1]); }
+        else { for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) { const r = Math.hypot(x, y); if (r < 4.2) lpx(sunX + x, sunY + y, r < 3.2 ? P[3] : P[2]); }
+        if (rays) for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283 + t * 0.5; lpx(sunX + Math.cos(a) * 6.5, sunY + Math.sin(a) * 6.5, P[3]); } }
+        if (page !== 'Colour Bars') for (const [cx2, cy2, w] of [[10, 8, 9], [36, 6, 11], [58, 14, 7]]) { const x0 = ((cx2 + t * 3) % 72) - 8; for (let x = 0; x < w; x++) { lpx(x0 + x, cy2, P[3]); if (x > 1 && x < w - 2) lpx(x0 + x, cy2 - 1, P[3]); if (x > 2 && x < w - 3) lpx(x0 + x, cy2 - 2, P[3]); } }
+      }
+      if (page !== 'Sunset Page') { const vx = facing > 0 ? 40 : 24, top = 7, dark = night ? P[0] : P[1], edge = P[0];
+        for (let y = top; y < SEA; y++) { const hw = 3 + (y - top) * 1.25 + (y > SEA - 4 ? (y - SEA + 4) * 1.5 : 0); for (let x = Math.floor(vx - hw); x <= vx + hw; x++) lpx(x, y, Math.abs(x - vx) > hw - 1 ? edge : (x - vx) < -(y - top) * 0.4 && (x + y) % 2 ? P[2] : dark); }
+        for (let x = -2; x <= 2; x++) lpx(vx + x, top, P[3]); lpx(vx - 1, top + 1, P[3]); lpx(vx + 1, top + 1, P[2]);
+        for (const [ox, len] of [[-1, 6], [2, 4]]) for (let k = 0; k < len; k++) lpx(vx + ox + Math.round(Math.sin(k * 0.9) * 0.6) + (ox > 0 ? k * 0.4 : -k * 0.3), top + 2 + k, P[night ? 3 : 2]);
+        for (let k = 0; k < 4; k++) { const u = ((t * 0.25 + k / 4) % 1), r = 2 + u * 4, cx2 = vx + u * 10 * (facing > 0 ? 1 : -1), cy2 = top - 2 - u * 5; for (let y = -3; y <= 3; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= r * r) lpx(cx2 + x, cy2 + y, (x + y) > r * 0.4 ? P[night ? 1 : 2] : P[3]); } }
+      if (page === 'Snow Page') for (let k = 0; k < 14; k++) { const x = (k * 23 + Math.sin(t + k) * 2 + 64) % 64, y = SKY0 + ((k * 11 + t * 8) % 21); lpx(x, y, P[2]); lpx(x + 1, y, P[3]); }
+      if (page === 'Jungle') { for (const [x0, len] of [[3, 12], [9, 7], [55, 10], [61, 14]]) for (let y = SKY0; y < SKY0 + len; y++) { const x = x0 + Math.round(Math.sin(y * 0.5 + t) * 0.6); lpx(x, y, P[1]); if (y % 3 === 0) { lpx(x - 1, y, P[1]); lpx(x + 1, y + 1, P[2]); } } for (let x = 0; x < R; x++) { const h = 3 + Math.round(Math.abs(Math.sin(x * 0.35)) * 3); for (let y = SEA - h; y < SEA; y++) lpx(x, y, P[1]); } }
+      if (page === 'Cityline') for (let x = 0; x < R; x++) { const h = [6, 9, 4, 12, 7, 10, 5, 8][Math.floor(x / 8)]; for (let y = SEA - h; y < SEA; y++) lpx(x, y, (x % 8 > 0 && x % 8 < 7 && (y - SEA + h) % 3 === 1 && x % 2 === 0) ? P[3] : P[1]); }
+      if (page === 'Weather Map') { for (const [a, b2] of [[0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [2, 1], [3, 1]]) lpx(20 + a, 12 + b2, P[1]); ltext3('21', 26, 10, P[1]); }
+      // the sea, rolling in to the shore in bands
+      for (let y = SEA; y < SAND; y++) for (let x = 0; x < R; x++) { const w = (x + Math.round(t * 6) + y * 5) % 16; lpx(x, y, y === SEA ? P[2] : (w < 3 && (y - SEA) % 5 === 2) ? P[2] : P[1]); }
+      for (let x = 0; x < R; x++) { const fy = SAND - 1 + Math.round(Math.sin(x * 0.4 + t * 2.4) * 0.8 + Math.sin(t * 1.3) * 0.5); lpx(x, fy, P[3]); lpx(x, fy + 1, P[3]); }
+      // the sand, speckled
+      for (let y = SAND + 1; y < R; y++) for (let x = 0; x < R; x++) lpx(x, y, ((x * 7 + y * 13) % 29 === 0 || (y === SAND + 1 && x % 9 < 5)) ? P[1] : P[2]);
+      // the island's things: rocks, the palm with its perch beside it, and the nest with an egg (or its chick)
+      const back = facing > 0 ? 1 : -1, nx0 = back > 0 ? 11 : 52;   // the perch behind the dodo, the nest before its beak
+      const rock = (cx2, cy2, w, h) => { for (let y = -h; y <= 0; y++) for (let x = -w; x <= w; x++) if ((x / w) ** 2 + ((y + h * 0.4) / h) ** 2 <= 1.1) lpx(cx2 + x, cy2 + y, y === -h || Math.abs(x) === w ? P[0] : x < 0 && y < -h / 2 ? P[2] : P[1]); };
+      rock(back > 0 ? 3 : 60, 63, 4, 4); rock(back > 0 ? 35 : 28, 63, 2, 2);
+      // its perch, standing at the back of the island
+      const px0 = back > 0 ? 56 : 7, O = P[0], D = P[1], L = P[2], H = P[3];
+      const box = (x0, y0, x1, y1, f) => { for (let y = y0; y <= y1; y++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) lpx(x, y, (y === y0 || y === y1 || x === x0 || x === x1) ? O : f); };
+      if (perch === 'Branch') { for (let x = -6; x <= 6; x++) { lpx(px0 + x, GROUND + 1, O); lpx(px0 + x, GROUND, D); } lpx(px0 - 3, GROUND - 1, O); lpx(px0 + 2, GROUND - 1, O); lpx(px0 + 3, GROUND - 2, L); }
+      else if (perch === 'Ring Swing') { const sw = Math.round(Math.sin(t * 1.3) * 1.5); for (let y = 38; y <= GROUND; y++) { lpx(px0 - 6, y, O); lpx(px0 + 6, y, O); } for (let x = -6; x <= 6; x++) lpx(px0 + x, 38, O); for (let y = 39; y < 44; y++) lpx(px0 + sw * (y - 39) / 5, y, D); for (let k = 0; k < 20; k++) { const a = k / 20 * 6.283; lpx(px0 + sw + Math.cos(a) * 3.5, 47 + Math.sin(a) * 3.5, O); } }
+      else if (perch === 'Rope') { box(px0 - 7, 44, px0 - 6, GROUND, D); box(px0 + 6, 44, px0 + 7, GROUND, D); for (let x = -5; x <= 5; x++) lpx(px0 + x, 45 + Math.round(Math.sin((x + 5) / 10 * Math.PI) * 2), (x >> 1) % 2 ? L : O); }
+      else if (perch === 'Bird Bath') { box(px0 - 5, 44, px0 + 5, 46, H); box(px0 - 1, 46, px0 + 1, GROUND, L); box(px0 - 3, GROUND - 1, px0 + 3, GROUND, D); }
+      else if (perch === 'Ladder') { for (let y = 40; y <= GROUND; y++) { const w = (y - 40) * 0.3; lpx(px0 - w, y, O); lpx(px0 + w, y, O); if (y % 4 === 0 && y > 42) for (let x = -w; x <= w; x++) lpx(px0 + x, y, D); } }
+      else if (perch === 'Cage') { for (let k = 0; k < 20; k++) { const a = Math.PI + k / 19 * Math.PI; lpx(px0 + Math.cos(a) * 6, 46 + Math.sin(a) * 6, O); } for (let x = -6; x <= 6; x += 3) for (let y = 46 - Math.round(Math.sqrt(Math.max(0, 36 - x * x))); y <= GROUND; y++) lpx(px0 + x, y, O); for (let x = -6; x <= 6; x++) lpx(px0 + x, GROUND, D); }
+      else if (perch === 'Palm Frond') { for (let r = 0; r < 14; r++) { const x = px0 - 7 + r, y = GROUND - Math.round(Math.sin(r / 13 * Math.PI) * 3); lpx(x, y, O); if (r % 2) { lpx(x, y - 1, D); lpx(x + 1, y - 2, D); } } }
+      else if (perch === 'Fence Post') { box(px0 - 2, 44, px0 + 2, GROUND, L); lpx(px0, 43, O); for (let x = -7; x <= 7; x++) { if (Math.abs(x) > 2) { lpx(px0 + x, 48, O); lpx(px0 + x, 53, O); } } }
+      else if (perch === 'Teacup') { for (let y = 48; y <= GROUND; y++) { const w = 6 - Math.floor((y - 48) / 3); for (let x = -w; x <= w; x++) lpx(px0 + x, y, Math.abs(x) === w || y === GROUND ? O : y === 48 ? D : H); } for (let k = 0; k < 10; k++) { const a = -1.4 + k / 9 * 2.8; lpx(px0 + back * 7 + Math.cos(a) * 2.5 * back, 52 + Math.sin(a) * 2.5, O); } }
+      else if (perch === 'TV Aerial') { for (let y = 34; y <= GROUND; y++) lpx(px0, y, O); for (const [y, w] of [[35, 5], [39, 4], [43, 3]]) for (let x = -w; x <= w; x++) lpx(px0 + x, y, O); }
+      else if (perch === 'Treasure Chest') { box(px0 - 6, 50, px0 + 6, GROUND, D); box(px0 - 6, 47, px0 + 6, 50, L); lpx(px0, 51, H); lpx(px0, 52, H); for (let x = -5; x <= 5; x += 2) lpx(px0 + x, 46, sec ? H : L); }
+      // the nest, before its beak, with an egg in it (or its chick, With Chick)
+      { const pxm = facing > 0 ? 1 : 62, lean = facing > 0 ? 1 : -1;
+        for (let j = 0; j < 44; j++) { const x = pxm + lean * Math.round(Math.sin(j / 44 * 1.6) * 3), y = GROUND + 2 - j; lpx(x, y, P[0]); lpx(x + lean, y, j % 3 ? P[1] : P[0]); }
+        const tx0 = pxm + lean * 3, ty0 = GROUND - 42;
+        for (let f = 0; f < 7; f++) { const a = (lean > 0 ? -0.35 : Math.PI + 0.35) + lean * (f - 3) * 0.5 + Math.sin(t * 1.4 + f) * 0.05; for (let r = 1; r < 16; r++) { const x = tx0 + Math.cos(a) * r, y = ty0 + Math.sin(a) * r * 0.6 + r * r * 0.045, w = r > 2 && r < 14 ? (r < 9 ? 2 : 1) : 0; lpx(x, y - 1, P[0]); for (let q = 0; q < w; q++) lpx(x, y + q, P[1]); lpx(x, y + w, P[0]); if (r % 2 && w) lpx(x + lean, y + w + 1, P[0]); } }
+        for (const [a, b2] of [[-1, 1], [1, 2], [0, 3]]) { lpx(tx0 + a, ty0 + b2, P[0]); lpx(tx0 + a + 1, ty0 + b2, P[1]); } }
+      for (let x = -8; x <= 8; x++) for (let y = -1; y <= 3; y++) if ((x / 8.5) ** 2 + ((y - 1) / 3) ** 2 <= 1) lpx(nx0 + x, GROUND + y, (x + y * 2) % 3 === 0 || y === -1 ? O : (x * 3 + y) % 4 === 0 ? L : D);
+      if (pose === 'With Chick') { const hop = Math.max(0, Math.sin(t * 5)) * 1.5; for (let y = -4; y <= 0; y++) for (let x = -2; x <= 2; x++) if (x * x + (y + 2) ** 2 <= 5) lpx(nx0 + x, GROUND - 1 + y - hop, H); lpx(nx0 - back, GROUND - 4 - hop, O); lpx(nx0 - back * 3, GROUND - 3 - hop, L); }
+      else for (const ex of [-3, 3]) for (let y = -5; y <= 0; y++) for (let x = -3; x <= 3; x++) { const q = (x / 2.6) ** 2 + ((y + 2.5) / 3.2) ** 2; if (q <= 1) lpx(nx0 + ex + x, GROUND - 1 + y, q > 0.62 ? O : x < 0 && y < -3 ? H : x > 1 ? L : H); }
+      // ---- the sprites: fruit and the dodo, drawn in shades and then ringed in the darkest green ----
+      const spr = dd.spr || (dd.spr = new Int8Array(R * R)); spr.fill(-1);
+      const sp = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < R && y < R) spr[y * R + x] = v; };
+      for (const f of dd.fruits) { for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) if (x * x + y * y <= 8.5) sp(f.x + x, f.y - 3 + y, (x + y < -2 && x * x + y * y > 1) ? 3 : f.kind === 1 ? 2 : 1); sp(f.x, f.y - 7, 0); sp(f.x, f.y - 8, 0); sp(f.x + 1, f.y - 8, 2); sp(f.x + 2, f.y - 9, 2); }
+      const fc = dd.face, jump = t - dd.jumpAt < 0.6 ? Math.sin((t - dd.jumpAt) / 0.6 * Math.PI) * 9 : 0;
+      const dance = pose === 'Dancing' ? Math.max(0, Math.sin(t * 6.2)) * 2 : 0;
+      const dip = eat < 0.3 ? Math.sin(eat / 0.3 * Math.PI / 2) : eat < 0.55 ? 1 - (eat - 0.3) / 0.25 : 0;
+      const preen = pose === 'Preening' && (t % 5) > 3.6 && eat > 1.9 ? Math.sin(((t % 5) - 3.6) / 1.4 * Math.PI) : 0;
+      const step = walking ? Math.floor(t * 10) % 2 : pose === 'Dancing' ? Math.floor(t * 6.2 / Math.PI) % 2 : 0, bx = dd.x, by = GROUND - 4 - jump - dance;
+      const Ld = (x, y, v) => sp(bx - fc * x, by + y, v);   // the dodo's own coordinates: x forward (toward its beak), y down
+      const puff = pose === 'Puffed Up' ? 2 : 0;
+      // stout legs, the great round body (lighter back and belly), a stubby wing; a curled white tail
+      for (const [lx, up] of [[-4, step], [2, 1 - step]]) { for (let k = 0; k < 5; k++) { Ld(lx, -k - up + 4, 1); Ld(lx + 1, -k - up + 4, 1); } Ld(lx + 2, 4 - up, 1); Ld(lx - 1, 4 - up, 1); }
+      for (let y = -17 - puff; y <= 0; y++) for (let x = -14 - puff; x <= 11 + puff; x++) { const u = (x + 1.5) / (12.5 + puff), v = (y + 8) / (9 + puff * 0.6); if (u * u + v * v <= 1) Ld(x, y, v > 0.5 || (u < -0.75 && v > 0) ? 2 : 3); }
+      if (pose === 'Wing Stretch') { const fl = Math.sin(t * 3) * 1.5; for (let k = 0; k < 12; k++) for (let w = 0; w < 4 - k * 0.25; w++) Ld(-2 - k * 0.6 - w * 0.3, -11 - k - fl * k / 12 + w, k > 8 ? 2 : w < 1 ? 0 : 3); }
+      else for (let k = 0; k < 7; k++) { Ld(-3 + k, -9 + (k > 4 ? 1 : 0), 0); if (k > 1 && k < 6) Ld(-3 + k, -8 + (k > 4 ? 1 : 0), 2); }
+      for (const [a, b2] of [[-15, -12], [-16, -13], [-17, -14], [-17, -15], [-16, -16], [-15, -16], [-14, -15], [-15, -11], [-16, -10]]) Ld(a - puff, b2, 3);
+      // the head on a short neck, the bare pale face round the eye, the great hooked beak
+      const cock = pose === 'Head Cocked' ? 1 : 0;
+      const hy = -20 + dip * 17 + preen * 8 - cock * 2, hx = 7 + dip * 4 - preen * 10 - cock;
+      for (let y = -6; y <= 6; y++) for (let x = -6; x <= 6; x++) if (x * x + y * y <= 30) Ld(hx + x, hy + y, 3);
+      for (let y = Math.min(hy, -13); y < -12; y++) for (let x = 3; x <= 9; x++) Ld(x + (hx - 7) * Math.min(1, (y + 12) / (hy + 12 || -1)), y, 3);
+      for (let y = -2; y <= 2; y++) for (let x = -1; x <= 3; x++) if ((x - 1) ** 2 + y * y <= 5) Ld(hx + x, hy - 1 + y - cock, 2);
+      Ld(hx + 1, hy - 1 - cock, 0); Ld(hx + 2, hy - 2 - cock, 3);
+      const beakOpen = eat > 0.2 && eat < 0.3 ? 1 : 0;
+      for (let k = 0; k < 10; k++) { const top = k < 7 ? -3 : -3 + (k - 6); for (let y = top; y <= 1 - (k > 7 ? 1 : 0); y++) Ld(hx + 5 + k, hy + y + 1 - (y < 0 ? beakOpen : 0), y < 0 ? 2 : 1); }
+      Ld(hx + 15, hy + 1, 1); Ld(hx + 15, hy + 2, 1); Ld(hx + 14, hy + 3, 1); Ld(hx + 8, hy - 1, 0); for (let k = 0; k < 7; k++) Ld(hx + 6 + k, hy + 1, 0);
+      // the gulp: a lump sliding down its neck into its body
+      if (eat > 0.55 && eat < 1) { const u = (eat - 0.55) / 0.45; for (let a = 0; a < 2; a++) for (let b2 = 0; b2 < 2; b2++) Ld(6 + a - u * 3, -14 + u * 8 + b2, 2); }
+      // what it wears on its head and round its neck, and holds in its beak
+      const hat = (x, y, v) => Ld(hx + x, hy + y, v);
+      if (headwear === 'Party Hat') { for (let r = 0; r < 7; r++) for (let x = -3 + Math.floor(r / 2); x <= 3 - Math.floor(r / 2); x++) hat(x, -5 - r, r % 2 ? 1 : 3); hat(0, -12, 3); hat(0, -13, 2); }
+      else if (headwear === 'Pirate Bandana') { for (let x = -5; x <= 5; x++) { hat(x, -4, 0); hat(x, -5, x % 2 ? 0 : 1); } hat(-6, -3, 0); hat(-7, -2, 0); hat(-7, -4, 0); }
+      else if (headwear === 'Bow') { for (const [a, b2] of [[-2, -6], [-3, -7], [-3, -5], [-1, -6], [1, -6], [2, -7], [2, -5], [0, -6], [3, -6], [-4, -6]]) hat(a, b2, b2 === -6 && Math.abs(a) < 2 ? 0 : 1); }
+      else if (headwear === 'Sailor Cap') { for (let y = -8; y <= -5; y++) for (let x = -4 + (y === -8 ? 1 : 0); x <= 4 - (y === -8 ? 1 : 0); x++) hat(x, y, y === -5 ? 0 : 2); hat(5, -5, 0); hat(6, -5, 0); }
+      else if (headwear === 'Fez') { for (let y = -10; y <= -5; y++) for (let x = -3 + (y < -8 ? 1 : 0); x <= 3 - (y < -8 ? 1 : 0); x++) hat(x, y, 0); for (let k = 0; k < 4; k++) hat(-3 - (k > 1 ? 1 : 0), -10 + k, 2); }
+      else if (headwear === 'Top Hat') { for (let y = -14; y <= -6; y++) for (let x = -3; x <= 3; x++) hat(x, y, y === -8 ? 2 : 0); for (let x = -5; x <= 5; x++) hat(x, -5, 0); }
+      else if (headwear === 'Crown') { for (let x = -4; x <= 4; x++) { hat(x, -5, 2); hat(x, -6, 2); } for (const x of [-4, 0, 4]) { hat(x, -7, 2); hat(x, -8, 2); } hat(0, -6, 0); }
+      else if (headwear === 'Halo') { for (let k = 0; k < 20; k++) { const a = k / 20 * 6.283; hat(Math.round(Math.cos(a) * 5), -10 + Math.round(Math.sin(a) * 1.4), 3); } }
+      const nk = (x, y, v) => Ld(5 + x, -11 + y, v);
+      if (neckwear === 'Bow Tie') { for (const [a, b2] of [[0, 0], [-1, -1], [-1, 0], [-1, 1], [1, -1], [1, 0], [1, 1], [-2, -1], [-2, 1], [2, -1], [2, 1], [-2, 0], [2, 0]]) nk(a, b2, a === 0 ? 0 : 1); }
+      else if (neckwear === 'Bead Necklace' || neckwear === 'Pearls') { for (let k = 0; k < 6; k++) nk(-4 + k * 1.4, Math.round(Math.sin(k / 5 * Math.PI) * 2), neckwear === 'Pearls' ? 2 : k % 2 ? 1 : 0); }
+      else if (neckwear === 'Bandana') { for (let r = 0; r < 4; r++) for (let x = -3 + r; x <= 3 - r; x++) nk(x, r, r === 0 ? 0 : 1); }
+      else if (neckwear === 'Bell Collar') { for (let x = -4; x <= 3; x++) nk(x, 0, 0); for (const [a, b2] of [[0, 1], [-1, 2], [0, 2], [1, 2], [0, 3]]) nk(a, b2, 1); }
+      else if (neckwear === 'Medal') { nk(-1, 0, 0); nk(0, 1, 0); nk(1, 0, 0); for (const [a, b2] of [[0, 2], [-1, 3], [0, 3], [1, 3], [0, 4]]) nk(a, b2, 1); }
+      if (holding !== 'Nothing' && eat > 1.9 && dip === 0) {
+        const it = (x, y, v) => Ld(hx + 13 + x, hy + 4 + y, v), k = holding;
+        if (k === 'Cracker' || k === 'Letter' || k === 'Remote') { for (let y = 0; y <= 3; y++) for (let x = -2; x <= 2; x++) it(x, y, (k === 'Letter' && y === Math.abs(x) - 0) || (k === 'Remote' && x === 0 && y % 2) ? 0 : 3); }
+        else if (k === 'Key') { for (const [a, b2] of [[0, 0], [1, 0], [0, 1], [1, 1], [0, 2], [0, 3], [0, 4], [1, 4], [1, 3]]) it(a, b2, 3); }
+        else if (k === 'Bell') { for (const [a, b2] of [[0, 0], [-1, 1], [0, 1], [1, 1], [-1, 2], [0, 2], [1, 2], [-2, 3], [-1, 3], [0, 3], [1, 3], [2, 3], [0, 4]]) it(a, b2, b2 === 4 ? 0 : 3); }
+        else if (k === 'Grapes' || k === 'Cherry') { for (const [a, b2] of (k === 'Grapes' ? [[-1, 1], [1, 1], [0, 2], [-1, 3], [1, 3], [0, 4]] : [[-1, 3], [1, 3]])) { it(a, b2, 2); } it(0, 0, 0); it(0, 1, 0); }
+        else if (k === 'Chili') { for (let q = 0; q < 5; q++) it(q - 2, Math.round(Math.sin(q / 4 * Math.PI) * 1.5) + 1, q === 0 ? 0 : 2); }
+        else for (let y = 0; y <= 3; y++) for (let x = -2; x <= 2; x++) if (x * x + (y - 1.5) ** 2 <= (k === 'Seed' ? 2 : 4.5)) it(x, y, k === 'Gold Coin' ? (x + y < 0 ? 3 : 2) : k === 'Strawberry' && (x + y) % 2 ? 3 : 2);
+      }
+      for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
+        const v = spr[y * R + x];
+        if (v >= 0) { d[y * R + x] = P[v]; continue; }
+        if ((x > 0 && spr[y * R + x - 1] >= 0) || (x < R - 1 && spr[y * R + x + 1] >= 0) || (y > 0 && spr[(y - 1) * R + x] >= 0) || (y < R - 1 && spr[(y + 1) * R + x] >= 0)) d[y * R + x] = P[0];
+      }
+      // after the gulp: a heart floats up off its head, then a burp
+      const headX = Math.round(bx - fc * hx), headY = Math.round(by + hy);
+      if (eat > 0.85 && eat < 1.7) { const u = (eat - 0.85) / 0.85, x = headX, y = Math.round(headY - 9 - u * 8); ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'].forEach((row, r) => { for (let q = 0; q < 7; q++) if (row[q] === '#') lpx(x - 3 + q, y + r, P[0]); }); lpx(x - 2, y + 1, P[3]); }
+      if (eat > 1.35 && eat < 1.9) { const u = (eat - 1.35) / 0.55, bxk = Math.round(bx - fc * (hx + 17)), r = 1 + u * 3; for (let q = 0; q < 10; q++) { const a = q / 10 * 6.283; lpx(bxk + Math.cos(a) * r, headY + Math.sin(a) * r, P[0]); } ltext3('BURP', fc > 0 ? Math.max(0, bxk - 16) : Math.min(R - 16, bxk + 2), headY - 9, P[0]); }
+      // no header: a flashing Title blinks the game's name small in the corner of the sky, a flashing Header Bar a line along the top
+      if (flashName === 'Title' && sec) ltext3('DODO', back > 0 ? 46 : 2, 2, P[0]);
+      if (flashName === 'Header Bar' && sec) for (let x = 0; x < R; x++) lpx(x, 0, P[0]);
+    }
+    // ---------- the Clockwork bird: a blueprint, its patent drawing ----------
+    // white line on Prussian blue: the bird (FIG. 1) as one bold solid shape on its perch, and beside it (FIG. 2) an
+    // exploded view of its gear train along a dashed axis, with dimension arrows, numbered parts and a title block
+    function blueprint(t, dt, held, taps, inp) {
+      const R = lgB.R, d = lgB.d;
+      const BW = screen === 'Black & White';
+      const BG = ABGR(BW ? 0x303030 : 0x153f72), GRID = ABGR(BW ? 0x3c3c3c : 0x1d4c84), WH = ABGR(BW ? 0xf4f4f4 : 0xf2f7ff), LI = ABGR(BW ? 0xa8a8a8 : 0x8ab4e4), DK = ABGR(BW ? 0x202020 : 0x0c2c56);
+      // winding: circle the finger round the drawing; a short still tap gives one notch; let go and it sings until it runs down
+      for (const tp of taps) { cw.wind = Math.min(1, cw.wind + 0.05); c.sound.hit('click', 0.16); }
+      if (held) {
+        const a = Math.atan2(inp.y * R - 40, inp.x * R - 40);
+        if (cw.ang !== null) { let da = a - cw.ang; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; if (Math.abs(da) < 1.2) { cw.acc += Math.abs(da); cw.spin += Math.abs(da); } if (cw.acc > Math.PI / 4) { cw.acc = 0; cw.wind = Math.min(1, cw.wind + 0.07); c.sound.hit('click', 0.14); c.sound.note(home + 31 + Math.round(cw.wind * 7), { dur: 0.02, vel: 0.05, wave: 'square', cutoff: 4000 }); } }
+        cw.ang = a;
+      } else {
+        cw.ang = null;
+        if (cw.wind > 0) {
+          cw.wind = Math.max(0, cw.wind - dt * 0.07); cw.spin += dt * (2.5 + cw.wind * 10);
+          if (t >= cw.nextAt) { cw.nextAt = t + 0.18 / Math.max(0.3, Math.min(1, cw.wind * 2.5)); cw.noteAt = t; const dg = MEL[cw.step % MEL.length]; cw.step++; cw.notes.push([t, dg]); c.sound.note(home + ladder[dg] + 24, { dur: 0.5, vel: 0.12, wave: 'sine' }); }
+        }
+      }
+      cw.notes = cw.notes.filter(n => t - n[0] < 2.2);
+      if (Math.floor(t * 2) !== cw.tick) { cw.tick = Math.floor(t * 2); cw.spin += 0.16; }   // the escapement: a tick every half second
+      const sing = cw.wind > 0 && cw.ang === null, since = t - cw.noteAt, pose3 = !sing ? 0 : since < 0.09 ? 2 : since < 0.2 ? 1 : 0, gape = pose3;
+      const fx = x => facing > 0 ? x : R - 1 - x;      // facing Right: the sheet drawn in mirror
+      const P = (x, y, c2) => lpx(fx(x), y, c2);
+      const line = (x0, y0, x1, y1, c2, dash) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) || 1; for (let k = 0; k <= n; k++) if (!dash || (k % 6) < (dash === 2 ? 1 : 4)) P(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), c2); };
+      const arrow = (x, y, dx, dy, c2) => { P(x, y, c2); P(x - dx - dy, y - dy + dx, c2); P(x - dx + dy, y - dy - dx, c2); };
+      // the sheet: blue, a fine grid, a border rule
+      for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) d[y * R + x] = (x % 8 === 0 || y % 8 === 0) ? GRID : BG;
+      for (let k = 1; k < R - 1; k++) { lpx(k, 1, LI); lpx(k, R - 2, LI); lpx(1, k, LI); lpx(R - 2, k, LI); }
+      const Q = (x, y, c2) => P(x + 3, y, c2), lineQ = (x0, y0, x1, y1, c2, dash) => line(x0 + 3, y0, x1 + 3, y1, c2, dash), arrowQ = (x, y, dx, dy, c2) => arrow(x + 3, y, dx, dy, c2);
+      // FIG. 1, the bird: one solid shape (body, head, fan tail, wing raised when it sings), the perch and its bracket
+      const S = cw.S || (cw.S = new Uint8Array(R * R)); S.fill(0);
+      const sv = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < R && y < R) S[y * R + x] = Math.max(S[y * R + x], v); };
+      const ell = (cx2, cy2, rx, ry, v) => { for (let y = Math.floor(cy2 - ry); y <= cy2 + ry; y++) for (let x = Math.floor(cx2 - rx); x <= cx2 + rx; x++) if (((x - cx2) / rx) ** 2 + ((y - cy2) / ry) ** 2 <= 1) sv(x, y, v); };
+      const bob = sing ? (Math.floor(t * 8) % 2) : 0, by = 36 + bob;
+      for (let k = 0; k < 5; k++) { const a = 0.35 + k * 0.2 + (sing ? Math.sin(t * 7 + k) * 0.05 : 0); for (let r = 0; r < 17; r++) for (let w = -1; w <= 1; w++) sv(30 + Math.cos(a) * r - Math.sin(a) * w * (1 + r / 12), by + 3 + Math.sin(a) * r + Math.cos(a) * w * (1 + r / 12), 1); }
+      ell(22, by, 11, 8, 1);
+      ell(13, by - 9, 6, 6, 1);
+      { const open = [0, 0.45, 0.95][pose3];
+        for (let x = 0; x <= 8; x++) { const top = by - 12 + (8 - x) * 0.35, bot = by - 9.5 + (8 - x) * 0.1; for (let y = Math.round(top); y <= Math.round(bot); y++) sv(8 - x, y, 2); }
+        for (let x = 0; x <= 8; x++) { const yc = by - 8 + (8 - x) * open + x * 0.05; sv(8 - x, yc, 2); if (x > 2) sv(8 - x, yc + 1, 2); } }
+      const wa = [-0.25, -0.75, -1.25][pose3];
+      for (let r = 0; r < 15; r++) for (let w = -2.5 + r * 0.12; w <= 2.5 - r * 0.12; w++) sv(20 + Math.cos(wa) * r - Math.sin(wa) * w, by - 3 + Math.sin(wa) * r + Math.cos(wa) * w, 3);
+      for (let k = 0; k < 3; k++) for (let j = 0; j < 5; j++) sv(14 + k * 2 + (j % 2), by - 15 - j, 1);
+      // perch and legs
+      for (let x = 6; x < 40; x++) { Q(x, 48, WH); Q(x, 49, WH); }
+      lineQ(10, 50, 10, 58, WH); lineQ(7, 58, 13, 58, WH); lineQ(10, 54, 16, 50, LI);
+      lineQ(19, by + 7, 18, 47, WH); lineQ(25, by + 7, 26, 47, WH);
+      for (let y = 0; y < R; y++) for (let x = 0; x < 46; x++) {
+        const v = S[y * R + x]; if (!v) continue;
+        Q(x, y, v === 2 ? LI : WH);
+      }
+      for (let y = 1; y < R - 1; y++) for (let x = 1; x < 46; x++) { const i = y * R + x; if (S[i] === 3 && (!S[i - 1] || S[i - 1] !== 3 || !S[i - R] || S[i - R] !== 3)) Q(x, y, DK); }
+      // in its body a window: the gear that turns its heart, and the eye a lens
+      { const gx = 23, gy = by + 2, ga = cw.spin * 2; for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) { const r = Math.hypot(x, y), a = Math.atan2(y, x); if (r <= 2.6 + (Math.cos((a - ga) * 6) > 0.3 ? 1.2 : 0) && r > 1) Q(gx + x, gy + y, DK); } }
+      { const ex = 12, ey = by - 10; for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= 5) Q(ex + x, ey + y, DK); Q(ex, ey, WH); }
+      // the key in its back, turning
+      { const kc = Math.cos(cw.spin * 1.5); lineQ(30, by - 6, 34, by - 10, WH); for (const s of [-1, 1]) for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= 4) Q(35 + s * 2.5 * kc + x * Math.max(0.35, Math.abs(kc)), by - 12 + y, WH); }
+      // its song: notes drifting up off the beak
+      for (const [nt, dg] of cw.notes) { const u = t - nt, x = Math.round(4 + u * 10 + Math.sin(u * 5 + dg) * 2), y = Math.round(by - 14 - u * 22 - dg); if (y > 9) { for (let b2 = -2; b2 <= 2; b2++) for (let a = -2; a <= 2; a++) if (a * a + b2 * b2 <= 5) Q(x + a, y + b2, a * a + b2 * b2 > 3.5 ? DK : WH); for (let k = 0; k < 9; k++) { Q(x + 2, y - k, WH); Q(x + 3, y - k, DK); } Q(x + 3, y - 8, WH); Q(x + 4, y - 7, WH); Q(x + 5, y - 6, WH); Q(x + 5, y - 5, WH); } }
+      // dimension arrows: the bird's length under the perch, its height beside it
+      lineQ(6, 59, 40, 59, LI); arrowQ(6, 59, -1, 0, LI); arrowQ(40, 59, 1, 0, LI); lineQ(6, 57, 6, 61, LI); lineQ(40, 57, 40, 61, LI);
+      ltext3('42', facing > 0 ? 23 : R - 1 - 23 - 6, 52, LI);
+      // FIG. 2, the exploded gear train along a dashed axis: the mainspring (coiled tighter as it is wound), three gears
+      // meshing (each turning its own way at its own speed), the key; numbered parts with leader lines
+      const AX = 60;
+      line(AX, 6, AX, 58, LI, 2);
+      line(40, by - 10, AX - 8, 12, LI, 1);
+      const gear = (cx2, cy2, r, teeth, a0) => {
+        for (let y = Math.floor(cy2 - r - 2); y <= cy2 + r + 2; y++) for (let x = Math.floor(cx2 - r - 2); x <= cx2 + r + 2; x++) {
+          const dx = x - cx2, dy = y - cy2, rr = Math.hypot(dx, dy), a = Math.atan2(dy, dx), tooth = Math.cos((a - a0) * teeth) > 0.2;
+          if (rr <= r + (tooth ? 2 : 0) && rr > 1.6) { const spoke = rr < r - 2 && rr > 2.6 && Math.cos((a - a0) * 3) < 0.4; P(x, y, spoke ? BG : WH); }
+        }
+        P(cx2, cy2, WH);
+      };
+      const sp = cw.spin;
+      gear(AX, 24, 10, 12, sp * 0.8);
+      gear(AX + 2, 46, 8, 9, -sp * 0.8 * 12 / 9 + 0.25);
+      // the mainspring, a spiral, drawn tighter the more it is wound
+      { const turns = 2 + cw.wind * 3, cx2 = AX, cy2 = 7; for (let k = 0; k < 120; k++) { const u = k / 120, a = u * turns * 6.283 + sp, r = 0.6 + u * 3.6; P(Math.round(cx2 + Math.cos(a) * r * 1.4), Math.round(cy2 + Math.sin(a) * r * 0.8), WH); } }
+      // reference numerals in circles, on leader lines
+      const balloon = (x, y, n, lx, ly) => { line(x, y, lx, ly, LI); for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283; P(Math.round(x + Math.cos(a) * 3.5), Math.round(y + Math.sin(a) * 3.5), LI); } ltext3(String(n), fx(x) - 1, y - 2, WH); };
+      balloon(73, 9, 1, AX + 5, 7); balloon(75, 26, 2, AX + 12, 24); balloon(75, 44, 3, AX + 11, 46);
+      // the winding: a dimension arc round FIG. 2, filled as far as it is wound
+      { const n = Math.round(cw.wind * 48); for (let k = 0; k <= 48; k++) { const a = -Math.PI / 2 + k / 48 * 6.283, on = k < n; for (const dr of on ? [0, 1] : [0]) { const x = Math.round(AX + Math.cos(a) * (16 + dr)), y = Math.round(30 + Math.sin(a) * (26 + dr)); if (on || k % 4 === 0) P(x, y, on ? WH : LI); } } if (n) { const a = -Math.PI / 2 + n / 48 * 6.283; P(Math.round(AX + Math.cos(a) * 18.5), Math.round(30 + Math.sin(a) * 28.5), WH); P(Math.round(AX + Math.cos(a) * 14), Math.round(30 + Math.sin(a) * 24), WH); } }
+      // the labels, and the title block: the bird's name, and its traits, whole, one at a time
+      const sec = Math.floor(t) % 2 === 1;
+      const txt = (s, x, y, c2) => { s = W(s); for (let i = 0; i < s.length; i++) { const g2 = F3[s[i]]; if (!g2) continue; for (let r = 0; r < 5; r++) for (let q = 0; q < 3; q++) if (g2[r * 3 + q] === '#') lpx(x + i * 4 + q, y + r, c2); } };
+      txt('FIG.1', facing > 0 ? 4 : R - 24, 4, flashName === 'Title' && sec ? LI : WH);
+      txt('FIG.2', facing > 0 ? 58 : 3, 57, WH);
+      const TB = 63;
+      for (let x = 2; x < R - 2; x++) { lpx(x, TB, flashName === 'Header Bar' && sec ? WH : LI); }
+      const [lab, val] = LT[Math.floor(t / 2.8) % LT.length];
+      const v = W(val).slice(0, 19), l2 = W(lab) + ' ' + v;
+      // the title block: the name in big blueprint capitals, the sheet's number, and its traits as the drawing's notes, whole
+      ltext5('CLOCKWORK', 4, TB + 2, flashName === 'Title' && sec ? LI : WH);
+      const li = Math.floor(t / 2.8) % LT.length; txt((li + 1) + '/' + LT.length, R - 16, TB + 3, LI);
+      for (let y = TB; y < TB + 10; y++) lpx(R - 19, y, LI);
+      txt(l2.length <= 19 ? l2 : v, 4, TB + 10, LI);
+      if (flashName === 'Clock') { const secs = clock0 + t, cx2 = facing > 0 ? 72 : 7, cy2 = 72; for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283; lpx(Math.round(cx2 + Math.cos(a) * 4), Math.round(cy2 + Math.sin(a) * 4), sec ? WH : LI); } const ha = (secs / 3600 % 12) / 12 * 6.283 - Math.PI / 2, ma = (secs / 60 % 60) / 60 * 6.283 - Math.PI / 2; for (let r = 0; r <= 2; r++) lpx(Math.round(cx2 + Math.cos(ha) * r), Math.round(cy2 + Math.sin(ha) * r), WH); for (let r = 0; r <= 3; r++) lpx(Math.round(cx2 + Math.cos(ma) * r), Math.round(cy2 + Math.sin(ma) * r), WH); }
+    }
     const two = n => (n < 10 ? '0' : '') + n;
     function show(t) {
       // the page, wiping in row by row after a flip, then the bird over it
@@ -661,9 +1092,10 @@ Proto.add({
       if (screen === 'Ghosting') { cx.globalAlpha = 0.2; cx.drawImage(cx.canvas, 0, 0, S, S, Math.round(S * 0.014), 0, S, S); cx.globalAlpha = 1; }
       if (scan) cx.drawImage(scan, 0, 0);
     }
-    show(0);
+    if (legend !== 'None') legendFrame(0, c.input); else show(0);
     return (t) => {
       const inp = c.input;
+      if (legend !== 'None') { legendFrame(t, inp); return; }   // a legendary is drawn in a medium of its own
       hov = inp.inside ? [inp.x * X, inp.y * Yn] : null;
       for (const beat of inp.taps()) {
         // the coloured links flip the page

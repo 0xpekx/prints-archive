@@ -161,6 +161,540 @@ Proto.add({
     if (backlit) c.trait('Screen Light', 'Backlit');
     if (brolly) c.trait('Holding', 'Tiny Umbrella');
     if (leg !== 'None') c.trait('Legendary', leg);
+    // the legendaries drawn as 1/1 pictures of their own (legendPond, below); every other frog is drawn as before.
+    // A type left out of this list falls back to the older drawing further down.
+    const ONE_OF_ONE = ['Full Colour', 'Axolotl', 'Stone Idol'];
+    if (ONE_OF_ONE.includes(leg)) return legendPond();
+
+    // ---------- the legendaries: each its own full-colour 1/1 on the same 32-dot screen ----------
+    function legendPond() {
+      const cel = Math.max(1, Math.floor(S / G)), of = Math.floor((S - cel * G) / 2);
+      const gp = cel >= 6 ? Math.max(1, Math.round(cel / 14)) : 0;
+      const g = c.ctx;
+      const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+      const th = (x, y) => (B4[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+      const hv = (x, y, k) => { let h = Math.imul(x + 97, 0x9e3779b1) ^ Math.imul(y + 61, 0x85ebca6b) ^ Math.imul(k + 7, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+      // a few draws of its own for the small things that vary, from the legendary stream
+      const lv = [];
+      for (let i = 0; i < 24; i++) lv.push(xo());
+      const buf = new Array(G * G).fill('#000'), shownL = new Array(G * G).fill('');
+      const put = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < G && y < G) buf[y * G + x] = col; };
+      const at = (x, y) => (x >= 0 && y >= 0 && x < G && y < G) ? buf[y * G + x] : null;
+      const inE = (x, y, cx, cy, rx, ry) => ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1;
+      const GAP = leg === 'Stone Idol' ? '#0c0a08' : '#06080c';
+      let shake = 0, lastShake = 0, fresh = true;
+      g.fillStyle = GAP; g.fillRect(0, 0, S, S);
+      const paintL = () => {
+        if (shake !== lastShake) { fresh = true; lastShake = shake; g.fillStyle = GAP; g.fillRect(0, 0, S, S); }
+        for (let i = 0; i < G * G; i++) {
+          if (!fresh && shownL[i] === buf[i]) continue;
+          shownL[i] = buf[i];
+          g.fillStyle = buf[i];
+          g.fillRect(of + shake * cel + (i % G) * cel + gp, of + Math.floor(i / G) * cel + gp, cel - gp, cel - gp);
+        }
+        fresh = false;
+      };
+      const tapsNow = () => c.input.taps().map(p => [Math.floor((p.x * S - of) / cel), Math.floor((p.y * S - of) / cel)]);
+      // the pointer in dots (only the large view has one; tiles get a still one that is never inside)
+      const ptr = () => { const i = c.input; return { x: (i.x * S - of) / cel, y: (i.y * S - of) / cel, in: i.inside, down: i.inside && i.down }; };
+      // a tap that is only a tap: the gallery sends one on every press, so for the toys that also hold or drag, a tap
+      // counts on a short, still release (or a press and release inside one frame)
+      let pressT = -1, pressP = null, pressMoved = 0;
+      const pressNow = t => {
+        const p = ptr(), click = [], down = tapsNow();
+        if (down.length) { if (p.down) { pressT = t; pressP = down[down.length - 1]; pressMoved = 0; } else click.push(...down); }
+        if (pressT >= 0) {
+          if (p.down) pressMoved = Math.max(pressMoved, Math.hypot(p.x - pressP[0] - 0.5, p.y - pressP[1] - 0.5));
+          else { if (t - pressT < 0.35 && pressMoved < 1.6) click.push(pressP); pressT = -1; }
+        }
+        return { down, click };
+      };
+      let croakAt = -3; // the first croak comes a moment in
+      const scene = leg === 'Full Colour' ? colourScene() : leg === 'Axolotl' ? axolotlScene() : idolScene();
+      const frameL = t => { scene.feel(t); scene.draw(t); paintL(); };
+      frameL(0);
+      return frameL;
+
+      // ----- Full Colour: the one screen in colour, and it shows off: a jewel of a frog on a lily pad at sunset.
+      // In the large view the pointer is a fly: buzz too close and the tongue comes for you -----
+      function colourScene() {
+        // the frog's kind follows its skin
+        const KINDS = {
+          'Dart Frog': { body: ['#06103a', '#1446b8', '#2f8cff', '#9ad8ff'], legs: null, belly: '#2f8cff', mark: 'spots', markCol: '#05060e', eye: 'black' },
+          Striped: { body: ['#3a2a04', '#e0a810', '#ffd830', '#fff4a0'], legs: null, belly: '#ffd830', mark: 'bands', markCol: '#0a0806', eye: 'black' },
+          Banded: { body: ['#3a2a04', '#e0a810', '#ffd830', '#fff4a0'], legs: null, belly: '#ffd830', mark: 'bands', markCol: '#0a0806', eye: 'black' },
+          Spotted: { body: ['#3a0606', '#c01818', '#ff3a2a', '#ffa08a'], legs: ['#081a4a', '#1a48b0', '#3a7aff', '#a0c8ff'], belly: '#ff5a3a', mark: 'freckles', markCol: '#1a0404', eye: 'black' },
+          Freckled: { body: ['#3a0606', '#c01818', '#ff3a2a', '#ffa08a'], legs: ['#081a4a', '#1a48b0', '#3a7aff', '#a0c8ff'], belly: '#ff5a3a', mark: 'freckles', markCol: '#1a0404', eye: 'black' },
+          'Two-Tone': { body: ['#04281a', '#10a060', '#3ae890', '#b0ffd8'], legs: null, belly: '#3ae890', mark: 'marble', markCol: '#020806', eye: 'black' },
+          'Glass Frog': { body: ['#1a3a10', '#70c030', '#b0f060', '#eaffc0'], legs: null, belly: '#e8ffe0', mark: 'heart', markCol: '#e0304a', eye: 'gold' },
+          Pale: { body: ['#5a3a48', '#e0b0c0', '#ffd8e4', '#fff6fa'], legs: null, belly: '#fff6fa', mark: 'none', markCol: '#000', eye: 'black' },
+        };
+        const K = KINDS[skin] || { body: ['#0a3010', '#28a030', '#5ae040', '#c0ff90'], legs: null, belly: '#f0f8d0', mark: 'sides', markCol: '#2a6aff', eye: 'red' };
+        const LEGS = K.legs || K.body;
+        const OUT = '#08040c';
+        const SKY = ['#1e0c40', '#3a1458', '#6a2068', '#b03a62', '#ff7a40', '#ffc060'];
+        const sunX = lv[0] < 0.5 ? 26 : 5, sunY = 5;
+        // the frog's shape: 1 head, 2 body, 3 legs, 4 eye bulge, 5 belly
+        const frog = (x, y) => {
+          if (inE(x, y, 11.2, 11.6, 2.8, 2.8) || inE(x, y, 20.8, 11.6, 2.8, 2.8)) return 4;
+          if (inE(x, y, 16, 15.6, 7.8, 4.4)) return 1;
+          if (inE(x, y, 16, 22.2, 3.6, 3)) return 5;
+          if (inE(x, y, 16, 21, 6.6, 4.6)) return 2;
+          if (inE(x, y, 9.6, 22.6, 3.4, 3) || inE(x, y, 22.4, 22.6, 3.4, 3)) return 3;
+          if ((x === 11 || x === 12 || x === 19 || x === 20) && y >= 19 && y <= 25) return 3;
+          if (y === 26 && (x === 10 || x === 12 || x === 13 || x === 18 || x === 19 || x === 21)) return 3;
+          if (y === 25 && ((x >= 4 && x <= 8) || (x >= 23 && x <= 27))) return 3;
+          if (y === 24 && (x === 4 || x === 27)) return 3;
+          return 0;
+        };
+        const FROG = new Uint8Array(G * G);
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) FROG[y * G + x] = frog(x, y);
+        const spots = [];
+        // a few big marks, placed once, well apart
+        const BIG = [[9, 18], [21, 19], [14, 14], [18, 13], [12, 21], [19, 22], [16, 19]];
+        for (let i = 0; i < 9; i++) spots.push([7 + Math.floor(hv(i, 1, 3) * 18), 13 + Math.floor(hv(i, 2, 3) * 10)]);
+        let tongue = null, nextSnap = 5 + lv[1] * 3, flyGone = -1, aim = 0, lastT = 0, gulps = 0, gulpUntil = -1, sulkUntil = -1;
+        const ripples = [], trail = [];
+        let lastTrail = -1, plusAt = -9;
+        // where the fly is: the pointer, when there is one, or a fly of its own circling
+        const flyAt = t => { const p = ptr(); return p.in ? [Math.floor(p.x), Math.floor(p.y), true] : [22 + Math.round(Math.cos(t * 2.1) * 5), 6 + Math.round(Math.sin(t * 3.3) * 2), false]; };
+        return {
+          feel: t => {
+            const dt = Math.max(0, Math.min(0.1, t - lastT)); lastT = t;
+            const [fx, fy, you] = flyAt(t);
+            for (const [x, y] of pressNow(t).click) {
+              if (x < 0 || y < 0 || x >= G || y >= G || FROG[y * G + x] || y < 15) continue;
+              // a plink on the pond: rings spread and rock the pad
+              if (ripples.length < 4) ripples.push({ x, y, t0: t });
+              c.sound.note(pnote(10 + (x % 5)), { dur: 0.3, vel: 0.12, wave: 'sine' });
+            }
+            // a fly hanging about in front of its face: it fixes on it, and the tongue comes
+            const d = Math.hypot(fx - 16, fy - 17);
+            if (you && t > flyGone && !tongue && d < 12 && t > gulpUntil) {
+              aim += dt;
+              if (aim > 0.45) { tongue = { x: fx, y: fy, t0: t, you: true }; aim = 0; c.sound.hit('click', 0.3); }
+            } else aim = Math.max(0, aim - dt);
+            if (!you && !tongue && t > nextSnap) { tongue = { x: fx, y: fy, t0: t }; nextSnap = t + 7 + lv[3] * 4; }
+            if (tongue && tongue.you && !tongue.done && t - tongue.t0 > 0.22) {
+              tongue.done = true;
+              // did it get you?
+              if (Math.hypot(fx - tongue.x, fy - tongue.y) < 2.2) {
+                gulps = Math.min(6, gulps + 1); gulpUntil = t + 1.1; flyGone = t + 1.4; croakAt = t + 0.5; plusAt = t;
+                c.sound.note(pnote(0), { dur: 0.1, vel: 0.3, wave: 'square', cutoff: 700, at: 0.15 }); c.sound.note(pnote(-3), { dur: 0.25, vel: 0.26, wave: 'square', cutoff: 600, at: 0.3 });
+              } else { sulkUntil = t + 1; c.sound.note(pnote(2), { dur: 0.08, vel: 0.14, wave: 'square', cutoff: 700, at: 0.2 }); }
+            }
+            if (tongue && !tongue.you && t - tongue.t0 > 0.22 && !tongue.done) { tongue.done = true; flyGone = t + 2; }
+            if (tongue && t - tongue.t0 > 0.45) tongue = null;
+            for (let i = ripples.length - 1; i >= 0; i--) if (t - ripples[i].t0 > 1.6) ripples.splice(i, 1);
+            if (t - lastTrail > 0.07) { lastTrail = t; trail.unshift([fx, fy]); trail.length = Math.min(trail.length, 3); }
+          },
+          draw: t => {
+            const st = Math.floor(t * 4), p = ptr();
+            // the sky and its sun, low jungle at the sides, the water with a broken road of sunlight across it
+            for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+              let col;
+              if (y < 15) {
+                const k = Math.min(5, Math.max(0, Math.floor(y / 2.7 + th(x, y) * 0.7 - 0.2)));
+                col = SKY[k];
+                if (inE(x, y, sunX + 0.5, sunY + 0.5, 3.2, 3.2)) col = inE(x, y, sunX, sunY, 2.2, 2.2) ? '#fff6c0' : '#ffd070';
+                const edge = Math.min(x, 31 - x), h = 14 - Math.max(0, Math.round(5 - edge * 0.7 + Math.sin(x * 1.7 + lv[2] * 6) * 0.9));
+                if (y >= h) col = y === h ? '#2a1438' : '#180a26';
+              } else {
+                col = y < 18 ? '#34184a' : y < 22 ? '#1e1a44' : '#121436';
+                const road = Math.abs(x + 0.5 - sunX - 0.5 - Math.sin(y * 1.3 + t * 3) * 0.8) < 1.8 - (y - 15) * 0.05;
+                if (road && (x + y + st) % 4 === 0) col = y < 20 ? '#ffd060' : '#ff8a3a';
+                for (const r of ripples) { const rr = (t - r.t0) * 7, dd = Math.hypot(x + 0.5 - r.x - 0.5, (y + 0.5 - r.y - 0.5) * 2.2); if (Math.abs(dd - rr) < 0.6 && rr < 11) col = rr < 6 ? '#c8a8f0' : '#6a5a9a'; }
+              }
+              put(x, y, col);
+            }
+            // a lily pad under the frog with its notch, rocked by the ripples; a small one with a lotus on it
+            const rock = ripples.some(r => { const rr = (t - r.t0) * 7; return Math.abs(Math.hypot(16 - r.x, (27 - r.y) * 2.2) - rr) < 4; }) ? 1 : 0;
+            for (let y = 23; y < G; y++) for (let x = 0; x < G; x++) {
+              const Y = y - rock;
+              if (inE(x, Y, 16, 27.6, 13.6, 3.8) && !(Math.abs(x + 0.5 - 16) < (Y - 27) * 1.2 && Y > 27)) put(x, y, Y === 24 || !inE(x, Y - 1, 16, 27.6, 13.6, 3.8) ? '#7ad850' : Y > 29 ? '#1e5a1e' : (x + Y) % 5 === 0 ? '#58b840' : '#3a9a32');
+            }
+            for (let y = 18; y < 24; y++) for (let x = 0; x < 8; x++) if (inE(x, y, 3, 21.5, 3.4, 1.5)) put(x, y, y === 20 ? '#7ad850' : '#3a9a32');
+            [[2, 17, '#ffc0dc'], [3, 16, '#ffc0dc'], [1, 18, '#ff7ab0'], [2, 18, '#ffe070'], [3, 18, '#ffe070'], [4, 18, '#ff7ab0'], [3, 17, '#ff9ac4'], [4, 17, '#ffc0dc'], [1, 19, '#e0508a'], [2, 19, '#ff7ab0'], [3, 19, '#ff7ab0'], [4, 19, '#e0508a'], [5, 19, '#ff9ac4'], [0, 19, '#ff9ac4']].forEach(([x, y, col]) => put(x, y, col));
+            // the frog, riding the pad
+            const blink = ((t + 1.7) % 3.9) < 0.14 || t < gulpUntil, sulk = t < sulkUntil;
+            const cph = ((t - croakAt) % 4.6 + 4.6) % 4.6, croak = cph < 1.1 ? Math.sin(cph / 1.1 * Math.PI) : 0;
+            const F = (x, y) => (x >= 0 && y >= 0 && x < G && y < G) ? FROG[y * G + x] : 0;
+            for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+              const Y = y - rock, k = F(x, Y);
+              if (!k) {
+                if (F(x - 1, Y) || F(x + 1, Y) || F(x, Y - 1) || F(x, Y + 1)) put(x, y, OUT);
+                continue;
+              }
+              const R = k === 3 ? LEGS : K.body;
+              // flat: a highlight along its top edge, its body colour, a shadow along the bottom and the far side
+              let s = 2;
+              if (!F(x, Y - 1) || (k === 1 && Y < 13 && Math.abs(x - 16) < 5)) s = 3;
+              if (!F(x, Y + 1) || (k !== 4 && !F(x + (sunX > 16 ? -1 : 1), Y))) s = 1;
+              let col = R[s];
+              if (k === 5) col = K.belly;
+              if (K.mark === 'spots' && k !== 4 && k !== 5 && BIG.some(([a, b]) => (x === a || x === a + 1) && (Y === b || Y === b + 1))) col = K.markCol;
+              if (K.mark === 'bands' && k !== 4 && k !== 5 && (Y === 14 || Y === 19 || Y === 23) && s > 1) col = K.markCol;
+              if (K.mark === 'freckles' && k !== 3 && k !== 4 && k !== 5 && BIG.some(([a, b]) => x === a && Y === b)) col = K.markCol;
+              if (K.mark === 'marble' && k !== 4 && k !== 5 && BIG.slice(0, 3).some(([a, b]) => Math.abs(x - a) + Math.abs(Y - b) < 2)) col = K.markCol;
+              if (K.mark === 'sides' && k === 2 && (x < 11 || x > 20) && Y % 2) col = Y % 4 === 1 ? K.markCol : '#ffe040';
+              if (K.mark === 'sides' && k === 3 && Y >= 24) col = '#ff7a20';
+              put(x, y, col);
+            }
+            if (K.mark === 'heart') { put(16, 22 + rock, K.markCol); put(15, 21 + rock, '#ff8aa0'); }
+            // the eyes follow the fly; shut tight and happy after a catch, narrowed after a miss
+            const [fx, fy, you] = flyAt(t);
+            const lx = Math.max(-1, Math.min(1, Math.round((fx - 16) / 6))), ly = fy < 9 ? -1 : fy > 16 ? 1 : 0;
+            for (const ex of [11, 20]) {
+              const R0 = rock;
+              if (blink) { put(ex - 1, 12 + R0, OUT); put(ex, 11 + R0, OUT); put(ex + 1, 11 + R0, OUT); put(ex + 2, 12 + R0, OUT); continue; }
+              const WH = K.eye === 'red' ? '#ff3a1a' : K.eye === 'gold' ? '#ffd040' : '#ffffff';
+              for (let yy = 9; yy <= 13; yy++) for (let xx = ex - 1; xx <= ex + 2; xx++) if (!((yy === 9 || yy === 13) && (xx === ex - 1 || xx === ex + 2))) put(xx, yy + R0, WH);
+              // the pupil, looking towards the fly
+              const px = ex + (lx < 0 ? -1 : lx > 0 ? 1 : 0), py = ly > 0 ? 11 : ly < 0 ? 9 : 10;
+              for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) put(px + a, py + b + R0, '#050308');
+              put(px + (lx > 0 ? 0 : 1), py + R0, '#ffffff');
+              if (sulk) for (let q = -1; q <= 2; q++) { put(ex + q, 9 + R0, K.body[1]); put(ex + q, 10 + R0, K.body[1]); }
+            }
+            // its wide smile, cheeks full after a gulp, and the throat sac swelling under it
+            if (tongue) { for (let y = 16; y <= 19; y++) for (let x = 11; x <= 20; x++) if (!(y === 19 && (x < 13 || x > 18))) put(x, y + rock, y === 16 ? OUT : '#5a0a1a'); }
+            else for (let x = 10; x <= 21; x++) put(x, (x === 10 || x === 21 ? 16 : 17) + rock, OUT);
+            if (t < gulpUntil) for (const cx of [9, 22]) { put(cx, 15 + rock, K.body[3]); put(cx, 16 + rock, K.body[3]); }
+            if (croak > 0.05) for (let y = 17; y < 23; y++) for (let x = 10; x < 22; x++) if (inE(x, y - rock, 16, 19.2, 2 + croak * 3, 1 + croak * 1.8) && y - rock > 17) put(x, y, y - rock < 19 ? '#fff4f0' : '#f0d8e0');
+            // the tongue
+            if (tongue) {
+              const u = (t - tongue.t0) / 0.45, r = u < 0.5 ? u * 2 : (1 - u) * 2, sx = 15.5, sy = 17 + rock;
+              const ex2 = sx + (tongue.x - sx) * r, ey2 = sy + (tongue.y - sy) * r, n = Math.max(2, Math.ceil(Math.hypot(ex2 - sx, ey2 - sy) * 2));
+              for (const [w, col] of [[1, '#5a0a2a'], [0, '#ffb0c8']]) for (let k = 0; k <= n; k++) {
+                const x = sx + (ex2 - sx) * k / n, y = sy + (ey2 - sy) * k / n;
+                for (const [a, b] of w ? [[-1, 0], [2, 0], [0, -1], [1, -1], [0, 2], [1, 2]] : [[0, 0], [1, 0], [0, 1], [1, 1]]) put(x + a, y + b, col);
+              }
+              put(ex2, ey2, '#ff6a90'); put(ex2 + 1, ey2, '#ff6a90'); put(ex2, ey2 + 1, '#ff6a90'); put(ex2 + 1, ey2 + 1, '#ff6a90');
+            }
+            // the fly: you, buzzing, or its own; gone for a moment once eaten
+            if (t > flyGone && !(tongue && tongue.done && !you)) {
+              // a buzz trail behind you
+              if (you) trail.forEach(([a, b], i) => { if (i && (a !== fx || b !== fy)) put(a, b, i === 1 ? '#8a90b0' : '#4a4a6a'); });
+              put(fx, fy, '#0a0a0e'); put(fx, fy + 1, '#2a2a30');
+              if (st % 2 || you) { put(fx - 1, fy - 1 + (Math.floor(t * 20) % 2), '#d0e8ff'); put(fx + 1, fy - 1 + (Math.floor(t * 20) % 2), '#d0e8ff'); }
+            }
+            if (you && aim > 0.15 && t > flyGone) { put(fx, fy - 3, '#ff4040'); put(fx, fy - 2, '#ff4040'); }
+            // a +1 rising from its mouth for a catch
+            if (t - plusAt < 0.9) { const py = Math.round(13 - (t - plusAt) * 6), PL = ['.#..#', '###.#', '.#..#']; PL.forEach((row, r) => { for (let q = 0; q < 5; q++) if (row[q] === '#') put(14 + q, py + r, '#ffffff'); }); }
+            // the flies it has caught, kept in a row in the corner
+            for (let i = 0; i < gulps; i++) { const cx = sunX > 16 ? 1 + i * 4 : 28 - i * 4; put(cx, 1, '#d0e8ff'); put(cx + 2, 1, '#d0e8ff'); put(cx + 1, 2, '#0a0a0e'); put(cx + 1, 1, '#0a0a0e'); }
+            // a dragonfly hovering over the water, wings flickering
+            const dx = (sunX > 16 ? 5 : 20) + (Math.floor(t * 0.5) % 3), dyy = 4 + (Math.floor(t * 0.7) % 2);
+            for (let q = 0; q < 5; q++) put(dx + q, dyy, q === 0 ? '#2ad0ff' : q < 2 ? '#1a7ad0' : '#2a50a0');
+            if (st % 2) { put(dx + 1, dyy - 1, '#c8f0ff'); put(dx + 2, dyy - 1, '#c8f0ff'); put(dx + 1, dyy + 1, '#a0d0f0'); put(dx + 2, dyy + 1, '#a0d0f0'); }
+            else { put(dx, dyy - 1, '#c8f0ff'); put(dx + 1, dyy - 2, '#c8f0ff'); put(dx, dyy + 1, '#a0d0f0'); put(dx + 1, dyy + 2, '#a0d0f0'); }
+          },
+        };
+      }
+
+      // ----- Axolotl: an axolotl smiling in its tank, gills waving, light rippling down through the water.
+      // Tap the water to drop in a worm: it swims over and gulps it; feed it three and it's in love -----
+      function axolotlScene() {
+        const wild = skin === 'Wild';
+        const SKIN = wild ? ['#1a2410', '#3e5424', '#6a8236', '#a8b860'] : ['#a04a6a', '#f08aa8', '#ffc0d4', '#fff0f4'];
+        const GILL = wild ? ['#2a0a2a', '#7a2a6a', '#c060a8'] : ['#8a0a3a', '#e0306a', '#ff7aa0'];
+        const OUT = wild ? '#100c08' : '#3a0a24';
+        const WATER = ['#0a3a4a', '#0e5060', '#147080', '#2a98a0'];
+        const bubbles = [];
+        for (let i = 0; i < 7; i++) bubbles.push([2 + Math.floor(hv(i, 4, 1) * 28), hv(i, 5, 1) * 40, 0.6 + hv(i, 6, 1)]);
+        const plants = [[2, 18, 0], [5, 23, 1.3], [27, 17, 2.1], [30, 21, 0.7]];
+        let fluff = 0, ox = 0, oy = 0, lastT = 0, eaten = 0, gulpAt = -9, loveAt = -9;
+        const worms = [];
+        // the body: 1 head, 2 body and tail, 3 legs
+        const body = (x, y) => {
+          if (inE(x, y, 16, 15.2, 8.6, 5.6)) return 1;
+          if (inE(x, y, 16, 21.5, 5.4, 4.2)) return 2;
+          if (y >= 23 && y <= 27 && x >= 18 && x <= 28 && Math.abs(y - (25 - (x - 18) * 0.25 + Math.sin(x * 0.7) * 0.6)) < 1.3 - (x - 18) * 0.07) return 2;
+          if ((inE(x, y, 9.6, 21.6, 1.6, 2.6) || inE(x, y, 22.4, 21.6, 1.6, 2.6))) return 3;
+          if (y === 24 && (x === 8 || x === 10 || x === 21 || x === 23)) return 3;
+          return 0;
+        };
+        return {
+          feel: t => {
+            const dt = Math.max(0, Math.min(0.1, t - lastT)); lastT = t;
+            const p = ptr(), over = p.in && Math.abs(p.x - 16 - ox) < 11 && p.y > 6 && p.y < 26;
+            if (over && fluff < 0.1) c.sound.note(pnote(7), { dur: 0.3, vel: 0.1, wave: 'sine', attack: 0.04 });
+            fluff += ((over ? 1 : 0) - fluff) * 0.15;
+            for (const [x, y] of tapsNow()) {
+              if (x < 0 || y < 0 || x >= G || y >= 27 || worms.length > 3) continue;
+              // a bloodworm plops in and wriggles down
+              worms.push({ x: Math.max(10, Math.min(22, x)), y: Math.min(y, 4), t0: t });
+              c.sound.note(pnote(10), { dur: 0.08, vel: 0.12, wave: 'sine' }); c.sound.note(pnote(5), { dur: 0.2, vel: 0.1, wave: 'sine', at: 0.06 });
+            }
+            for (const w of worms) w.y = Math.min(25, w.y + dt * 3.2);
+            // it swims after the first worm, mouth first
+            const w0 = worms[0];
+            const tx = w0 ? Math.max(-6, Math.min(6, w0.x - 16)) : Math.sin(t * 0.4) * 1.5, ty = w0 ? Math.max(-6, Math.min(4, w0.y - 17)) : 0;
+            ox += (tx - ox) * Math.min(1, dt * 2.6); oy += (ty - oy) * Math.min(1, dt * 2.2);
+            if (w0 && Math.abs(w0.x - 16 - ox) < 2 && Math.abs(w0.y - 17 - oy) < 2) {
+              worms.shift(); gulpAt = t; eaten++;
+              c.sound.note(pnote(5), { dur: 0.1, vel: 0.2, wave: 'sine' }); c.sound.note(pnote(9), { dur: 0.16, vel: 0.16, wave: 'sine', at: 0.08 });
+              if (eaten >= 3) { eaten = 0; loveAt = t; [0, 4, 7, 12].forEach((k, i) => c.sound.note(pnote(k + 5), { dur: 0.4, vel: 0.1, wave: 'sine', at: 0.2 + i * 0.12 })); }
+            }
+          },
+          draw: t => {
+            const love = t - loveAt < 2.6, gulp = t - gulpAt < 0.5;
+            const bob = love ? (Math.floor(t * 8) % 2) : Math.round(Math.sin(t * 1.1)) > 0 ? 1 : 0;
+            const X = Math.round(ox), Y = Math.round(oy) + bob;
+            // the tank: deep water, light rays shifting down from the surface, sand and pebbles
+            for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+              let k = y < 6 ? 3 : y < 14 ? 2 : y < 22 ? 1 : 0;
+              if (th(x, y) < ((y % 8) / 8) * 0.9 && k > 0 && y < 24) k--;
+              const ray = Math.sin((x + y * 0.45) * 0.55 - t * 0.8) + Math.sin((x - y * 0.2) * 0.31 + t * 0.5);
+              if (ray > 1.45 && y < 26) k = Math.min(3, k + 1);
+              let col = WATER[k];
+              if (y === 0 && (x + Math.floor(t * 4)) % 4 < 2) col = '#a0e8e8';
+              if (y >= 28 || (y === 27 && (x * 7) % 5 < 3)) col = (x * 3 + y * 5) % 7 === 0 ? '#b89060' : (x + y) % 3 ? '#e0c890' : '#c8a870';
+              put(x, y, col);
+            }
+            [[4, 27, '#6a7a8a'], [5, 27, '#8a9aa8'], [25, 27, '#7a6a5a'], [12, 28, '#5a6a7a'], [26, 27, '#5a4a3a']].forEach(([x, y, col]) => put(x, y, col));
+            for (const [px0, top, ph] of plants) for (let y = top; y < 28; y++) {
+              const sw = Math.round(Math.sin(t * 1.2 + ph + y * 0.35) * (28 - y) * 0.09);
+              put(px0 + sw, y, y % 3 ? '#2a9a4a' : '#5ad070');
+              if (y % 3 === 1) put(px0 + sw + (y % 6 === 1 ? 1 : -1), y, '#1e7a3a');
+            }
+            // the worms wriggling down
+            for (const w of worms) { const wy = Math.round(w.y), wg = Math.floor(t * 6 + w.x) % 2; put(w.x, wy, '#c0182a'); put(w.x + (wg ? 1 : -1), wy - 1, '#e03040'); put(w.x + (wg ? -1 : 1), wy + 1, '#8a0a1a'); }
+            // the axolotl
+            const B = (x, y) => body(x - X, y - Y);
+            for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+              const k = B(x, y);
+              if (!k) { if (B(x - 1, y) || B(x + 1, y) || B(x, y - 1) || B(x, y + 1)) put(x, y, OUT); continue; }
+              const yy = y - Y, xx = x - X;
+              let s = yy < 13 ? 3 : yy < 17 ? 2 : 1;
+              if (k === 1 && yy > 18.5) s = 1;
+              if (k === 2 && inE(xx, yy, 16, 22.2, 3, 2.4)) s = 3;
+              if (k === 3) s = 2;
+              let col = SKIN[s];
+              if (wild && hv(xx, yy, 2) < 0.2) col = hv(xx, yy, 3) < 0.45 ? '#f0d860' : '#0e1408';
+              put(x, y, col);
+            }
+            // gills: three feathery stalks a side, thick at the root, waving (flared right out when it's happy)
+            const fl2 = love ? 1.4 : fluff, wave = Math.sin(t * (love ? 6 : 2.4)) * (0.6 + fl2 * 0.6);
+            for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) {
+              const ang = (-0.55 + k * 0.55) + wave * 0.12 * (k - 1 || 1), len = 5.4 + fl2 * 1.3 - Math.abs(k - 1) * 0.6;
+              const bx = 16 + X + sd * 7.4, by = 11.6 + k * 2.2 + Y;
+              for (let s = 0; s < len; s += 0.5) {
+                const xx = bx + sd * Math.cos(ang) * s, yy = by + Math.sin(ang) * s - s * 0.35;
+                put(xx, yy, GILL[0]);
+                if (s < len * 0.5) put(xx, yy + 1, GILL[0]);
+                if (Math.round(s * 2) % 2 === 0 && s > 1) { put(xx + sd * 0.4, yy - 1, GILL[(Math.floor(s + t * 3) % 2) + 1]); put(xx - sd * 0.2, yy + 1.4, GILL[2]); }
+              }
+            }
+            // the face: beady eyes, a long smile (an O when it gulps), cheeks
+            const blink = ((t + 1.2) % 5.1) < 0.12;
+            for (const ex of [10, 20]) {
+              if (blink || love) { put(ex + X, 14 + Y, OUT); put(ex + 1 + X, 14 + Y, OUT); if (love) { put(ex + X, 13 + Y, OUT); } continue; }
+              const lk = worms.length && worms[0].x > 16 + ox ? 1 : 0;
+              put(ex + X + lk, 13 + Y, '#ffffff'); put(ex + 1 + X - lk, 13 + Y, '#0a0408'); put(ex + X, 14 + Y, '#0a0408'); put(ex + 1 + X, 14 + Y, '#0a0408');
+            }
+            if (gulp) { for (const [a, b] of [[15, 16], [16, 16], [14, 17], [17, 17], [15, 18], [16, 18]]) put(a + X, b + Y, OUT); put(15 + X, 17 + Y, '#6a0a2a'); put(16 + X, 17 + Y, '#6a0a2a'); }
+            else for (let x = 11; x <= 20; x++) put(x + X, (x === 11 || x === 20 ? 16 : 17) + Y, OUT);
+            if (!wild || love || gulp) { put(9 + X, 17 + Y, '#ff7a9a'); put(22 + X, 17 + Y, '#ff7a9a'); if (gulp) { put(8 + X, 17 + Y, '#ff9ab0'); put(23 + X, 17 + Y, '#ff9ab0'); } }
+            // bubbles rising, and hearts when it's been fed enough
+            for (const b of bubbles) {
+              const yy = Math.floor(G + 2 - ((b[1] + t * b[2] * 3) % (G + 6))), xx = b[0] + Math.round(Math.sin(t * 1.4 + b[1]) * 0.6);
+              put(xx, yy, '#c8fff8');
+            }
+            if (love) for (let i = 0; i < 4; i++) {
+              const u = (t - loveAt) * 0.6 + i * 0.25, hx = 16 + X + Math.round(Math.sin(i * 2.1 + t * 2) * 6), hy = Math.round(10 + Y - u * 12);
+              for (const [a, b] of [[0, 0], [2, 0], [0, 1], [1, 1], [2, 1], [1, 2]]) put(hx + a - 1, hy + b, i % 2 ? '#ff4a7a' : '#ff8aa8');
+            }
+          },
+        };
+      }
+
+      // ----- Stone Idol: a frog god carved in stone on its temple steps, gem eyes burning, torches either side.
+      // Press and hold on it: the glyph on its belly kindles cell by cell, and when it is full the idol wakes -----
+      function idolScene() {
+        const GEMS = [['#20ff9a', '#0a8a50', '#c0ffe0'], ['#ff3a4a', '#9a0a1a', '#ffc0c0'], ['#3a8aff', '#0a3aa0', '#c0e0ff'], ['#ffc020', '#a06008', '#fff0b0']];
+        const GEM = GEMS[Math.floor(lv[4] * 4)];
+        // carved from sandstone, or jade, or dark basalt veined with gold
+        const STONE = [['#1c120c', '#3e2a1c', '#6a4a30', '#9a7046', '#c89a62', '#f0c88a'], ['#06140e', '#0e3424', '#1a5a3a', '#2e8a56', '#56b878', '#9ae8a8'],
+          ['#0c0c12', '#26262f', '#3e3e4c', '#5c5c6c', '#888698', '#b8b6c6']][lv[5] < 0.5 ? 0 : lv[5] < 0.8 ? 1 : 2];
+        const INLAY = lv[5] >= 0.8 ? '#e8c060' : null; // the basalt idol's carving is inlaid with gold
+        const WALL = ['#07060a', '#110e14', '#1a161e', '#262028', '#3a2e2a'];
+        const MOSS = ['#2a4a1a', '#4a7a2a', '#7aaa3a'];
+        const motes = [];
+        for (let i = 0; i < 6; i++) motes.push([hv(i, 1, 9), hv(i, 2, 9)]);
+        const dust = [];
+        let rumbleUntil = -1, gaze = 0, charge = 0, awakeAt = -9, lastT = 0, awake = false, sleepAt = -9;
+        // awake for at least AWAKE seconds, and for as long as you keep holding; then it settles back slowly
+        const AWAKE = 3.6, SETTLE = 1.4;
+        const level = t => !awake ? 0 : sleepAt > 0 ? Math.max(0, 1 - (t - sleepAt) / SETTLE) : Math.min(1, (t - awakeAt) * 3);
+        // the belly glyph, lit cell by cell from the centre outwards as it charges
+        const GLYPH = [[16, 19], [16, 20], [15, 21], [14, 21], [13, 20], [13, 19], [14, 18], [15, 18], [16, 18], [17, 18], [18, 19], [18, 20], [17, 21], [16, 21]];
+        // the idol, carved from rounded masses: haunches, body, front legs, head, the two great eye domes;
+        // each lit from the upper left as a rounded solid, with a carved groove wherever one mass meets another
+        const PARTS = [[9, 19.6, 4.6, 4], [23, 19.6, 4.6, 4], [16, 18.6, 7.2, 5], [11.4, 20.6, 2.2, 3.2], [20.6, 20.6, 2.2, 3.2], [16, 12.6, 9.6, 5], [10.5, 8.2, 3.4, 3.3], [21.5, 8.2, 3.4, 3.3]];
+        const L = [-0.36, -0.66, 0.66];
+        const PART = new Int8Array(G * G), SH = new Int8Array(G * G), TOP = new Uint8Array(G * G);
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+          const i = y * G + x;
+          if (y >= 23) {
+            // the plinth: three steps, lit on each tread
+            const px = Math.abs(x + 0.5 - 16), half = y >= 28 ? 14.6 : y >= 25 ? 12.4 : 10.2;
+            if (px < half) { PART[i] = 9; SH[i] = y === 23 || y === 25 || y === 28 ? 4 : px > half - 1 ? 1 : 2; }
+            continue;
+          }
+          PARTS.forEach(([cx, cy, rx, ry], k) => {
+            const nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry, d = nx * nx + ny * ny;
+            if (d > 1) return;
+            const nz = Math.sqrt(1 - d), b = nx * L[0] + ny * L[1] + nz * L[2];
+            PART[i] = k + 1; SH[i] = Math.max(1, Math.min(5, Math.round(2.3 + b * 3))); TOP[i] = ny < -0.55 ? 1 : 0;
+          });
+          if (y === 22 && [9, 11, 13, 18, 20, 22].includes(x)) { PART[i] = 4; SH[i] = 2; } // the toes
+        }
+        const P = (x, y) => (x >= 0 && y >= 0 && x < G && y < G) ? PART[y * G + x] : 0;
+        const torches = [[3, 12], [28, 12]];
+        // each dot's distance to the nearer torch, worked out once
+        const TD = new Float32Array(G * G);
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) TD[y * G + x] = Math.min(Math.hypot(x - 3, (y - 12) * 0.8), Math.hypot(x - 28, (y - 12) * 0.8));
+        return {
+          feel: t => {
+            const dt = Math.max(0, Math.min(0.1, t - lastT)); lastT = t;
+            const p = ptr(), near = p.in && p.y < 14 && Math.abs(p.x - 16) < 10;
+            if (near && gaze < 0.1) { c.sound.note(pnote(0) - 12, { dur: 1.4, vel: 0.12, wave: 'triangle', attack: 0.3, cutoff: 600 }); c.sound.note(pnote(4), { dur: 1.2, vel: 0.05, wave: 'sine', attack: 0.4 }); }
+            gaze += ((near ? 1 : 0) - gaze) * 0.2;
+            for (const [x, y] of pressNow(t).click) {
+              if (x < 0 || y < 0 || x >= G || y >= G || t < rumbleUntil - 0.2 || awake) continue;
+              // a touch: the idol stirs, dust sifts down, a deep stone note
+              rumbleUntil = t + 0.4;
+              for (let k = 0; k < 6; k++) dust.push({ x: Math.floor(hv(k, Math.floor(t * 10), 4) * G), t0: t + hv(k, 3, 4) * 0.4, sp: 0.6 + hv(k, 5, 4) * 0.8 });
+              c.sound.note(pnote(0) - 12, { dur: 1.2, vel: 0.24, wave: 'triangle', cutoff: 500 });
+            }
+            // held down on the idol, the glyph charges; let go and it fades back
+            const holding = p.down && !awake && P(Math.floor(p.x), Math.floor(p.y));
+            const was = charge;
+            charge = Math.max(0, Math.min(1, charge + (holding ? dt / 2.4 : -dt * 0.7)));
+            if (holding && Math.floor(charge * GLYPH.length) > Math.floor(was * GLYPH.length)) c.sound.note(pnote(Math.floor(charge * GLYPH.length)), { dur: 0.5, vel: 0.08, wave: 'sine' });
+            if (awake && sleepAt < 0 && !p.down && t - awakeAt > AWAKE) sleepAt = t;
+            if (awake && sleepAt > 0 && t - sleepAt > SETTLE) { awake = false; sleepAt = -9; }
+            if (charge >= 1) {
+              // it wakes: a roar of stone, the eyes blaze, the mouth opens, gold pours down the steps
+              charge = 0; awakeAt = t; awake = true; sleepAt = -9; rumbleUntil = t + 0.9;
+              for (let k = 0; k < 14; k++) dust.push({ x: Math.floor(hv(k, Math.floor(t * 10), 6) * G), t0: t + hv(k, 3, 6) * 0.5, sp: 0.6 + hv(k, 5, 6) * 0.8 });
+              c.sound.note(pnote(0) - 24, { dur: 2, vel: 0.35, wave: 'triangle', cutoff: 420 });
+              c.sound.hit('noise', 0.2, { cutoff: 380, dur: 1.2 });
+              [0, 4, 7, 11, 14].forEach((k, i) => c.sound.note(pnote(k + 5), { dur: 0.9, vel: 0.07, wave: 'sine', at: 0.5 + i * 0.12 }));
+            }
+          },
+          draw: t => {
+            const lvl = level(t), aw = lvl > 0 ? 1 : -1;
+            shake = t < rumbleUntil || (charge > 0.6 && Math.floor(t * 12) % 3 === 0) ? (Math.floor(t * 24) % 2 ? 1 : -1) : 0;
+            const fl = [0.2, 0.9, 0.5, 1, 0.3, 0.7, 0.1, 0.8][Math.floor(t * 9) % 8];
+            const glow = 0.5 + 0.5 * Math.sin(t * 1.6) + gaze + (t < rumbleUntil ? 1 : 0) + charge * 1.5 + lvl * 2;
+            // the temple wall: big carved blocks, a glyph on every other one, warmed near the torches
+            for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+              const row = y >> 2, bx = (x + (row % 2) * 4) >> 3;
+              const mortar = y % 4 === 3 || (x + (row % 2) * 4) % 8 === 7;
+              let s = mortar ? 0 : 1 + (hv(bx, row, 1) < 0.5 ? 1 : 0);
+              const lx = (x + (row % 2) * 4) % 8, ly = y % 4;
+              if (!mortar && (bx + row) % 3 === 0 && ly === 1 && lx >= 2 && lx <= 4 && (lx !== 3 || hv(bx, row, 2) < 0.5)) s = 0;
+              const warm = TD[y * G + x] < 5 + fl * 1.5 - th(x, y) * 2;
+              if (warm && s) s = Math.min(4, s + 2);
+              put(x, y, WALL[s]);
+            }
+            // a shaft of daylight slanting in from above, dust turning in it
+            for (let y = 0; y < 22; y++) for (let x = 0; x < G; x++) {
+              const d = x - 6 - y * 0.55;
+              if (d > 0 && d < 5 && th(x, y) < 0.22) put(x, y, '#3a3440');
+            }
+            for (const m of motes) {
+              const mx = Math.floor(8 + m[0] * 6 + ((t * 0.4 + m[1] * 20) % 12) * 0.55), my = Math.floor((t * 0.4 + m[1] * 20) % 12) + 4;
+              put(mx, my, '#fff0c0');
+            }
+            // the torches in their brackets
+            for (const [a, b] of torches) {
+              put(a, b + 1, '#4a3420'); put(a, b + 2, '#4a3420'); put(a - 1, b + 2, '#2a1e12'); put(a + 1, b + 2, '#2a1e12');
+              // the flames climb as the idol charges, and burn its gem colour once it wakes
+              const h = 1 + (fl > 0.6 ? 1 : 0) + Math.round(charge * 3) + (aw >= 0 ? 3 : 0), FL = aw >= 0 ? [GEM[2], GEM[0], GEM[1]] : ['#ffd040', '#ff8020', '#e04010'];
+              put(a, b, FL[0]); put(a, b - 1, FL[1]);
+              for (let k = 0; k < h; k++) put(a + ((k + Math.floor(t * 9)) % 3 === 0 ? (fl > 0.4 ? 1 : -1) : 0), b - 2 - k, k < h - 1 ? FL[1] : FL[2]);
+            }
+            // the idol, carved and mossy, warmer on the side a torch flares
+            for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+              const i = y * G + x, k = PART[i];
+              if (!k) { if (y < 23 && (P(x - 1, y) || P(x + 1, y) || P(x, y - 1) || P(x, y + 1))) put(x, y, STONE[0]); continue; }
+              let s = SH[i];
+              // a groove wherever one carved mass meets another in front of it
+              if (k !== 9 && ((P(x + 1, y) && P(x + 1, y) !== k && P(x + 1, y) > k) || (P(x, y + 1) && P(x, y + 1) !== k && P(x, y + 1) > k) || (P(x - 1, y) > k && P(x - 1, y) !== 9) || (P(x, y - 1) > k && P(x, y - 1) !== 9))) s = 0;
+              if (fl > 0.6 && (x < 9 || x > 22) && s > 0 && s < 5) s++;
+              if (k !== 9 && s > 0 && s < 5 && (!P(x - 1, y) || !P(x, y - 1))) s++; // a rim of torchlight on its upper edges
+              let col = STONE[s];
+              if (k !== 9 && s > 0 && TOP[i] && hv(x, y, 7) < 0.45) col = MOSS[hv(x, y, 8) < 0.5 ? 1 : 2];
+              if (k === 9 && y === 23 && hv(x, y, 7) < 0.3) col = MOSS[1];
+              if (k === 9 && (y === 26 || y === 30) && x % 3 === 1 && s > 1) col = STONE[1];
+              put(x, y, col);
+            }
+            // the carving: a wide grooved mouth, nostrils, a spiral glyph on the belly
+            for (let x = 9; x <= 22; x++) put(x, x === 9 || x === 22 ? 14 : 15, INLAY || STONE[0]);
+            put(14, 12, STONE[0]); put(17, 12, STONE[0]);
+            GLYPH.forEach(([a, b], i) => put(a, b, aw >= 0 ? ((i + Math.floor(t * 12)) % 4 ? GEM[0] : GEM[2]) : i < charge * GLYPH.length ? (i === Math.floor(charge * GLYPH.length) - 1 ? GEM[2] : GEM[0]) : INLAY || STONE[1]));
+            if (lvl > 0) {
+              // the jaw grinds open in three steps onto a glow inside
+              const h2 = lvl < 0.34 ? 1 : lvl < 0.67 ? 2 : 3;
+              for (let y = 15; y < 15 + h2 + 1; y++) for (let x = 10; x <= 21; x++) put(x, y, y === 15 + h2 ? STONE[1] : y === 15 ? STONE[0] : (x + y + Math.floor(t * 10)) % 3 ? GEM[1] : GEM[0]);
+              for (let x = 10; x <= 21; x += 2) put(x, 15 + h2, STONE[3]);
+              // gold pouring out of it in a stream, step by step down the plinth, piling at the foot
+              const pour = Math.min(1, lvl * 1.5);
+              for (let k = 0; k < 22; k++) {
+                const u = (t * 0.8 + k / 22) % 1;
+                if (u > pour) continue;
+                const y = Math.round(17 + u * 14), st = y >= 28 ? 3 : y >= 25 ? 2 : y >= 22 ? 1 : 0;
+                const x = Math.round(15.5 + (k % 2 ? 1 : -1) * (st * 1.6 + (k % 3)));
+                put(x, y, (k + Math.floor(t * 10)) % 4 ? '#ffd040' : '#fff4b0'); if (k % 3 === 0) put(x + 1, y, '#c88a10');
+              }
+              const pile = Math.min(3, Math.floor((t - awakeAt) * 1.1)) * lvl;
+              for (let y = 31; y > 31 - pile; y--) for (let x = 0; x < G; x++) if (Math.abs(x + 0.5 - 16) < 4 + (31 - y) * -1 + pile * 2.5) put(x, y, (x * 3 + y + Math.floor(t * 6)) % 7 ? '#e8b030' : '#fff4b0');
+              // two straight beams from the eyes, widening as they go, a white core
+              for (const [ex, dir] of [[10.5, -1], [21.5, 1]]) {
+                const dx = dir * 0.88, dy = -0.48;
+                for (let k = 1.5; k < 17 * Math.min(1, lvl * 2); k += 0.5) {
+                  const cx = ex + dx * k, cy = 7.5 + dy * k, w = 0.6 + k * 0.13;
+                  for (let o = -w; o <= w; o += 0.5) {
+                    const x = cx - dy * o, y = cy + dx * o * dir * dir, a = Math.abs(o);
+                    put(Math.floor(x), Math.floor(y), a < 0.5 ? '#ffffff' : a < w * 0.6 ? GEM[2] : GEM[0]);
+                  }
+                }
+              }
+            }
+            // gem eyes set in the domes, burning
+            for (const ex of [10, 21]) {
+              for (const [a, b] of [[-1, 0], [0, -1], [1, -1], [2, 0], [-1, 1], [2, 1], [0, 2], [1, 2]]) put(ex + a, 7 + b, STONE[0]);
+              const hot = glow > 1.2;
+              put(ex, 7, hot ? GEM[2] : GEM[0]); put(ex + 1, 7, GEM[0]); put(ex, 8, GEM[1]); put(ex + 1, 8, hot ? GEM[0] : GEM[1]);
+              if (glow > 0.8) for (const [a, b] of [[-2, 7], [3, 7], [0, 5], [1, 10]]) if (th(ex + a, b) < glow - 0.8) put(ex + a, b, GEM[1]);
+            }
+            // offerings: a bowl of fire on the steps, flowers either side
+            put(15, 27, '#3a2a18'); put(16, 27, '#3a2a18'); put(14, 26, '#5a4228'); put(17, 26, '#5a4228');
+            put(15, 26, fl > 0.5 ? '#ffd040' : '#ff8020'); put(16, 26, fl > 0.5 ? '#ff8020' : '#ffd040'); put(15 + (fl > 0.3 ? 1 : 0), 25, '#e04010'); if (fl > 0.6) put(16, 24, '#ff8020');
+            put(7, 24, '#ff5a8a'); put(8, 24, '#ffd040'); put(23, 24, '#ff5a8a'); put(24, 24, '#ffffff');
+            // vines hanging over the top
+            for (const [vx, len, ph] of [[1, 9, 0], [5, 5, 1.7], [26, 6, 3.1], [30, 11, 0.6]]) for (let y = 0; y < len; y++) {
+              const sx = vx + (y > len - 4 && Math.sin(t * 0.9 + ph) > 0.4 ? 1 : 0);
+              put(sx, y, MOSS[0]);
+              if (y % 3 === 1) put(sx + (y % 6 === 1 ? 1 : -1), y, MOSS[2]);
+            }
+            // a butterfly or a dragonfly visiting, if one rolled
+            if (visitor !== 'None') {
+              const vx = 22 + Math.round(Math.sin(t * 0.8) * 3), vy = 4 + Math.round(Math.cos(t * 1.1) * 1.5), up = Math.floor(t * 6) % 2;
+              const VC = visitor === 'Dragonfly' ? '#3ad0ff' : visitor === 'Moth' ? '#d8c8a0' : '#ff9a2a';
+              put(vx, vy, '#1a1008'); put(vx - 1, vy - up, VC); put(vx + 1, vy - up, VC); if (!up) { put(vx - 1, vy + 1, VC); put(vx + 1, vy + 1, VC); }
+            }
+            for (let i = dust.length - 1; i >= 0; i--) {
+              const d = dust[i], y = (t - d.t0) * d.sp * 9;
+              if (y > G) { dust.splice(i, 1); continue; }
+              if (y >= 0) put(d.x + Math.round(Math.sin(y * 0.5 + d.x)), y, '#d8c8a0');
+            }
+          },
+        };
+      }
+    }
 
     const pal = screens[screens[screen] ? screen : 'Pea'].map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
     const px = new Uint8Array(G * G);

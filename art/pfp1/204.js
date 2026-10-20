@@ -10,7 +10,7 @@ Proto.add({
   seed: 5,
   interactive: 'Tap to bucket-fill, drag to spray, tap a swatch to pick a colour.',
   music: true,
-  recipe: 'A duck doodled with a mouse in an old desktop paint program, 64 dots across: jaggy one-dot outlines, the ellipse tool, bucket fills that stop at every line, spray-can speckle, all inside the program\'s window with its palette along the bottom. Pose, feathers, bill, what it carries in it, eyes, headwear, neckwear, a friend, the scene, a corner doodle, how steady the hand was, the window colours, the cursor and the odd Image-menu command (flip, skew, invert, tile, zoom) vary; about 1 in 375 is a legendary (a Transparent duck made of the see-through checkerboard of the program, a Phoenix of flame with embers rising for ever, or a Mandarin in full plumage), and about 1 in 200 sits by the coveted Golden Egg; each one is drawn again stroke by stroke, then it blinks and the cursor rests.',
+  recipe: 'A duck doodled with a mouse in an old desktop paint program, 64 dots across: jaggy one-dot outlines, the ellipse tool, bucket fills that stop at every line, spray-can speckle, all inside the program\'s window with its palette along the bottom. Pose, feathers, bill, what it carries in it, eyes, headwear, neckwear, a friend, the scene, a corner doodle, how steady the hand was, the window colours, the cursor and the odd Image-menu command (flip, skew, invert, tile, zoom) vary; about 1 in 375 is a legendary, a picture in a style of its own (Transparent: an X-ray film of the duck, its bones glowing; Phoenix: a tarot card, XX, The Phoenix, displayed in flame before a burning sun; or Mandarin: a cloisonne enamel plaque, the drake mandarin in gold wire cells of bright enamel on a turquoise ground), and about 1 in 200 sits by the coveted Golden Egg; each one is drawn again stroke by stroke, then it blinks and the cursor rests.',
   make(c) {
     const S = c.size, g = c.ctx;
     // splitmix32 over a seed folded from the hash: the original traits and the strokes' wobble
@@ -280,6 +280,7 @@ Proto.add({
     if (friend === 'Snail') { ellTool(10, 53.5, 7, 1.5, BLACK, 22); ellTool(11, 49.5, 4, 4, BLACK, ORANGE); const pts = []; for (let i = 0; i <= 14; i++) { const a = i * 0.6, r = 0.3 + i * 0.2; pts.push([11 + Math.cos(a) * r, 49.5 + Math.sin(a) * r]); } pen(pts, BLACK); pen([[4, 52], [3, 48]], BLACK); pen([[5, 52], [5.5, 48]], BLACK); }
     if (friend === 'Computer Mouse') { ellTool(10, 48, 4, 5.5, BLACK, SILVER); pen([[6, 46], [14, 46]], BLACK); pen([[10, 42.5], [10, 46]], BLACK); pen([[10, 42.5], [8, 39], [4, 39], [2, 36]], GREY); }
     J = R;
+    const opsBeforeDuck = ops.length;   // the scene, the doodle and the friend (the Transparent legendary shows them through its glass)
 
     // the duck
     if (pose !== 'Bottoms Up') {
@@ -543,35 +544,477 @@ Proto.add({
     const root = 55 + ((sm >>> 5) % 7);
     let replayAt = 0, quackAt = -9;
     const ghostMask = new Uint8Array(N * N);
-    const FLAME = [16, 17, 27, 3, ORANGE, YEL];
-    // a tap on a legendary itself: the ghost says boo, the phoenix burns and is drawn again from its ashes, the mandarin whistles
-    function legendHit(tx, ty) {
-      if (!LEG) return false;
-      const x = facing === 'Right' ? CX0 + CX1 - tx : tx, i = ty * N + x;
-      if (LEG === 'Transparent') return !!ghostMask[i];
-      const k = lastBuf[ty * N + tx];
-      if (LEG === 'Phoenix') return FLAME.includes(k) && ty > CY0 && x > 12 && x < 62;
-      return [22, 13, 4, 7, ORANGE, WHITE].includes(k) && x > 14 && x < 56 && ty > 10 && ty < 56;
-    }
-    function legTap(t) {
-      if (LEG === 'Transparent' && t - legAt > 1) {
-        legAt = t;
-        [12, 8, 3].forEach((d, i) => c.sound.note(root + d, { dur: 0.6, vel: 0.14, wave: 'sine', attack: 0.18, at: i * 0.22 }));
-      } else if (LEG === 'Phoenix' && t - legAt > 3.4) {
-        legAt = t;
-        for (let i = 0; i < 6; i++) c.sound.hit('noise', 0.08, { cutoff: 900 + i * 300, dur: 0.12, at: i * 0.09 });
-        MODE.slice(0, 8).forEach((d, i) => c.sound.note(root + d, { dur: 0.16, vel: 0.16, wave: 'triangle', at: 0.8 + i * 0.1 }));
-        c.sound.note(root + 24, { dur: 0.8, vel: 0.14, wave: 'triangle', at: 1.65 });
-      } else if (LEG === 'Mandarin' && t - legAt > 0.7) {
-        legAt = t;
-        c.sound.note(root + 26, { dur: 0.18, vel: 0.12, wave: 'sine', attack: 0.04 });
-        c.sound.note(root + 31, { dur: 0.3, vel: 0.12, wave: 'sine', attack: 0.05, at: 0.16 });
-        c.sound.note(root + 24, { dur: 0.25, vel: 0.1, wave: 'sine', at: 0.42 });
+    // ================= the legendaries, each in a style of its own (drawn whole on their own grid, 96 dots across) ====
+    // Transparent: an X-ray film; Phoenix: a tarot card; Mandarin: a woodblock print. They share the duck's own
+    // shape and the drawing of what it wears and carries (so every trait shows, each in its style's colours).
+    const LG = 96;
+    // the duck, facing left, as shape tests on the 96 grid; its pose moves the body, the wings and the legs
+    const DUCK = (() => {
+      const by = pose === 'Swimming' ? 64 : pose === 'Standing' ? 54 : 60, hy = pose === 'Swimming' ? 38 : pose === 'Standing' ? 30 : 34;
+      const H = [31, hy], R = 11;
+      const body = (x, y) => ((x - 54) / 27) ** 2 + ((y - by) / 15) ** 2 <= 1;
+      const neck = (x, y) => ((x - 37) / 8) ** 2 + ((y - (hy + by) / 2 + 2) / ((by - hy) / 2 + 1)) ** 2 <= 1;
+      const head = (x, y) => (x - H[0]) ** 2 + (y - H[1]) ** 2 <= R * R;
+      const bill = (x, y) => { const u = (H[0] - 9 - x) / 13; if (u < 0 || u > 1) return false; return Math.abs(y - (H[1] + 3 + u * 2)) < 3.6 * (1 - u * 0.55); };
+      const tail = (x, y) => { const ax = 78, ay = by - 4; const u = (x - ax) / 10; return u >= 0 && u <= 1 && y > ay - 8 * u - 1 && y < ay + 4 - u * 2; };
+      const wingUp = pose === 'Flapping';
+      const wing = (x, y) => wingUp ? ((x - 62) / 9) ** 2 + ((y - (by - 18)) / 16) ** 2 <= 1 && y < by - 2 : ((x - 60) / 16) ** 2 + ((y - by + 1) / 8) ** 2 <= 1;
+      const legs = (x, y) => pose === 'Standing' && y > by + 12 && y < by + 24 && (Math.abs(x - 48) < 1.5 || Math.abs(x - 58) < 1.5) || (pose === 'Standing' && y >= by + 23 && y <= by + 25 && ((x > 42 && x < 50) || (x > 52 && x < 60)));
+      const any = (x, y) => body(x, y) || neck(x, y) || head(x, y) || bill(x, y) || tail(x, y) || wing(x, y) || legs(x, y);
+      return { by, hy, H, R, body, neck, head, bill, tail, wing, legs, any, eye: [H[0] - 3, H[1] - 3], tip: [H[0] - 22, H[1] + 5], hatAt: [H[0] + 1, H[1] - R + 1], neckAt: [38, by - 12] };
+    })();
+    // a little pixel art kit: rows of characters, each mapped to a colour (or skipped)
+    const SPR = (put, art, x0, y0, map) => art.forEach((r, j) => { for (let i = 0; i < r.length; i++) { const k = map[r[i]]; if (k !== undefined) put(x0 + i, y0 + j, k); } });
+    // (a sprite that must read the right way round on screen, at a screen position, on a grid that is shown mirrored
+    // when the duck faces right)
+    const SPRS = (put, art, sx, sy, map) => facing === 'Right' ? SPR(put, art.map(r => [...r].reverse().join('')), LG - sx - art[0].length, sy, map) : SPR(put, art, sx, sy, map);
+    const HATS = {
+      'Top Hat': ['..KKKKK..', '..KAAAK..', '..KAAAK..', '..KBBBK..', 'KKKKKKKKK'], 'Sailor Cap': ['..KKKKK..', '.KLLLLLK.', 'KLLLLLLLK', 'KKAAAAAKK'], Beanie: ['....A....', '..KKKKK..', '.KAAAAAK.', 'KABABABAK', 'KKKKKKKKK'],
+      'Party Hat': ['....A....', '...KBK...', '...KAK...', '..KBAAK..', '..KAABK..', '.KBAAABK.', 'KKKKKKKKK'], Flower: ['.A.A.', 'AABAA', '.A.A.', '..K..'], Crown: ['A.A.A.A', 'AAAAAAA', 'ABAAABA', 'AAAAAAA'],
+      'Cowboy Hat': ['...KKK...', '..KAAAK..', 'KKKAAAKKK', '.KKKKKKK.'], 'Chef Hat': ['.LL.LL.', 'LLLLLLL', 'LLLLLLL', '.LLLLL.', '.KKKKK.'], 'Propeller Cap': ['AA.K.BB', '...K...', '.KAAAK.', 'KABABAK', 'KKKKKKK'],
+      Headphones: ['..KKKKK..', '.K.....K.', 'K.......K', 'AA.....AA', 'AA.....AA'], 'Wizard Hat': ['.....K...', '....KA...', '...KAAK..', '..KABAK..', '..KAAAAK.', 'KKKKKKKKK'], 'Viking Helmet': ['L.......L', 'L.KKKKK.L', '.LKAAAKL.', '..KAAAK..', 'KKKKKKKKK'],
+      Halo: ['.AAAAA.', 'A.....A', '.AAAAA.'], 'Flame Crest': ['..A..A.', '.ABA.AB', 'ABBAABA', '.AAAAA.'], Crest: ['....AA', '..AAB.', 'AABB..', 'BB....'],
+    };
+    const NECKS = {
+      'Bow Tie': ['A...A', 'AAKAA', 'A...A'], Scarf: ['AAAAAAA', 'ABABABA', '....AB.', '....BA.'], Medal: ['K.K', '.K.', 'AAA', 'ABA', 'AAA'], Bell: ['.K.', 'AAA', 'AAA', 'AKA'],
+      Pearls: ['L.L.L.L.L'], Lei: ['ABABABAB', '.BABABA.'], Necktie: ['AAA', '.A.', 'AAA', 'ABA', '.A.'], Bandana: ['AAAAAAA', '.ABABA.', '..AAA..', '...A...'], 'Life Ring': ['.LAAL.', 'A....A', 'L....L', '.LAAL.'], Camera: ['.K.K.', 'KKKKK', 'KLAKK', 'KKKKK'],
+    };
+    const BILLS = { Worm: ['AA.AA', '.AAA.'], Flower: ['.A.', 'ABA', '.A.', '.K.'], Bread: ['.LLL.', 'LLLLL', 'LLLLL'], Letter: ['LLLLL', 'LKLKL', 'LLKLL', 'LLLLL'], Bubblegum: ['.AAA.', 'AAAAA', 'AAAAA', '.AAA.'], Fish: ['A..AA.', 'AAAAAB', 'A..AA.'] };
+    const FRIENDS = { Duckling: ['.AA..', 'AAAB.', '.AAA.', 'AAAA.'], Frog: ['A.A.A', 'AAAAA', 'ABBBA', 'A...A'], Fish: ['..AA..A', '.AAAAAA', 'ABAAAAA', '.AAAAAA', '..AA..A'], Bee: ['..L.L', '.ABAB', 'ABABA', '.ABA.'], Snail: ['..AA.', '.ABBA', 'AABAA', 'KKKKK'], 'Computer Mouse': ['..K..', '.LLL.', 'LLKLL', 'LLLLL', '.LLL.'] };
+    const DOODLES = { Sun: ['A.A.A', '.AAA.', 'AAAAA', '.AAA.', 'A.A.A'], Rainbow: ['.AAAA.', 'ABBBBA', 'AB..BA', 'A....A'], Hearts: ['AA.AA', 'AAAAA', '.AAA.', '..A..'], Stars: ['..A..', 'AAAAA', '.AAA.', 'A...A'], Raincloud: ['.LLL.', 'LLLLL', '.A.A.', 'A.A..'], Moon: ['.AA..', 'AA...', 'AA...', '.AA..'], Balloons: ['AA.BB', 'AA.BB', '.K.K.', '..K..'], Lightning: ['..AA', '.AA.', 'AAAA', '.AA.', 'AA..'], Spiral: ['AAAAA', 'A...A', 'A.A.A', 'A.AAA'], Kite: ['..A..', '.ABA.', 'ABBBA', '.ABA.', '..K..', '.K...'], UFO: ['..A..', '.LLL.', 'AAAAA'] };
+    const CURSORS2 = { Arrow: ['K....', 'KK...', 'KLK..', 'KLLK.', 'KLLLK', 'KLKK.', 'K..K.'], Pencil: ['....KK', '...KAK', '..KAK.', '.KAK..', 'KLK...', 'KK....'], Bucket: ['.KKK..', 'KLLLK.', 'KLLLKA', 'KLLLKA', '.KKK.A'], 'Spray Can': ['..L.L', '.KK..', 'KAAK.', 'KAAK.', 'KAAK.', 'KKKK.'], Brush: ['....KA', '...KA.', '..KA..', '.LK...', 'LL....'], Hourglass: ['KKKKK', '.KAK.', '..K..', '.KLK.', 'KKKKK'] };
+    // the Image trait, laid over a finished picture: skewed (sheared), inverted (each style says how), tiled, zoomed
+    const IMGFX = (px, inv) => {
+      if (image === 'Skewed') { const o = px.slice(); for (let y = 0; y < LG; y++) { const s = Math.round((y - 48) * 0.12); for (let x = 0; x < LG; x++) px[y * LG + x] = o[y * LG + Math.max(0, Math.min(LG - 1, x + s))]; } }
+      if (image === 'Tiled') { const o = px.slice(); for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) px[y * LG + x] = o[((y * 2) % LG) * LG + (x * 2) % LG]; }
+      if (image === 'Zoomed') { const o = px.slice(); for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) px[y * LG + x] = o[(24 + (y >> 1)) * LG + 20 + (x >> 1)]; }
+      if (image === 'Inverted' && inv) inv(px);
+    };
+    // the finished grid onto the canvas, through a palette (mirrored when it faces right)
+    const LCV = document.createElement('canvas'); LCV.width = LCV.height = LG;
+    const LCX = LCV.getContext('2d'), LIM = LCX.createImageData(LG, LG);
+    const LSHOW = (px, pal, mir = facing === 'Right') => {
+      const d = LIM.data;
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const p = pal[px[y * LG + (mir ? LG - 1 - x : x)]], j = (y * LG + x) * 4; d[j] = p[0]; d[j + 1] = p[1]; d[j + 2] = p[2]; d[j + 3] = 255; }
+      LCX.putImageData(LIM, 0, 0);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(LCV, 0, 0, S, S);
+    };
+    // a press: a short still one is a tap; longer, a hold; and where it went down
+    const LPR = { at: -9, x: 0, y: 0, mv: 0, was: false };
+    const lpress = (inp, t) => {
+      inp.taps();
+      let tap = false, rel = false;
+      if (inp.down && !LPR.was) { LPR.at = t; LPR.x = inp.x; LPR.y = inp.y; LPR.mv = 0; }
+      if (inp.down) LPR.mv = Math.max(LPR.mv, Math.hypot(inp.x - LPR.x, inp.y - LPR.y) * LG);
+      if (!inp.down && LPR.was) { rel = true; tap = t - LPR.at < 0.3 && LPR.mv < 2; }
+      LPR.was = inp.down;
+      return { tap, rel, hold: inp.down && t - LPR.at > 0.3 && LPR.mv < 2, held: t - LPR.at, drag: inp.down && LPR.mv >= 2 };
+    };
+    // (the pointer in the grid's own unmirrored dots)
+    const lpt = inp => [(facing === 'Right' ? 1 - inp.x : inp.x) * LG, inp.y * LG];
+    // ---- Transparent: an X-ray film. The duck seen straight through: a faint glow of flesh and, in it, its bones,
+    // bright on the black film (skull, eye socket, the bones of its bill, the chain of its neck, spine, ribs, wing,
+    // legs) and whatever metal it wears shining solid. Your pointer is the scanner: under its ring the bones blaze
+    // out; with no pointer a scan line sweeps the film. A quick tap takes an exposure (a white flash, then every bone
+    // at once); hold and its heart shows, beating, with a trace running along the bottom of the film.
+    // Its traits, the film's way: the lightbox's tint (Scene), the ID label (Window, with the bill's colour), the lead
+    // L or R marker (Facing), the doodle as a marker stuck to the film, the friend's ghost in the corner, the eyes,
+    // headwear, neckwear and what's in its bill seen through, the hand's tremble as a doubled exposure, Inverted as a
+    // negative, the cursor at your pointer.
+    const XR = LEG === 'Transparent' ? (() => {
+      const TIS = new Uint8Array(LG * LG), BONE = new Uint8Array(LG * LG), ACC = new Uint8Array(LG * LG), FILM = new Uint8Array(LG * LG);
+      const WOB = hand === 'Very Shaky' ? 1.4 : hand === 'Shaky' ? 0.8 : 0;
+      const D = DUCK;
+      // the film: near black, a faint grain and a couple of scratches
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const h = ((x * 73856093) ^ (y * 19349663)) >>> 0; FILM[y * LG + x] = (h % 23 === 0) ? 1 : (Math.abs(x - 70 - y * 0.18) < 0.5 && y > 8 && y < 40) ? 1 : 0; }
+      // the flesh: a soft glow, denser toward its edge
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+        const X = x + Math.sin(y * 0.8) * WOB * 0.3;
+        if (!D.any(X, y)) continue;
+        const e = !D.any(X - 2, y) || !D.any(X + 2, y) || !D.any(X, y - 2) || !D.any(X, y + 2);
+        TIS[y * LG + x] = e ? 3 : D.bill(X, y) ? 3 : 2;
       }
+      // the bones: 1 dim, 2 bone, 3 a joint or the brightest edge
+      const bput = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LG && y < LG && BONE[y * LG + x] < v) BONE[y * LG + x] = v; };
+      const bline = (pts, w, v) => { for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i], n = Math.ceil(Math.hypot(bx - ax, by - ay) * 2); for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, y = ay + (by - ay) * k / n; for (let dy = -w; dy <= w; dy++) for (let dx = -w; dx <= w; dx++) if (dx * dx + dy * dy <= w * w + 0.3) bput(x + dx, y + dy, v); } } };
+      const ring = (cx, cy, rx, ry, v, a0 = 0, a1 = 6.283) => { const n = Math.ceil((rx + ry) * 3); for (let k = 0; k <= n; k++) { const a = a0 + (a1 - a0) * k / n; bput(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, v); } };
+      const [hx, hy] = D.H;
+      ring(hx, hy, 8, 7.5, 2); ring(hx, hy, 7, 6.5, 1);                                   // the skull
+      bline([[hx - 7, hy + 1], [D.tip[0] + 2, D.tip[1] - 2]], 0, 2); bline([[hx - 6, hy + 4], [D.tip[0] + 3, D.tip[1] + 1]], 0, 2);   // the bill's bones
+      const neck = []; for (let k = 0; k <= 6; k++) neck.push([hx + 5 + k * 1.4, hy + 7 + k * ((D.by - hy - 14) / 6)]);
+      for (const [x, y] of neck) { bline([[x - 1.5, y], [x + 1.5, y]], 0.6, 2); bput(x, y, 3); }        // the vertebrae
+      const sp = []; for (let k = 0; k <= 10; k++) sp.push([40 + k * 3.8, D.by - 9 + Math.sin(k / 10 * Math.PI) * -3 + k * 0.3]);
+      bline(sp, 0.6, 2);                                                                          // the spine
+      for (let k = 1; k <= 6; k++) { const [x, y] = sp[k]; ring(x - 1, y + 6, 3, 6, 2, -1.6, 1.4); }     // the ribs
+      ring(70, D.by - 3, 6, 4, 2, 2.4, 6.0);                                                       // the pelvis
+      // the wing's bones (raised if it flaps)
+      if (pose === 'Flapping') bline([[52, D.by - 8], [60, D.by - 22], [66, D.by - 32], [72, D.by - 30]], 0.5, 2);
+      else bline([[46, D.by - 4], [58, D.by - 2], [70, D.by - 2], [76, D.by - 5]], 0.5, 2);
+      // the legs: standing, the long bones and toes; otherwise folded under it
+      if (pose === 'Standing') for (const lx of [48, 58]) { bline([[lx + 2, D.by + 6], [lx, D.by + 14], [lx, D.by + 23]], 0.5, 2); bline([[lx - 3, D.by + 24], [lx + 3, D.by + 24]], 0, 3); }
+      else for (const lx of [50, 60]) bline([[lx, D.by + 6], [lx - 4, D.by + 10], [lx + 2, D.by + 12]], 0.5, 1);
+      // its eyes (Eyes) as the X-ray sees them; glasses and shades shine as metal does
+      const [ex, ey] = D.eye, A = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LG && y < LG) ACC[y * LG + x] = v; };
+      const EY = {
+        Glasses: () => { ring(ex, ey, 3, 3, 3); ring(ex + 6, ey + 1, 2.5, 2.5, 3); bline([[ex + 3, ey], [ex + 4, ey]], 0, 3); },
+        Shades: () => { for (let y = -1; y <= 1; y++) for (let x = -3; x <= 7; x++) A(ex + x, ey + y, 8); },
+        Hearts: () => SPR(A, ['AA.AA', 'AAAAA', '.AAA.', '..A..'], ex - 2, ey - 2, { A: 10 }),
+        Star: () => SPR(A, ['..A..', 'AAAAA', '.AAA.', 'A...A'], ex - 2, ey - 2, { A: 7 }),
+        Googly: () => { ring(ex, ey, 3.5, 3.5, 3); A(ex + 1, ey + 1, 8); },
+        Dizzy: () => { for (let k = 0; k < 14; k++) A(ex + Math.cos(k * 0.9) * k * 0.25, ey + Math.sin(k * 0.9) * k * 0.25, 7); },
+        Sleepy: () => bline([[ex - 2, ey], [ex + 2, ey]], 0, 3), Happy: () => ring(ex, ey + 1, 2.5, 2, 3, 3.4, 6.0),
+        Teary: () => { ring(ex, ey, 2.5, 2.5, 2); A(ex, ey + 4, 8); A(ex, ey + 5, 8); }, Angry: () => { ring(ex, ey, 2.5, 2.5, 2); bline([[ex - 3, ey - 4], [ex + 2, ey - 2]], 0, 3); },
+        Lashes: () => { ring(ex, ey, 2.5, 2.5, 2); for (const d of [-2, 0, 2]) A(ex + d, ey - 4, 7); },
+      }[eyes];
+      if (EY) EY(); else ring(ex, ey, 2.5, 2.5, 3);
+      // what it wears: fabric faint, the metal (crowns, buckles, the bell, the camera, the medal) solid white
+      const XM = { K: 6, A: 5, B: 8, L: 5 };
+      const ht = HATS[hat]; if (ht) SPR(A, ht, D.hatAt[0] - (ht[0].length >> 1), D.hatAt[1] - ht.length + 1, hat === 'Crown' || hat === 'Halo' || hat === 'Viking Helmet' ? { A: 8, B: 7, K: 7, L: 8 } : XM);
+      const nk = NECKS[neck]; if (nk) SPR(A, nk, D.neckAt[0] - (nk[0].length >> 1), D.neckAt[1], neck === 'Medal' || neck === 'Bell' || neck === 'Camera' || neck === 'Pearls' ? { A: 8, B: 7, K: 7, L: 8 } : XM);
+      const ib = BILLS[inBill]; if (ib) SPR(A, ib, D.tip[0] - 4, D.tip[1] - 1, inBill === 'Fish' ? { A: 7, B: 8 } : { A: 6, B: 7, L: 6, K: 5 });
+      // the friend's faint ghost in the corner, the doodle stuck on as a lead marker, the L or R marker, the ID label
+      // its organs, seen only under the scanner's lens: lungs, the heart, the gizzard
+      const ORG = new Uint8Array(LG * LG);
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+        const lung = ((x - 52) / 8) ** 2 + ((y - D.by + 4) / 3.5) ** 2 <= 1, giz = ((x - 64) / 5) ** 2 + ((y - D.by - 3) / 4) ** 2 <= 1, gizE = giz && ((x - 64) / 5) ** 2 + ((y - D.by - 3) / 4) ** 2 > 0.6;
+        if (lung) ORG[y * LG + x] = 4; if (gizE) ORG[y * LG + x] = 6; else if (giz) ORG[y * LG + x] = 3;
+      }
+      // the duck made bigger on the film (it fills it), before the markers go on
+      const up = L => { const o = L.slice(); for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const sx = Math.round(48 + (x - 48) / 1.34), sy = Math.round(50 + (y - 52) / 1.34); L[y * LG + x] = sx >= 0 && sy >= 0 && sx < LG && sy < LG ? o[sy * LG + sx] : 0; } };
+      up(TIS); up(BONE); up(ACC); up(ORG);
+      // the film's edge: a lighter base strip along the foot with its edge numbers and notches (as film reads)
+      const D3 = { 1: ['010', '110', '010', '010', '111'], 2: ['111', '001', '111', '100', '111'], 4: ['101', '101', '111', '001', '001'], A: ['010', '101', '111', '101', '101'] };
+      for (let y = LG - 8; y < LG; y++) for (let x = 0; x < LG; x++) A(x, y, y === LG - 8 ? 2 : (y === LG - 3 && x % 6 < 3) ? 6 : 1);
+      let ex2 = 14; for (const ch of '24A') { SPRS(A, D3[ch], ex2, LG - 7, { 1: 6 }); ex2 += 4; }
+      ex2 = 66; for (const ch of '21') { SPRS(A, D3[ch], ex2, LG - 7, { 1: 6 }); ex2 += 4; }
+      for (const nx of [4, 8]) for (let y = 0; y < 4; y++) A(nx, y, 1);
+      const fr = FRIENDS[friend]; if (fr) SPR(A, fr, 84, 76, { A: 4, B: 6, L: 5, K: 5 });
+      const dd = DOODLES[doodle]; if (dd) SPRS(A, dd, 84, 6, { A: 8, B: 7, L: 7, K: 7 });
+      SPRS(A, facing === 'Right' ? ['XXX.', 'X..X', 'XXX.', 'X.X.', 'X..X'] : ['X...', 'X...', 'X...', 'X...', 'XXXX'], 6, 78, { X: 10 });
+      for (let y = 4; y < 14; y++) for (let x = 4; x < 32; x++) A(x, y, y === 4 || y === 13 || x === 4 || x === 31 ? 9 : (y === 7 || y === 10) && x > 6 && x < 27 && (x * 7 % 5) ? 7 : x > 26 && x < 30 && y > 5 && y < 12 ? 12 : 0);
+      // the theme's colour for the label, the bill's colour on it, the scene's tint over the whole film
+      const TINT = { Pond: [0.4, 1, 1], Sky: [0.5, 0.8, 1.2], Meadow: [0.6, 1.1, 0.7], Night: [0.6, 0.6, 1.2], Bathtub: [0.5, 1.05, 1.15], Lava: [1.25, 0.6, 0.45], Snow: [0.9, 1, 1.15], Sunset: [1.2, 0.85, 0.6], Beach: [0.7, 1.1, 1], Space: [0.9, 0.6, 1.25] }[scene] || [0.5, 1, 1.1];
+      const tn = (r, gg, b) => [Math.min(255, r * TINT[0]) | 0, Math.min(255, gg * TINT[1]) | 0, Math.min(255, b * TINT[2]) | 0];
+      const THC = { Navy: [40, 60, 160], Teal: [30, 140, 140], Maroon: [150, 40, 50], Olive: [130, 130, 40], Graphite: [110, 110, 120], Plum: [140, 60, 150], 'Hot Dog': [230, 60, 40] }[theme] || [40, 60, 160];
+      const BLC = { Orange: [255, 140, 40], Yellow: [255, 220, 60], Red: [230, 50, 50], Black: [40, 40, 40], Gold: [230, 180, 60], Pink: [255, 120, 180], Blue: [60, 140, 255], Purple: [150, 80, 230] }[bill] || [255, 140, 40];
+      const pal = [tn(4, 10, 14), tn(14, 26, 32), tn(20, 54, 64), tn(34, 92, 106), tn(52, 130, 146), tn(96, 170, 186), tn(170, 226, 236), tn(226, 250, 255), [255, 255, 255], THC, [255, 70, 60], tn(40, 70, 80), BLC];
+      const neg = pal.map(p => [255 - p[0], 255 - p[1], 255 - p[2]]);
+      const px = new Uint8Array(LG * LG);
+      return { TIS, BONE, ACC, ORG, FILM, pal, neg, px, flashAt: -9, wasHold: false };
+    })() : null;
+    function xrayFrame(t) {
+      const K = XR, inp = c.input, px = K.px, pr = lpress(inp, t), [pX, pY] = lpt(inp);
+      if (pr.tap) { K.flashAt = t; c.sound.hit('click', 0.6); c.sound.hit('noise', 0.12, { cutoff: 7000, dur: 0.15 }); c.sound.note(root + 31, { dur: 0.4, vel: 0.06, wave: 'sine', at: 0.05 }); }
+      const ft = t - K.flashAt, hold = pr.hold, beat = hold ? (pr.held * 1.6) % 1 : 1;
+      if (hold && Math.floor(pr.held * 1.6) !== Math.floor((pr.held - 0.05) * 1.6)) { c.sound.note(root + 24, { dur: 0.08, vel: 0.08, wave: 'square', cutoff: 2000 }); c.sound.hit('kick', 0.35); }
+      // the scan: under the scanner's ring (or near the sweeping line) the bones blaze out
+      // the scanner is a lens: inside it the bones blaze white and the organs show; outside, only faint
+      // (an exposure: a white flash held a few frames, then every bone and organ glowing, fading back)
+      const scanY = 10 + ((t * 22) % 76), r2 = 22 * 22, all = ft < 0.22 ? 1 : ft < 2.2 ? 1 - (ft - 0.22) / 2 : 0;
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+        const i = y * LG + x, a = K.ACC[i];
+        const lit = all > 0.35 || (inp.inside ? (x - pX) ** 2 + (y - pY) ** 2 < r2 : Math.abs(y - scanY) < 8);
+        if (a) { px[i] = lit || a > 8 ? a : Math.min(a, 5); continue; }
+        const b = K.BONE[i], ts = K.TIS[i], o = K.ORG[i];
+        if (b) { px[i] = lit ? (b === 1 ? 7 : 8) : inp.inside ? (b === 1 ? 3 : 4) : b === 1 ? 5 : 6; continue; }   // (no scanner on it: the whole skeleton shows, the scan line brighter)
+        if (o && lit) { px[i] = o; continue; }
+        px[i] = ts ? (lit ? ts + 1 : ts - 1) : K.FILM[i];
+      }
+      // the scanner's ring, or the scan line
+      if (inp.inside) for (let k = 0; k < 64; k++) { const a = k / 64 * 6.283, x = Math.round(pX + Math.cos(a) * 20), y = Math.round(pY + Math.sin(a) * 20); if (x >= 0 && y >= 0 && x < LG && y < LG && (k + Math.floor(t * 12)) % 4 < 2) px[y * LG + x] = 6; }
+      else for (let x = 0; x < LG; x++) if (px[Math.round(scanY) * LG + x] < 5) px[Math.round(scanY) * LG + x] = x % 2 ? 4 : 3;
+      // held: its heart, beating, and a trace along the bottom of the film
+      if (hold) {
+        const hx = 46, hy = DUCK.by - 2, sz = 2.5 + (beat < 0.15 ? 1.5 : 0);
+        for (let y = -4; y <= 4; y++) for (let x = -4; x <= 4; x++) if (x * x + y * y <= sz * sz) px[(hy + y) * LG + hx + x] = beat < 0.15 ? 10 : 6;
+        for (let x = 0; x < LG; x++) { const u = ((x / LG + pr.held * 0.8) % 0.33) / 0.33, yy = 84 - (u > 0.4 && u < 0.45 ? 7 : u > 0.45 && u < 0.5 ? -3 : 0); if (x < (pr.held * 60) % LG + 40) px[Math.round(yy) * LG + x] = 7; }
+      }
+      // the cursor at your pointer
+      const cu = CURSORS2[cursorKind]; if (inp.inside && cu) SPRS((x, y, k) => { if (x >= 0 && y >= 0 && x < LG && y < LG) px[y * LG + x] = k; }, cu, Math.round(inp.x * LG), Math.round(pY), { K: 8, L: 1, A: 10 });
+      IMGFX(px, null);
+      LSHOW(px, ft < 0.2 ? K.pal.map((p, i) => i < 3 ? [235, 245, 250] : [255, 255, 255]) : image === 'Inverted' ? K.neg : K.pal);
     }
+    // ---- Phoenix: a tarot card, XX, THE PHOENIX. On a midnight field strewn with stars, the phoenix displayed as on a
+    // coat of arms: body upright, wings spread wide in tiers of flame feathers, head turned in profile under its crest,
+    // a burning sun behind it and a nest of flames below; a gilt border, a numeral above, its name below. Hold it and
+    // the fire takes hold (the flames rise, embers fly, the border glows); let go after a long hold and the card burns
+    // away to ash and is born again; a quick tap turns the card over and back.
+    // Its traits, the card's way: the border's colour (Window), the doodle in the four corner roundels, its eyes, its
+    // pose (how it holds its wings), the friend at its feet, the hand's line, Inverted as a card dealt reversed, the
+    // cursor at your pointer.
+    const TA = LEG === 'Phoenix' ? (() => {
+      const CARD = new Uint8Array(LG * LG), WOB = hand === 'Very Shaky' ? 0.9 : hand === 'Shaky' ? 0.5 : 0;
+      const put = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LG && y < LG) CARD[y * LG + x] = k; };
+      // the card: a dark table at its rounded corners, the border (theme colour, gilt lines), the midnight field
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+        const d = Math.min(x, y, LG - 1 - x, LG - 1 - y), cn = Math.min(Math.hypot(x - 3, y - 3), Math.hypot(LG - 4 - x, y - 3), Math.hypot(x - 3, LG - 4 - y), Math.hypot(LG - 4 - x, LG - 4 - y));
+        let k = 1;
+        if (d < 1) k = 0; else if (d < 4) k = 9; else if (d === 4) k = 3; else if (d === 6) k = 3;
+        if ((x < 4 || x > LG - 5) && (y < 4 || y > LG - 5) && cn > 3) k = 0;
+        if (k === 1 && ((x * 37 + y * 17) % 61 === 0 || (x * 11 + y * 29) % 97 === 0) && y < 70) k = 2;
+        CARD[y * LG + x] = k;
+      }
+      // the numeral's banner and the name plate
+      for (let y = 8; y < 17; y++) for (let x = 36; x < 60; x++) put(x, y, y === 8 || y === 16 || x === 36 || x === 59 ? 3 : 8);
+      SPR(put, ['X...X.X...X', '.X.X...X.X.', '..X.....X..', '.X.X...X.X.', 'X...X.X...X'], 42, 10, { X: 7 });
+      for (let y = 80; y < 91; y++) for (let x = 9; x < 87; x++) put(x, y, y === 80 || y === 90 || x === 9 || x === 86 ? 3 : 8);
+      const F5 = { T: ['111', '010', '010', '010', '010'], H: ['101', '101', '111', '101', '101'], E: ['111', '100', '110', '100', '111'], P: ['110', '101', '110', '100', '100'], O: ['111', '101', '101', '101', '111'], N: ['101', '111', '111', '111', '101'], I: ['111', '010', '010', '010', '111'], X: ['101', '101', '010', '101', '101'] };
+      let lx = 48 - Math.round(('THE PHOENIX'.length * 4 - 1) / 2);
+      for (const ch of 'THE PHOENIX') { const gl = F5[ch]; if (gl) gl.forEach((r, j) => { for (let q = 0; q < 3; q++) if (r[q] === '1') put(lx + q, 83 + j, 7); }); lx += 4; }
+      // the doodle in the four corner roundels
+      const dd = DOODLES[doodle];
+      for (const [cx, cy] of [[13, 13], [82, 13], [13, 70], [82, 70]]) { for (let a = 0; a < 28; a++) put(cx + Math.cos(a / 28 * 6.283) * 5.5, cy + Math.sin(a / 28 * 6.283) * 5.5, 3); if (dd) SPR(put, dd, cx - (dd[0].length >> 1), cy - (dd.length >> 1), { A: 4, B: 5, L: 8, K: 3 }); }
+      // the friend at its feet, by the name plate
+      const fr = FRIENDS[friend]; if (fr) SPR(put, fr, 70, 72, { A: 4, B: 5, L: 8, K: 7 });
+      // the shapes that move (sun, wings, flames) are laid each frame; here, where the wings stand for each pose
+      const WING = { Flapping: [-1.25, 0.55], Sitting: [-0.55, 0.5], Swimming: [-0.15, 0.45], Standing: [-0.85, 0.5] }[pose] || [-0.85, 0.5];
+      const px = new Uint8Array(LG * LG);
+      const pal = [[8, 4, 14], [16, 24, 72], [255, 243, 192], [242, 192, 64], [255, 232, 144], [240, 122, 32], [200, 40, 30], [26, 10, 20], [244, 230, 196], { Navy: [40, 50, 140], Teal: [20, 120, 120], Maroon: [130, 30, 40], Olive: [120, 110, 30], Graphite: [70, 70, 80], Plum: [110, 40, 120], 'Hot Dog': [220, 50, 30] }[theme] || [40, 50, 140], [200, 52, 40], [236, 150, 50], [255, 255, 255], [106, 96, 112], [255, 64, 32], [10, 18, 54]];
+      return { CARD, WOB, WING, px, pal, burnAt: -9, flipAt: -9 };
+    })() : null;
+    function tarotFrame(t) {
+      const K = TA, inp = c.input, px = K.px, pr = lpress(inp, t);
+      if (pr.tap && t - K.burnAt > 3.4 && t - K.flipAt > 1.6) { K.flipAt = t; c.sound.hit('noise', 0.06, { cutoff: 3000, dur: 0.12 }); c.sound.note(root + 24, { dur: 0.2, vel: 0.06, wave: 'triangle', at: 0.3 }); }
+      if (pr.rel && !pr.tap && pr.held > 0.9 && !pr.drag) { K.burnAt = t; for (let i = 0; i < 8; i++) c.sound.hit('noise', 0.1, { cutoff: 700 + i * 350, dur: 0.14, at: i * 0.08 }); MODE.slice(0, 8).forEach((d, i) => c.sound.note(root + d, { dur: 0.16, vel: 0.14, wave: 'triangle', at: 2.0 + i * 0.1 })); c.sound.note(root + 24, { dur: 1.2, vel: 0.1, wave: 'triangle', at: 2.9 }); }
+      const stoke = pr.hold && t - K.burnAt > 3.4 ? Math.min(1, (pr.held - 0.3) / 2.2) : 0;
+      if (stoke && Math.floor(pr.held * 6) !== Math.floor((pr.held - 0.05) * 6)) c.sound.hit('noise', 0.03 + stoke * 0.05, { cutoff: 600 + stoke * 1200, dur: 0.15 });
+      px.set(K.CARD);
+      const put = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 5 && y >= 5 && x < LG - 5 && y < 79) px[y * LG + x] = k; };
+      const cyc = Math.floor(t * (8 + stoke * 14)), W = K.WOB;
+      // the burning sun behind it, its rays turning by a step
+      const rr = Math.floor(t * 1.5) % 2;
+      for (let y = 18; y < 78; y++) for (let x = 6; x < 90; x++) {
+        const dx = x - 48, dy = y - 44, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx), ray = ((a / 6.283 * 24 + rr * 0.5) % 1 + 1) % 1;
+        if (r < 19) put(x, y, r > 17.8 ? 11 : 10);
+        else if (r < 34 && ray < (Math.floor(a / 6.283 * 24 + rr * 0.5) % 2 ? 0.3 : 0.18) && r < (Math.floor(a / 6.283 * 24 + 99) % 2 ? 34 : 28)) put(x, y, 11);
+      }
+      // the nest of flames below, licking up (higher as you stoke it)
+      for (let k = 0; k < 9; k++) {
+        const fx = 22 + k * 6.5, h = 9 + ((k * 5 + cyc) % 4) + stoke * 8, w = 3.2;
+        for (let y = 0; y < h; y++) for (let x = -w; x <= w; x++) { const lim = w * (1 - y / h) ** 0.7; if (Math.abs(x + Math.sin(y * 0.6 + cyc * 0.9 + k) * 1.2 * (y / h)) <= lim) put(fx + x, 78 - y, Math.abs(x) > lim - 1 ? 7 : y > h * 0.6 ? 6 : y > h * 0.3 ? 5 : 4); }
+      }
+      // the wings: tiers of flame feathers fanning out from its shoulders
+      const [w0, sp] = K.WING, flap = Math.sin(t * (2 + stoke * 6)) * 0.08;
+      for (const s of [-1, 1]) for (let tier = 0; tier < 3; tier++) for (let f = 0; f < 6; f++) {
+        const a = w0 + flap + (f - 2.5) * sp * 0.38 + tier * 0.06, len = 34 - tier * 9 - Math.abs(f - 1.5) * 1.8 + stoke * 3, ang = s < 0 ? Math.PI - a : a;
+        const bx = 48 + s * 6, by = 46, col = [6, 5, 3][tier];
+        for (let r = 7; r < len; r++) {
+          const wdt = 2.6 * Math.sin(Math.min(1, r / len) * Math.PI) * (1 - tier * 0.15) + 0.6;
+          const cx = bx + Math.cos(ang) * r, cy = by - Math.sin(ang) * r * -1 * -1 + Math.sin(r * 0.5 + W * Math.sin(r)) * W;
+          for (let q = -wdt; q <= wdt; q += 0.5) { const x = cx - Math.sin(ang) * q, y = cy - Math.cos(ang) * q; put(x, y, Math.abs(q) > wdt - 0.6 ? 7 : col); }
+        }
+      }
+      // its shoulders, where the wings join
+      for (const s of [-1, 1]) for (let y = -6; y <= 6; y++) for (let x = -7; x <= 7; x++) if ((x / 7) ** 2 + (y / 6) ** 2 <= 1) put(48 + s * 8 + x, 46 + y, ((x / 7) ** 2 + (y / 6) ** 2 > 0.7) ? 7 : 6);
+      // its body upright, its tail of three flames, its head in profile with the crest and the gold bill
+      for (let y = 30; y < 80; y++) for (let x = 30; x < 66; x++) {
+        const X = x + Math.sin(y * 0.7) * W * 0.5;
+        const body = ((X - 48) / 8.5) ** 2 + ((y - 56) / 15) ** 2 <= 1, head = (X - 45) ** 2 + (y - 32) ** 2 <= 49, neck = Math.abs(X - 47) < 4.5 && y > 34 && y < 46;
+        const tail = [-1, 0, 1].some(k => { const u = (y - 68) / 12; return u > 0 && u < 1 && Math.abs(X - 48 - k * 5 * u - Math.sin(u * 5 + cyc + k) * 1.2) < 2.6 * (1 - u); });
+        if (!(body || head || neck || tail)) continue;
+        put(x, y, tail ? (y % 3 ? 5 : 6) : body ? (y < 50 ? 4 : (x + y) % 5 === 0 ? 5 : 3) : 4);
+      }
+      // the outline round body and head
+      for (let y = 22; y < 80; y++) for (let x = 30; x < 66; x++) {
+        const i = y * LG + x, v = px[i]; if (v !== 3 && v !== 4 && v !== 5) continue;
+        if ([i - 1, i + 1, i - LG, i + LG].some(j => px[j] === 10 || px[j] === 11 || px[j] === 1 || px[j] === 2 || px[j] === 15)) px[i] = 7;
+      }
+      // the crest of flames (Flame Crest), the gold bill, its eye (Eyes)
+      for (let k = 0; k < 4; k++) { const fx = 42 + k * 3, h = 6 + ((k + cyc) % 3) + stoke * 3; for (let y = 0; y < h; y++) for (let x = -1.5; x <= 1.5; x++) if (Math.abs(x) <= 1.5 * (1 - y / h) + 0.3) put(fx + x - y * 0.25, 26 - y, y > h * 0.5 ? 6 : 5); }
+      for (let x = 30; x <= 39; x++) { const u = (39 - x) / 9; for (let y = -2; y <= 2; y++) if (Math.abs(y) <= 2.2 * (1 - u * 0.6)) put(x, 34 + y + u, Math.abs(y) > 1.6 * (1 - u * 0.6) ? 7 : 3); }
+      const ex = 43, ey = 31;
+      const EY = { Star: ['.X.', 'XXX', '.X.'], Glasses: ['XXXXX', 'X.X.X', 'XXXXX'], Shades: ['XXXX', 'XXXX'], Hearts: ['X.X', 'XXX', '.X.'], Googly: ['XXX', 'X.X', 'XXX'], Sleepy: ['XXX'], Happy: ['X.X', '.X.'], Angry: ['X..', '.XX'], Dizzy: ['XX.', '.X.', '.XX'], Teary: ['XX', 'XX', '.T'], Lashes: ['X.X', 'XXX', 'XXX'] }[eyes] || ['XX', 'XX'];
+      SPR(put, EY, ex - 1, ey - 1, { X: 7, T: 12 });
+      // stoked: the fire climbs the card from its foot (behind the bird), the border scorches from the bottom up, embers fly
+      if (stoke) {
+        const fh = stoke * 72;
+        for (let x = 5; x < LG - 5; x++) {
+          const h = fh * (0.75 + 0.25 * Math.sin(x * 0.7 + cyc * 0.9) * Math.sin(x * 0.23 - cyc * 0.4));
+          for (let y = Math.max(5, Math.round(79 - h)); y < 79; y++) {
+            const i = y * LG + x, v = px[i]; if (!(v === 1 || v === 2 || v === 10 || v === 11 || v === 15)) continue;
+            const u = (79 - y) / Math.max(1, h);
+            px[i] = u > 0.85 ? ((x + y + cyc) % 2 ? 4 : 1) : u > 0.55 ? 5 : u > 0.25 ? 6 : 14;
+          }
+        }
+        const sc = stoke * 100;
+        for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const i = y * LG + x, d = Math.min(x, y, LG - 1 - x, LG - 1 - y); if (d < 1 || d > 6 || K.CARD[i] === 0) continue; const up = LG - 1 - y + (((x * 7) % 5) - 2) * 2; if (up < sc - 6) px[i] = (x * 3 + y) % 5 ? 7 : 13; else if (up < sc) px[i] = (x + y + cyc) % 2 ? 14 : 4; }
+        for (let k = 0; k < 30; k++) { const u = (t * (0.6 + stoke) + k * 0.137) % 1; put(48 + Math.sin(k * 2.4) * 34 * u, 76 - u * 66, u < 0.5 ? 14 : 4); }
+      }
+      // the burning (after a long hold): a front of fire eating in from the edges; then the ash crumbles away and
+      // falls; then, out of the dark, a ring of light opens from the bird and the card is reborn inside it, the
+      // phoenix rising into place
+      const bt = t - K.burnAt;
+      if (bt < 3.4) {
+        if (bt < 1.2) {
+          const front = bt / 1.2 * 52;
+          for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const d = Math.min(x, y, LG - 1 - x, LG - 1 - y) + (((x * 7 + y * 13) % 5) - 2) * 0.6; if (d < front - 2) px[y * LG + x] = (x * 3 + y * 5) % 7 ? 13 : 7; else if (d < front) px[y * LG + x] = (x + y + cyc) % 2 ? 14 : 4; }
+        } else if (bt < 2.0) {
+          const u = (bt - 1.2) / 0.8;
+          for (let y = LG - 1; y >= 0; y--) for (let x = 0; x < LG; x++) {
+            const fall = u * u * (60 + ((x * 37 + Math.floor(y / 3) * 11) % 30)), sy = Math.round(y - fall);
+            px[y * LG + x] = sy >= 0 && ((x * 3 + sy * 5) % 4) && sy < LG - 2 ? ((x * 3 + sy * 5) % 7 ? 13 : 7) : 0;
+          }
+        } else {
+          const u = Math.min(1, (bt - 2.0) / 1.4), R = u * 80, rise = Math.round((1 - Math.min(1, u * 1.6)) * 22), o = px.slice();
+          for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+            const r = Math.hypot(x - 48, y - 46), i = y * LG + x;
+            if (r > R + 2) px[i] = ((x * 13 + y * 7) % 41 === 0) ? 13 : 0;
+            else if (r > R - 1) px[i] = r > R ? 4 : 12;
+            else { const sy = y + rise; px[i] = sy < LG ? o[sy * LG + x] : 0; }
+          }
+          for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283 + t, x = Math.round(48 + Math.cos(a) * (R + 4)), y = Math.round(46 + Math.sin(a) * (R + 4)); if (x >= 0 && y >= 0 && x < LG && y < LG) px[y * LG + x] = 14; }
+        }
+      }
+      // turned over: a full turn (the face narrowing to its edge, the back opening out, held, and back again)
+      const ft = t - K.flipAt;
+      let sq = 1, back = false;
+      if (ft < 1.6) { const u = ft / 1.6; if (u < 0.22) sq = 1 - u / 0.22; else if (u < 0.44) { sq = (u - 0.22) / 0.22; back = true; } else if (u < 0.7) back = true; else if (u < 0.85) { sq = 1 - (u - 0.7) / 0.15; back = true; } else sq = (u - 0.85) / 0.15; sq = Math.max(0.03, sq); }
+      if (back) for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+        // the card's back: navy, a gilt border, a lattice, a ring of stars round a gold sun with its rays
+        const i = y * LG + x; if (K.CARD[i] === 0) { px[i] = 0; continue; }
+        const d = Math.min(x, y, LG - 1 - x, LG - 1 - y), r = Math.hypot(x - 47.5, y - 47.5), a = Math.atan2(y - 47.5, x - 47.5);
+        let k = 15;
+        if (((x + y) % 10 === 0 || (x - y + 100) % 10 === 0) && r > 26) k = 1;
+        if (Math.abs(r - 24) < 0.6) k = 3;
+        if (r < 24 && r > 20 && Math.abs(((a / 6.283 * 12) % 1 + 1) % 1 - 0.5) < 0.12) k = 4;
+        if (r < 9) k = r > 8 ? 11 : 10; else if (r < 17 && Math.abs(((a / 6.283 * 16) % 1 + 1) % 1 - 0.5) < 0.18 - (r - 9) * 0.015) k = 3;
+        if (d < 4) k = 9; else if (d === 4 || d === 6) k = 3;
+        px[i] = k;
+      }
+      if (sq < 1) { const o = px.slice(); for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const sx = 48 + (x - 48) / sq; px[y * LG + x] = sx < 0 || sx >= LG ? 0 : (Math.abs(x - 48) >= 48 * sq - 0.5 && Math.abs(x - 48) < 48 * sq + 0.5 ? 3 : o[y * LG + Math.floor(sx)]); } }
+      // the cursor at your pointer
+      if (facing === 'Right') for (let y = 18; y < 43; y++) for (let x = 29; x < 48; x++) { const a = y * LG + x, b = y * LG + 96 - x, v = px[a]; px[a] = px[b]; px[b] = v; }   // facing right: its head turned the other way
+      // Inverted: the card dealt reversed, upside down
+      IMGFX(px, p => { const o = p.slice(); for (let i = 0; i < LG * LG; i++) p[i] = o[LG * LG - 1 - i]; });
+      const cu = CURSORS2[cursorKind]; if (inp.inside && cu) SPR((x, y, k) => { if (x >= 0 && y >= 0 && x < LG && y < LG) px[y * LG + x] = k; }, cu, Math.round(inp.x * LG), Math.round(inp.y * LG), { K: 7, L: 12, A: 3 });
+      LSHOW(px, K.pal, false);
+    }
+    // ---- Mandarin: cloisonne enamel. A plaque of gold wire cells filled with flat, glossy enamel: the drake mandarin
+    // in its brightest colours (each colour its own cell, gold wire between them all), on a turquoise ground with gold
+    // cloud scrolls, cobalt water laid with gold wave scrolls, a plum branch in flower, a gold rim. A gloss slides over
+    // the enamel now and then. Tap the water and gold rings spread and the drake paddles over, a wake behind it (drag
+    // along the water to lead it); tap the blossom and the petals come down onto the water; tap the drake and it opens
+    // its bill and calls.
+    // Its traits, the plaque's way: the sky's motif (Corner Doodle) in enamel, the medallion's colour (Window), its eyes,
+    // its pose, what's in its bill, the friend on the water, the wire's hand, Inverted as a night enamel, the cursor.
+    const EN = LEG === 'Mandarin' ? (() => {
+      const W = 56, BACK = new Uint8Array(LG * LG), WIRE = hand === 'Very Shaky' ? 1 : hand === 'Shaky' ? 0.5 : 0;
+      const put = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LG && y < LG) BACK[y * LG + x] = k; };
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) {
+        let k = 0;
+        if (y >= W) {
+          // the water: rows of wave scrolls, each a gold wire arc, cobalt and blue cells in turn
+          const row = Math.floor((y - W) / 7), ry = (y - W) % 7, xo = x + (row % 2) * 7, cell = Math.floor(xo / 14), cx = xo % 14 - 7, r = Math.hypot(cx, ry - 7);
+          k = Math.abs(r - 6.5) < 0.7 ? 5 : Math.abs(r - 3.8) < 0.6 ? 3 : 2;
+        } else if (((x * 7 + y * 13) % 37) === 0) k = 16;            // an enamel pit here and there
+        BACK[y * LG + x] = k;
+      }
+      // gold cloud scrolls on the sky
+      for (const [cx, cy, s] of [[30, 16, 1], [54, 30, -1], [16, 38, 1]]) for (let k = 0; k < 40; k++) { const a = k / 40 * 6.283 * 1.6, r = 1 + k * 0.12; put(cx + Math.cos(a) * r * s, cy + Math.sin(a) * r * 0.7, 5); }
+      // the sky's motif (Corner Doodle), in enamel with its wire
+      const MOT = { Sun: () => { for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) { const r = Math.hypot(x, y); if (r < 7.5) put(72 + x, 18 + y, r > 6.6 ? 5 : 8); } },
+        Moon: () => { for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) { const r = Math.hypot(x, y), r2 = Math.hypot(x - 3, y - 2); if (r < 7.5 && r2 > 5.5) put(72 + x, 18 + y, r > 6.6 || r2 < 6.3 ? 5 : 10); } } };
+      const mt = MOT[doodle]; if (mt) mt(); else { const dd = DOODLES[doodle]; if (dd) for (const [ox, oy] of [[64, 12], [76, 20]]) SPRS(put, dd, ox, oy, { A: 8, B: 10, L: 7, K: 5 }); }
+      // the plum branch, brown cells edged in gold, its flowers pink round white hearts
+      for (const pts of [[[96, 6], [82, 12], [70, 12], [62, 18]], [[82, 12], [86, 22], [80, 28]]]) for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i], n = Math.ceil(Math.hypot(bx - ax, by - ay) * 2); for (let k = 0; k <= n; k++) { const x = ax + (bx - ax) * k / n, y = ay + (by - ay) * k / n; put(x, y - 1, 5); put(x, y, 15); put(x, y + 1, 15); put(x, y + 2, 5); } }
+      const BLOS = [[76, 8], [68, 15], [88, 14], [84, 25], [62, 20], [92, 9]];
+      for (const [bx, by] of BLOS) for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) { const r = Math.hypot(x, y); if (r < 3.4) put(bx + x, by + y, r > 2.7 ? 5 : r < 1.2 ? 10 : 13); }
+      // the medallion in the window's colour, with a wire glyph; the maker's gold mark
+      const THK = { Navy: 2, Teal: 12, Maroon: 8, Olive: 10, Graphite: 14, Plum: 11, 'Hot Dog': 9 }[theme] || 2;
+      for (let y = -7; y <= 7; y++) for (let x = -7; x <= 7; x++) { const r = Math.hypot(x, y); if (r < 7.5) put(13 + x, 14 + y, r > 6.5 ? 5 : (Math.abs(x) < 0.6 || Math.abs(y + x * 0.5) < 0.6) && r < 5 ? 5 : THK); }
+      for (let y = 84; y < 91; y++) for (let x = 82; x < 89; x++) put(x, y, y === 84 || y === 90 || x === 82 || x === 88 || (x + y) % 3 === 0 ? 5 : 6);
+      // the gold rim, its black enamel band
+      for (let y = 0; y < LG; y++) for (let x = 0; x < LG; x++) { const d = Math.min(x, y, LG - 1 - x, LG - 1 - y); if (d < 2) BACK[y * LG + x] = d === 0 ? 6 : 5; else if (d < 4) BACK[y * LG + x] = 14; else if (d === 4) BACK[y * LG + x] = 5; }
+      const pal = [[42, 168, 160], [72, 200, 188], [28, 60, 156], [58, 108, 212], [122, 168, 232], [240, 194, 74], [176, 132, 42], [246, 242, 226], [216, 52, 46], [240, 134, 42], [242, 204, 58], [122, 58, 160], [46, 154, 78], [244, 162, 178], [26, 22, 32], [138, 84, 40], [30, 138, 132], [20, 32, 74], [255, 255, 255]];
+      const night = pal.map((p, i) => i === 0 ? [20, 32, 74] : i === 1 ? [36, 52, 104] : i === 16 ? [14, 22, 56] : p);
+      return { BACK, W, WIRE, pal, night, px: new Uint8Array(LG * LG), dx: 0, tx: 0, rings: [], petalsAt: -9, callAt: -9, lastT: 0, vx: 0 };
+    })() : null;
+    // the drake's cells, facing left: the colour of each part (the wire is laid where two cells meet); open: its bill
+    function drakeCell(x, y, open) {
+      const W = EN.W, by = pose === 'Standing' ? 44 : pose === 'Swimming' ? 52 : 50, hx = 30, hy = by - 20;
+      const body = ((x - 56) / 23) ** 2 + ((y - by + 1) / 11) ** 2 <= 1 && y < W + 3;
+      const head = ((x - hx) / 9) ** 2 + ((y - hy) / 8.5) ** 2 <= 1;
+      const crest = y < hy + 2 && x > hx - 2 && x < hx + 21 && y > hy - 10 + (x - hx) * 0.38 && y < hy - 1 + (x - hx) * 0.55;
+      const neck = ((x - 36) / 5.5) ** 2 + ((y - (by - 11)) / 8) ** 2 <= 1;
+      const bu = x < hx - 6 && x > hx - 16 && Math.abs(y - hy - 1 - (hx - 6 - x) * 0.1 + (open ? 1.2 : 0)) < 2 - (hx - 6 - x) * 0.1;
+      const bl = x < hx - 6 && x > hx - 15 && Math.abs(y - hy - 3 - (hx - 6 - x) * (open ? 0.35 : 0.15)) < 1.4 - (hx - 6 - x) * 0.08;
+      const sailUp = pose === 'Flapping' ? 8 : 0;
+      const sail = x > 57 && x < 71 && y > by - 24 - sailUp + Math.abs(x - 64) * 1.15 && y < by - 7;
+      const tail = x > 77 && x < 88 && y > by - 7 - (x - 77) * 0.6 && y < by + 1 - (x - 77) * 0.3;
+      if (bu) return x < hx - 14 ? 7 : 8;
+      if (bl) return 8;
+      if (sail) return x < 64 ? 9 : 8;
+      if (head || crest) { const stripe = Math.abs(y - (hy - 2 + (x - hx) * 0.38)) < 1.7 && x > hx - 4; if (stripe) return 7; if (y < hy - 2 + (x - hx) * 0.38) return x > hx + 6 ? 11 : 12; return x < hx - 1 ? 7 : 9; }
+      if (neck && x < 43) return 9;
+      if (tail) return 15;
+      if (!body) return -1;
+      const bx = 43 + (y - by) * 0.25;
+      if (x < bx) return 11;
+      if (x < bx + 6) return Math.floor((x - bx) / 3) % 2 ? 14 : 7;
+      if (y < by - 4 + (x - 60) * 0.12) return 15;
+      return y > by + 5 ? 7 : 9;
+    }
+    function enamelFrame(t) {
+      const K = EN, inp = c.input, px = K.px, pr = lpress(inp, t), dt = Math.min(0.1, Math.max(0, t - K.lastT)); K.lastT = t;
+      const [qx, qy] = lpt(inp), ox0 = Math.round(K.dx);
+      if (pr.tap) {
+        const onDuck = drakeCell(qx - ox0, qy, false) >= 0;
+        if (qy < 30 && qx > 58) { K.petalsAt = t; [7, 12, 14, 19].forEach((d, i) => c.sound.note(root + 24 + d, { dur: 0.3, vel: 0.06, wave: 'sine', at: i * 0.09 })); }
+        else if (onDuck) { K.callAt = t; c.sound.note(root + 26, { dur: 0.18, vel: 0.12, wave: 'sine', attack: 0.04 }); c.sound.note(root + 31, { dur: 0.3, vel: 0.12, wave: 'sine', attack: 0.05, at: 0.16 }); }
+        else if (qy > K.W - 2) { K.rings.push([qx, qy, t]); if (K.rings.length > 6) K.rings.shift(); K.tx = Math.max(-20, Math.min(12, qx - 50)); c.sound.hit('blip', 0.2, { freq: 300 }); }
+      }
+      if (pr.drag && qy > K.W - 4) K.tx = Math.max(-20, Math.min(12, qx - 50));
+      const v = Math.max(-14, Math.min(14, (K.tx - K.dx) * 2.5)); K.dx += v * dt; K.vx = v;
+      const ox = Math.round(K.dx), bob = Math.sin(t * 1.6) > 0.3 ? 1 : 0, open = t - K.callAt < 0.7;
+      px.set(K.BACK);
+      // the drake: each pixel its cell's enamel, gold wire where cells meet and all round; its reflection below
+      const cellAt = (x, y) => drakeCell(x - ox + Math.sin(y * 0.9) * K.WIRE * 0.5, y - bob, open);
+      for (let y = 4; y < K.W + 4; y++) for (let x = 4; x < 92; x++) {
+        const k = cellAt(x, y); if (k < 0) continue;
+        const wire = cellAt(x + 1, y) !== k || cellAt(x, y + 1) !== k || cellAt(x - 1, y) < 0 || cellAt(x, y - 1) < 0;   // (one wire between two cells, and one all round)
+        if (y >= K.W) continue;
+        px[y * LG + x] = wire ? 5 : k;
+        const ry = 2 * K.W - y + 1;
+        if (ry < LG - 5 && ry > K.W && (ry - K.W) % 2 === 1 && ry - K.W < 16 && !wire) px[ry * LG + x + Math.round(Math.sin(ry + t * 3))] = k === 7 ? 4 : 3;
+      }
+      const by = pose === 'Standing' ? 44 : pose === 'Swimming' ? 52 : 50;
+      if (pose === 'Standing') for (const lx of [50, 60]) for (let y = by + 10; y < K.W + 2; y++) px[y * LG + lx + ox] = 9;
+      // a wake fanning out behind it while it swims
+      if (Math.abs(K.vx) > 0.8) { const bx = (K.vx < 0 ? 84 : 24) + ox, dir = K.vx < 0 ? 1 : -1; for (let k = 0; k < 22; k++) for (const s of [-1, 1]) { const x = Math.round(bx + dir * k * 1.5), y = Math.round(K.W + 2 + (s > 0 ? k * 0.7 : -k * 0.1)); if (x >= 5 && x < LG - 6 && y < LG - 6 && y > K.W) { px[y * LG + x] = k < 4 ? 18 : 5; px[y * LG + x + 1] = k < 4 ? 18 : 5; px[(y + 1) * LG + x] = 6; } } }
+      // its eye (Eyes), what's in its bill
+      const ex = 28 + ox, ey = by - 22 + bob, P = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LG && y < LG) px[y * LG + x] = k; };
+      const EY = { Star: ['.X.', 'XXX', '.X.'], Hearts: ['X.X', 'XXX', '.X.'], Googly: ['XXX', 'XWX', 'XXX'], Sleepy: ['XXX'], Happy: ['X.X', '.X.'], Angry: ['XX.', '.XX'], Dizzy: ['XX.', '.X.', '.XX'], Teary: ['XX', 'XX', '.T'], Lashes: ['XXX', 'XX.'] }[eyes] || ['XX', 'XW'];
+      SPR(P, EY, ex - 1, ey - 1, { X: 14, W: 18, T: 4 });
+      const ib = BILLS[inBill]; if (ib && !open) SPR(P, ib, 11 + ox, by - 19 + bob, { A: 8, B: 10, L: 7, K: 5 });
+      const fr = FRIENDS[friend]; if (fr) SPR(P, fr, 12, K.W + 10, { A: 10, B: 9, L: 7, K: 5 });
+      // the rings on the water
+      for (const [rx, ry, rt] of K.rings) { const u = t - rt; if (u > 2.4) continue; for (const [dr, col] of [[0, 5], [1, 6], [-8, 5]]) { const r = u * 13 + dr; if (r < 1) continue; for (let a = 0; a < 120; a++) { const x = Math.round(rx + Math.cos(a / 120 * 6.283) * r), y = Math.round(ry + Math.sin(a / 120 * 6.283) * r * 0.32); if (y > K.W && x >= 5 && x < LG - 5 && y < LG - 5) px[y * LG + x] = col; } } }   // (bold gold wire rings, an inner one following)
+      // petals: a few drifting always; after a tap, a flurry falling onto the water, each ringing it where it lands
+      const pf = t - K.petalsAt, flurry = pf < 3.6, np = flurry ? 40 : 5;
+      for (let k = 0; k < np; k++) {
+        const u = flurry ? Math.min(1, pf * (0.38 + (k % 5) * 0.07)) : (t * 0.08 + k * 0.2) % 1, x = Math.round(84 - u * (26 + (k % 7) * 6) + Math.sin(t * 2 + k) * 2), y = Math.round(12 + u * (K.W - 8 + (k % 4) * 3));
+        if (flurry && u >= 1) { const lt = pf - 1 / (0.38 + (k % 5) * 0.07); if (lt < 0.9) for (let a = 0; a < 24; a++) P(x + Math.cos(a / 24 * 6.283) * lt * 8, y + Math.sin(a / 24 * 6.283) * lt * 2.4, 5); P(x, y, 13); P(x + 1, y, 13); continue; }
+        for (const [a, b] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) P(x + a, y + b, 13); P(x, y, 10); P(x + 1, y + 1, 5);
+      }
+      // it calls: the bill open, and a little gold glyph rising
+      if (open) { const u = t - K.callAt; SPR(P, ['.XXX', '.X.X', '.X.X', 'XX.X', 'XXXX', '...X'], 14 + ox - Math.round(u * 4), Math.round(by - 34 - u * 10), { X: 5 }); }
+      // the gloss: a soft streak of light sliding over the enamel now and then
+      // (a broad band in which every enamel shows its lighter twin)
+      const gs = ((t * 0.22) % 2.2) * 150 - 50, LT = [1, 1, 3, 4, 7, 10, 5, 18, 13, 10, 7, 13, 1, 7, 15, 9, 0, 2, 18];
+      for (let y = 5; y < LG - 5; y++) { const x0 = Math.round(gs - y * 0.6); for (let x = Math.max(5, x0); x < Math.min(LG - 5, x0 + 14); x++) px[y * LG + x] = LT[px[y * LG + x]]; }
+      const cu = CURSORS2[cursorKind]; if (inp.inside && cu) SPRS((x, y, k) => { if (x >= 0 && y >= 0 && x < LG && y < LG) px[y * LG + x] = k; }, cu, Math.round(inp.x * LG), Math.round(inp.y * LG), { K: 14, L: 7, A: 5 });
+      IMGFX(px, null);
+      LSHOW(px, image === 'Inverted' ? K.night : K.pal);
+    }
+    // (a legendary never reaches the paint program below: frame() hands it to its own style first)
+    const legTap = () => {}, legend = () => ({ done: true });
     let lastBuf = new Uint8Array(N * N), wasNear = false;
     function frame(t) {
       TT = t;
+      if (LEG === 'Transparent') return xrayFrame(t);
+      if (LEG === 'Phoenix') return tarotFrame(t);
+      if (LEG === 'Mandarin') return enamelFrame(t);
       const inp = c.input;
       const gx = Math.floor(inp.x * N), gy = Math.floor(inp.y * N);
       for (const tp of inp.taps()) {
@@ -583,8 +1026,8 @@ Proto.add({
         } else if (ty >= 57 && tx >= 8 && tx <= 51) {
           picked = Math.max(0, Math.min(13, Math.floor((tx - 9) / 3))) + (ty >= 60 ? 14 : 0);
           c.sound.hit('blip', 0.25, { freq: 600 + picked * 40 });
-        } else if (inCanvas(tx, ty) && legendHit(tx, ty)) {
-          legTap(t);
+        } else if (inCanvas(tx, ty) && LEG) {
+          legTap(t, facing === 'Right' ? CX0 + CX1 - tx : tx, ty);
         } else if (goldEgg && Math.hypot((facing === 'Right' ? CX0 + CX1 - tx : tx) - EGX, (ty - EGY) * 0.75) < 8) {
           if (t - eggAt > 0.8) { eggAt = t; [0, 4, 7, 12].forEach((d, i) => c.sound.note(root + 24 + MODE[i * 2], { dur: 0.3, vel: 0.12, wave: 'triangle', at: i * 0.07 })); }
         } else if (inCanvas(tx, ty)) {
@@ -603,7 +1046,7 @@ Proto.add({
           }
         }
       }
-      if (inp.inside && inp.down && gy > 4 && gy < 56 && t - lastSpray > 0.05) {
+      if (!LEG && inp.inside && inp.down && gy > 4 && gy < 56 && t - lastSpray > 0.05) {
         lastSpray = t;
         const k = curColour(), d = [];
         for (let i = 0; i < 6; i++) { const a = sprayRand() * 6.283, rr = Math.sqrt(sprayRand()) * 3.2; d.push([gx + Math.cos(a) * rr, gy + Math.sin(a) * rr]); }
@@ -611,51 +1054,28 @@ Proto.add({
         if (user.length > 600) user.splice(0, 1);
         c.sound.hit('noise', 0.04, { cutoff: 2600, dur: 0.05 });
       }
-      // the phoenix burns for a moment, then is drawn again from the start
-      const lt = t - legAt;
-      if (LEG === 'Phoenix' && lt < 0.8) replayAt = t + 0.05;
-      sailUp = LEG === 'Mandarin' && ((inp.inside && gy > 4 && gy < 56) || lt < 0.8) ? 1 : 0;
-      const n = Math.min(nOps, Math.floor((t - replayAt) / REPLAY * nOps) + 1);
+      let n = nOps, done, legCur = null;
       buf.fill(WHITE);
-      for (let i = 0; i < n; i++) { curOX = ops[i].ox; curOY = ops[i].oy; ops[i].fn(); }
-      const done = n >= nOps;
-      curOX = 0; curOY = HDY;
-      const ex = 25, ey = 22;
-      const quack = pose !== 'Bottoms Up' && done && t - quackAt < 0.35;
-      if (done && pose !== 'Bottoms Up' && ((t + blinkAt) % 4.2) < 0.16 && eyes !== 'Shades' && eyes !== 'Sleepy' && eyes !== 'Happy' && eyes !== 'Dizzy' && eyes !== 'Hearts') {
-        for (let y = ey - 4; y <= ey + 4; y++) for (let x = ex - 4; x <= ex + 4; x++) if ((x - ex) ** 2 + (y - ey) ** 2 <= (eyes === 'Googly' || eyes === 'Glasses' ? 15 : 6)) dot(x, y, headK);
-        line(ex - 3, ey, ex + 3, ey, BLACK);
-      }
-      if (quack) {
-        for (let x = 7; x <= 19; x++) { const h = (19 - x) / 12 * 3; for (let y = Math.round(29 - h); y <= Math.round(29 + h * 0.6); y++) dot(x, y, BLACK); }
-        dot(12, 29, PINK); dot(13, 29, PINK);
-      }
-      curOX = 0; curOY = 0;
-      if (LEG === 'Transparent') {
-        // the duck is the paint program's see-through checkerboard; touch it and even its outline fades
-        const px = facing === 'Right' ? CX0 + CX1 - gx : gx;
-        let near = false;
-        if (inp.inside) for (let dy = -3; dy <= 3 && !near; dy++) for (let dx = -3; dx <= 3; dx++) { const yy = gy + dy, xx = px + dx; if (inCanvas(xx, yy) && ghostMask[yy * N + xx]) { near = true; break; } }
-        if (near && !wasNear) c.sound.note(root + 19, { dur: 0.5, vel: 0.06, wave: 'sine', attack: 0.12 });
-        wasNear = near;
-        ghostMask.fill(0);
-        const boo = lt < 0.5;
-        for (let y = CY0; y <= CY1; y++) for (let x = CX0; x <= CX1; x++) {
-          const i = y * N + x, k = buf[i];
-          if (k !== 8 && k !== 9) continue;
-          ghostMask[i] = 1;
-          const ch = ((x >> 1) + (y >> 1)) & 1;
-          buf[i] = boo ? WHITE : k === 8 ? (ch ? SILVER : WHITE) : (ch ? GREY : SILVER);
+      if (LEG) {
+        // a legendary is its own painting (below), with its own way of being drawn in
+        const r = legend(t, t - replayAt, t - legAt, inp, facing === 'Right' ? CX0 + CX1 - gx : gx, gy);
+        done = r.done; legCur = r.cur;
+      } else {
+        n = Math.min(nOps, Math.floor((t - replayAt) / REPLAY * nOps) + 1);
+        for (let i = 0; i < n; i++) { curOX = ops[i].ox; curOY = ops[i].oy; ops[i].fn(); }
+        done = n >= nOps;
+        curOX = 0; curOY = HDY;
+        const ex = 25, ey = 22;
+        const quack = pose !== 'Bottoms Up' && done && t - quackAt < 0.35;
+        if (done && pose !== 'Bottoms Up' && ((t + blinkAt) % 4.2) < 0.16 && eyes !== 'Shades' && eyes !== 'Sleepy' && eyes !== 'Happy' && eyes !== 'Dizzy' && eyes !== 'Hearts') {
+          for (let y = ey - 4; y <= ey + 4; y++) for (let x = ex - 4; x <= ex + 4; x++) if ((x - ex) ** 2 + (y - ey) ** 2 <= (eyes === 'Googly' || eyes === 'Glasses' ? 15 : 6)) dot(x, y, headK);
+          line(ex - 3, ey, ex + 3, ey, BLACK);
         }
-        if (near && !boo) for (let y = CY0 + 1; y < CY1; y++) for (let x = CX0 + 1; x < CX1; x++) {
-          const i = y * N + x;
-          if (buf[i] === OUT && (ghostMask[i - 1] || ghostMask[i + 1] || ghostMask[i - N] || ghostMask[i + N])) buf[i] = ((x >> 1) + (y >> 1)) & 1 ? SILVER : WHITE;
+        if (quack) {
+          for (let x = 7; x <= 19; x++) { const h = (19 - x) / 12 * 3; for (let y = Math.round(29 - h); y <= Math.round(29 + h * 0.6); y++) dot(x, y, BLACK); }
+          dot(12, 29, PINK); dot(13, 29, PINK);
         }
-      }
-      if (LEG === 'Phoenix' && (lt < 0.8 || inp.inside)) {
-        // burning up, or embers gathering round the pointer
-        const cnt = lt < 0.8 ? 260 : 10, cx = lt < 0.8 ? 33 : gx, cy = lt < 0.8 ? 34 : gy, r = lt < 0.8 ? 26 : 5;
-        for (let i = 0; i < cnt; i++) { const a = sprayRand() * 6.283, rr = Math.sqrt(sprayRand()) * r, x = Math.round(cx + Math.cos(a) * rr), y = Math.round(cy + Math.sin(a) * rr * (lt < 0.8 ? 0.8 : 1) - (lt < 0.8 ? 0 : sprayRand() * 4)); if (inCanvas(x, y)) buf[y * N + x] = [RED, ORANGE, YEL, ORANGE][i & 3]; }
+        curOX = 0; curOY = 0;
       }
       if (facing === 'Right') flipX();
       if (done) imageMenu();
@@ -663,7 +1083,7 @@ Proto.add({
       lastBuf.set(buf);
       chrome(curColour());
       if (inp.inside) cursor(gx, gy, t);
-      else if (!done) { const o = ops[n - 1]; cursor(facing === 'Right' ? CX0 + CX1 - o.ax : o.ax, o.ay, t); }
+      else if (!done) { const o = legCur ? { ax: legCur[0], ay: legCur[1] } : ops[n - 1]; cursor(facing === 'Right' ? CX0 + CX1 - o.ax : o.ax, o.ay, t); }
       else cursor(55 + Math.sin(t * 0.4) * 1.5, 46 + Math.cos(t * 0.3) * 1.5, t);
       const dd = img.data, inv = image === 'Inverted' && done;
       for (let i = 0, M = N * N; i < M; i++) {

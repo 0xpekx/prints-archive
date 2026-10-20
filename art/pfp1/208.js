@@ -10,7 +10,7 @@ Proto.add({
   seed: 564,
   interactive: 'Tap to roll it into a ball. Drag to select and invert.',
   music: true,
-  recipe: 'An armadillo, head and shoulders, in one-bit pixel art 64 dots across, as on the first small black-and-white desktops: no greys at all, only black and white dots, with every shade and texture made by an eight-by-eight fill pattern. Shell patterns, bands, ears, eyes, snout, pose, headwear, a prop beside it (an ant it is after, a floppy disk, a mug), the desktop pattern, the ground, the window around it, the cursor on screen and the screen itself vary; it blinks and twitches its nose, and rolls up into a banded ball when tapped. About 1 in 380 is a legendary (a Glyptodon, its giant domed ancestor with rosette scutes and a club tail, or an Engraving in banknote green on cream with a guilloche frame), and about 1 in 200 has the coveted Prize Rosette pinned up beside it.',
+  recipe: 'An armadillo, head and shoulders, in one-bit pixel art 64 dots across, as on the first small black-and-white desktops: no greys at all, only black and white dots, with every shade and texture made by an eight-by-eight fill pattern. Shell patterns, bands, ears, eyes, snout, pose, headwear, a prop beside it (an ant it is after, a floppy disk, a mug), the desktop pattern, the ground, the window around it, the cursor on screen and the screen itself vary; it blinks and twitches its nose, and rolls up into a banded ball when tapped. About 1 in 380 is a legendary, a picture in a style of its own (a Glyptodon, its giant domed ancestor, as a cave painting in ochre and charcoal lit by a torch; or an Engraving: the armadillo engraved on a polished brass plate, its lines glinting in the light), and about 1 in 200 has the coveted Prize Rosette pinned up beside it.',
   make(c) {
     const S = c.size, g = c.ctx;
     // mulberry-style mixer over a counter keyed by the hash
@@ -494,9 +494,476 @@ Proto.add({
     const oc = off.getContext('2d'); // the bitmap's pen
     const img = oc.createImageData(N, N); // one byte-pair per dot, later
     let curlAt = -9, dragFrom = null, ant = null, wasDown = false, wasIn = false;
-    const lp = new Uint8Array(N * N);
     let lastKey = '';
+
+    // ================= the legendaries =================
+    // (only a legendary print ever comes here; paint() above draws the collection's armadillos.) Still one bit a dot,
+    // every grey a fill pattern, on the print's own screen.
+    const PR = (name, x, y) => (PAT[name][y & 7] >> (7 - (x & 7))) & 1;
+    const B1 = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < N && y < N) bit[y * N + x] = v; };
+    // the cursor (the print's Cursor trait) and the drag-select ants, as paint() draws them
+    function overlays(t, ant, pointer) {
+      if (ant) {
+        const [x0, y0, x1, y1] = ant.map(Math.round), ph = Math.floor(t * 8);
+        const ax0 = Math.max(0, Math.min(x0, x1)), ax1 = Math.min(N - 1, Math.max(x0, x1)), ay0 = Math.max(0, Math.min(y0, y1)), ay1 = Math.min(N - 1, Math.max(y0, y1));
+        for (let y = ay0 + 1; y < ay1; y++) for (let x = ax0 + 1; x < ax1; x++) bit[y * N + x] ^= 1;
+        let k = 0;
+        const step = (x, y) => { if (x >= 0 && y >= 0 && x < N && y < N) bit[y * N + x] = ((k++ + ph) >> 1) % 2 ? 1 : 0; };
+        for (let x = ax0; x <= ax1; x++) step(x, ay0);
+        for (let y = ay0; y <= ay1; y++) step(ax1, y);
+        for (let x = ax1; x >= ax0; x--) step(x, ay1);
+        for (let y = ay1; y >= ay0; y--) step(ax0, y);
+      }
+      if (cursor !== 'None') {
+        const cp = pointer || cursorAt, art = CURSORS[cursor], cx = Math.round(cp[0]) - (cursor === 'Crosshair' || cursor === 'Wristwatch' ? 3 : 0), cy = Math.round(cp[1]) - (cursor === 'Crosshair' || cursor === 'Wristwatch' ? 3 : 0);
+        art.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') B1(cx + i, cy + j, r[i] === 'X' ? 1 : 0); });
+        if (cursor === 'Wristwatch') { const a = Math.floor(t * 4) % 4, hand = [[0, -1], [1, 0], [0, 1], [-1, 0]][a]; B1(cx + 3 + hand[0], cy + 4 + hand[1], 1); }
+      }
+    }
+
+    // ---- Glyptodon: a cave painting by torchlight. Deep in a cave wall, painted in ochre and charcoal by the people
+    // who hunted it: the giant armoured beast with its dome of rosette scutes and its spiked club tail, hunters with
+    // spears, hand stencils, rows of dots. It is dark: only the torch you hold lights it, the rock and the pigment
+    // banded by its flickering light, and in that flicker the beast's doubled legs and tail move, as the old painters
+    // meant. Move the torch over the wall; hold it still and the hunt plays out (the torch flares, the spear flies, the
+    // beast swings its club); tap to blow a hand stencil onto the rock. Drawn on its own grid, 128 dots across.
+    // Its traits, in the cave's way: the rock (Desktop), the pigment (Screen), the ground line (Ground), the frame
+    // (Window), its eyes, ears, snout, pose and headwear painted on it, the prop painted beside it, the cursor scratched
+    // into the corner.
+    const CV = 128;
+    let CAVE = null;
+    function caveSetup() {
+      const seed = parseInt(c.hash.slice(2, 10), 16) >>> 0;
+      const hsh = (x, y, s) => { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s, 2246822519)) >>> 0; h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+      const vnoise = (x, y, sc, s) => { const X = Math.floor(x / sc), Y = Math.floor(y / sc), fx = x / sc - X, fy = y / sc - Y, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy); const a = hsh(X, Y, s), b = hsh(X + 1, Y, s), cc = hsh(X, Y + 1, s), d = hsh(X + 1, Y + 1, s); return a + (b - a) * u + (cc - a) * v + (a - b - cc + d) * u * v; };
+      // the rock: its tone (0 to 1) and its kind (the Desktop trait)
+      const ROCK = new Float32Array(CV * CV);
+      for (let y = 0; y < CV; y++) for (let x = 0; x < CV; x++) {
+        let r = vnoise(x, y, 24, seed) * 0.5 + vnoise(x, y, 9, seed + 1) * 0.32 + vnoise(x, y, 3, seed + 2) * 0.18;
+        if (desk === 'Diagonal') r = r * 0.7 + 0.3 * (((x + y + vnoise(x, y, 14, seed + 3) * 20) % 14) / 14);
+        if (desk === 'Waves') r = r * 0.7 + 0.3 * ((y + Math.sin(x * 0.12) * 5 + 40) % 12) / 12;
+        if (desk === 'Bricks') { const by = Math.floor(y / 18), bx = Math.floor((x + (by % 2) * 15) / 30); r = r * 0.75 + hsh(bx, by, seed + 4) * 0.25; if ((y % 18 === 0) || ((x + (by % 2) * 15) % 30 === 0)) r *= 0.45; }
+        if (desk === 'Light Dots' && hsh(x, y, seed + 5) < 0.035) r = 1.15;                 // flecks of limestone
+        if (desk === 'Black') r *= 0.62;
+        // cracks in the wall
+        const k = Math.abs(vnoise(x, y, 20, seed + 6) - 0.5);
+        if (k < 0.012) r *= 0.3;
+        ROCK[y * CV + x] = r;
+      }
+      // the paintings: 0 none, 1 charcoal, 2 red ochre, 3 ochre (faint, the second set of legs), 4 yellow ochre;
+      // two layers (A and B) for the two moments the flicker shows
+      const PA = new Uint8Array(CV * CV), PB = new Uint8Array(CV * CV);
+      const put = (L, x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < CV && y < CV) L[y * CV + x] = v; };
+      const both = (x, y, v) => { put(PA, x, y, v); put(PB, x, y, v); };
+      const disc = (L, cx, cy, r, v) => { for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) (L ? put(L, x, y, v) : both(x, y, v)); };
+      const stroke = (L, pts, w, v) => { for (let i = 1; i < pts.length; i++) { const [ax, ay] = pts[i - 1], [bx, by] = pts[i], n = Math.ceil(Math.hypot(bx - ax, by - ay) * 2) + 1; for (let k = 0; k <= n; k++) disc(L, ax + (bx - ax) * k / n, ay + (by - ay) * k / n, w, v); } };
+      // the beast, facing left, about its hind foot (rearing tips it up)
+      const tilt = pose === 'Rearing' ? -0.2 : 0, low = pose === 'Sniffing' || pose === 'Digging' ? 4 : 0;
+      const R0 = (x, y) => { const dx = x - 94, dy = y - 86, cs = Math.cos(tilt), sn = Math.sin(tilt); return [94 + dx * cs - dy * sn, 86 + dx * sn + dy * cs]; };
+      const IN = (x, y) => { const cs = Math.cos(-tilt), sn = Math.sin(-tilt), dx = x - 94, dy = y - 86; return [94 + dx * cs - dy * sn, 86 + dx * sn + dy * cs]; };
+      const dome = (x, y) => y <= 70 && ((x - 66) / 33) ** 2 + ((y - 70) / 30) ** 2 <= 1;
+      const head = (x, y) => (((x - 29) / 9) ** 2 + ((y - 66 - low) / 7.5) ** 2 <= 1) || (x > 31 && x < 40 && y > 58 + low * 0.5 && y < 74);
+      const snoutF = (x, y) => { const sy = 68 + low; if (snout === 'Pig-Nosed') return ((x - 19.5) / 3) ** 2 + ((y - sy) / 4) ** 2 <= 1; if (snout === 'Stubby') return ((x - 21.5) / 3) ** 2 + ((y - sy) / 3) ** 2 <= 1; return x > 15 && x <= 22 && Math.abs(y - sy - (22 - x) * 0.25) < 3 - (22 - x) * 0.25; };
+      for (let y = 20; y < 100; y++) for (let x = 6; x < 124; x++) {
+        const [X, Y] = IN(x, y);
+        const inB = dome(X, Y) || head(X, Y) || snoutF(X, Y);
+        if (!inB) continue;
+        // red ochre fill, the rock's grain showing through it; a charcoal outline, broken here and there
+        const edge = !(dome(X - 1.5, Y) || head(X - 1.5, Y) || snoutF(X - 1.5, Y)) || !(dome(X + 1.5, Y) || head(X + 1.5, Y) || snoutF(X + 1.5, Y)) || !(dome(X, Y - 1.5) || head(X, Y - 1.5) || snoutF(X, Y - 1.5)) || !(dome(X, Y + 1.5) || head(X, Y + 1.5) || snoutF(X, Y + 1.5));
+        if (edge) { if (hsh(x, y, seed + 9) > 0.12) both(x, y, 1); continue; }
+        if (hsh(x, y, seed + 7) < 0.97 - ROCK[y * CV + x] * 0.12) both(x, y, 2);
+      }
+      // its rosette scutes: charcoal rings with a dot in each, set in rows over the dome; the skirt of plates
+      for (let row = 0; row < 6; row++) for (let col = -6; col <= 6; col++) {
+        const cx = 66 + col * 9 + (row % 2) * 4.5, cy = 66 - row * 7.5;
+        if (!dome(cx, cy) || ((cx - 66) / 30) ** 2 + ((cy - 70) / 27) ** 2 > 1) continue;
+        for (let a = 0; a < 28; a++) { const [px, py] = R0(cx + Math.cos(a / 28 * 6.283) * 3.4, cy + Math.sin(a / 28 * 6.283) * 3); both(px, py, 1); }
+        const [dx, dy] = R0(cx, cy); both(dx, dy, 4);
+      }
+      for (let x = 36; x <= 96; x += 3) { const [px, py] = R0(x, 70); both(px, py, 1); both(px + 1, py, 1); }
+      // the legs: pillars, painted twice (two strides), one set bold and one faint, swapped by the flicker
+      const legsA = [[42, 0], [54, 0], [78, 0], [90, 0]], legsB = [[38, 0], [57, 0], [74, 0], [93, 0]];
+      for (const [L, legs, v, w] of [[PA, legsA, 2, 0], [PA, legsB, 3, 0], [PB, legsB, 2, 0], [PB, legsA, 3, 0]]) for (const [lx] of legs) {
+        for (let y = 70; y <= 86; y++) for (let x = lx - 3.5; x <= lx + 3.5; x++) { const [px, py] = R0(x + (y - 70) * (lx < 60 ? -0.12 : 0.08), y); put(L, px, py, (Math.abs(x - lx) > 2.9 || y === 86) && v === 2 ? 1 : v); }
+      }
+      // the tail with its spiked club, in two swings
+      for (const [L, end, v] of [[PA, [118, 62], 2], [PB, [119, 72], 2], [PA, [119, 72], 3], [PB, [118, 62], 3]]) {
+        const pts = [[97, 62], [108, 64], end].map(p => R0(p[0], p[1]));
+        stroke(L, pts, v === 2 ? 2.6 : 2, v);
+        const [ex, ey] = pts[2];
+        disc(L, ex, ey, 4.4, v === 2 ? 1 : 3);
+        if (v === 2) { disc(L, ex, ey, 2.6, 2); for (let k = 0; k < 7; k++) { const a = k / 7 * 6.283; stroke(L, [[ex + Math.cos(a) * 4, ey + Math.sin(a) * 4], [ex + Math.cos(a) * 7.5, ey + Math.sin(a) * 7.5]], 0.5, 1); } }
+      }
+      // its face: ears, eye and nose, as the Ears, Eyes and Snout traits have them
+      const [hx, hy] = R0(29, 66 + low);
+      const earAt = R0(34, 57 + low);
+      if (ears === 'Round') disc(null, earAt[0], earAt[1], 2.6, 1);
+      else if (ears === 'Floppy') stroke(null, [[earAt[0], earAt[1] + 1], [earAt[0] + 4, earAt[1] + 3], [earAt[0] + 6, earAt[1] + 7]], 1.1, 1);
+      else { const hgt = ears === 'Huge' ? 10 : ears === 'Tall' ? 7 : 5; stroke(null, [[earAt[0], earAt[1] + 2], [earAt[0] + 1, earAt[1] - hgt]], ears === 'Huge' ? 1.8 : 1.2, 1); if (ears === 'Tufted') for (const d of [-1.5, 0, 1.5]) both(earAt[0] + 1 + d, earAt[1] - hgt - 1, 1); }
+      const ex = hx - 3, ey = hy - 2;
+      if (eyes === 'Big Round') { disc(null, ex, ey, 2.2, 4); disc(null, ex, ey, 1, 1); }
+      else if (eyes === 'Sleepy' || eyes === 'Wink') stroke(null, [[ex - 2, ey], [ex + 2, ey]], 0.5, 1);
+      else if (eyes === 'X') { stroke(null, [[ex - 1.5, ey - 1.5], [ex + 1.5, ey + 1.5]], 0.5, 1); stroke(null, [[ex - 1.5, ey + 1.5], [ex + 1.5, ey - 1.5]], 0.5, 1); }
+      else if (eyes === 'Star') { for (let k = 0; k < 5; k++) { const a = k / 5 * 6.283 - 1.57; stroke(null, [[ex, ey], [ex + Math.cos(a) * 2.5, ey + Math.sin(a) * 2.5]], 0.4, 4); } }
+      else if (eyes === 'Heart') { disc(null, ex - 1, ey - 0.5, 1.2, 4); disc(null, ex + 1, ey - 0.5, 1.2, 4); both(ex, ey + 1.5, 4); }
+      else disc(null, ex, ey, 1.3, 1);
+      if (snout === 'Whiskered') for (const d of [-2, 0, 2]) stroke(null, [[hx - 10, hy + 2], [hx - 16, hy + d]], 0.4, 1);
+      if (snout === 'Moustache') stroke(null, [[hx - 13, hy + 4], [hx - 9, hy + 3], [hx - 6, hy + 5]], 0.7, 1);
+      if (snout === 'Pig-Nosed') { both(hx - 10, hy + 1, 1); both(hx - 10, hy + 3, 1); }
+      // its headwear, painted on in charcoal and yellow ochre
+      const [tx, ty] = R0(31, 57 + low);
+      const HW = {
+        Bowler: () => { disc(null, tx, ty - 3, 3.5, 1); stroke(null, [[tx - 6, ty], [tx + 6, ty]], 0.8, 1); },
+        Beret: () => { for (let x = -5; x <= 5; x++) for (let y = -3; y <= 0; y++) if ((x / 5) ** 2 + ((y + 1) / 2.5) ** 2 <= 1) both(tx + x, ty + y, 2); both(tx + 1, ty - 4, 1); },
+        Bow: () => { disc(null, tx - 2.5, ty - 1, 2, 2); disc(null, tx + 2.5, ty - 1, 2, 2); disc(null, tx, ty - 1, 1, 1); },
+        Sweatband: () => stroke(null, [[tx - 5, ty + 1], [tx + 5, ty + 1]], 1, 4),
+        Halo: () => { for (let a = 0; a < 24; a++) both(tx + Math.cos(a / 24 * 6.283) * 6, ty - 6 + Math.sin(a / 24 * 6.283) * 1.8, 4); },
+        Crown: () => { stroke(null, [[tx - 4, ty], [tx + 4, ty]], 1, 4); for (const d of [-4, 0, 4]) stroke(null, [[tx + d, ty], [tx + d, ty - 4]], 0.6, 4); },
+        'Party Hat': () => { for (let y = 0; y < 8; y++) for (let x = -3 + y * 0.4; x <= 3 - y * 0.4; x++) both(tx + x, ty - y, y % 3 ? 2 : 4); },
+        'Top Hat': () => { for (let y = 0; y < 8; y++) for (let x = -3; x <= 3; x++) both(tx + x, ty - y, 1); stroke(null, [[tx - 6, ty], [tx + 6, ty]], 0.7, 1); },
+        'Cowboy Hat': () => { stroke(null, [[tx - 8, ty - 1], [tx - 5, ty], [tx + 5, ty], [tx + 8, ty - 1]], 0.8, 1); disc(null, tx, ty - 3, 3, 1); },
+        Bandana: () => { stroke(null, [[tx - 5, ty + 1], [tx + 5, ty + 1]], 1.2, 2); stroke(null, [[tx + 5, ty + 1], [tx + 8, ty + 4]], 0.8, 2); },
+      }[hat];
+      if (HW) HW();
+      // a ground line under it, in the Ground trait's way
+      for (let x = 8; x < 122; x++) {
+        const gy = 90 + Math.round(Math.sin(x * 0.09) * 1.2);
+        if (ground === 'Dots') { if (x % 5 === 0) disc(null, x, gy, 1, 2); }
+        else if (ground === 'Sand') { if (hsh(x, gy, seed + 11) < 0.45) both(x, gy + (x % 3), 4); }
+        else if (ground === 'Grass') { if (x % 6 === 0) { stroke(null, [[x, gy + 2], [x - 1, gy - 3]], 0.4, 1); stroke(null, [[x + 1, gy + 2], [x + 3, gy - 2]], 0.4, 1); } }
+        else if (ground === 'Tiles') { both(x, gy, 1); if (x % 8 === 0) for (let k = 1; k < 4; k++) both(x, gy + k, 1); }
+        else if (ground === 'Rug') both(x, gy + Math.abs((x % 6) - 3) - 1, 2);
+      }
+      // two hunters with spears, behind it; hand stencils and a row of dots high on the wall
+      const man = (x, y, s) => { disc(null, x, y - 13, 1.6, 1); stroke(null, [[x, y - 11], [x, y - 5]], 0.6, 1); stroke(null, [[x, y - 5], [x - 3 * s, y]], 0.6, 1); stroke(null, [[x, y - 5], [x + 2 * s, y]], 0.6, 1); stroke(null, [[x, y - 9], [x - 3 * s, y - 7]], 0.5, 1); };
+      man(110, 104, 1); man(121, 106, 1);
+      for (const [mx, my] of [[110, 104], [121, 106]]) stroke(PA, [[mx - 5, my - 6], [mx + 3, my - 17]], 0.45, 1);
+      stroke(PB, [[105, 98], [113, 87]], 0.45, 1); stroke(PB, [[121 - 5, 106 - 6], [121 + 3, 106 - 17]], 0.45, 1);
+      const hand = (L, cx, cy, sc, v) => {
+        const inH = (x, y) => { const dx = (x - cx) / sc, dy = (y - cy) / sc; if (dx * dx / 9 + (dy - 2) ** 2 / 12 < 1) return true; for (const [fx, fl] of [[-2.6, 4.5], [-0.9, 6], [0.9, 6.3], [2.6, 5.4]]) if (Math.abs(dx - fx) < 0.75 && dy < 0 && dy > -fl) return true; return dx < -2.4 && dx > -5.4 && dy > -1 && dy < 1.6 && Math.abs(dy + (dx + 2.4) * 0.6) < 1; };
+        for (let y = Math.floor(cy - 11 * sc); y <= cy + 9 * sc; y++) for (let x = Math.floor(cx - 9 * sc); x <= cx + 8 * sc; x++) { if (inH(x, y)) continue; const r = Math.hypot((x - cx) / sc, (y - cy + 1) / sc); if (r < 9 && hsh(x, y, seed + 12) < 0.85 - r * 0.08) put(L, x, y, v); }
+      };
+      hand(PA, 16, 26, 1, 2); hand(PB, 16, 26, 1, 2); hand(PA, 30, 20, 0.8, 3); hand(PB, 30, 20, 0.8, 3);
+      for (let k = 0; k < 7; k++) disc(null, 46 + k * 6, 16 + Math.sin(k) * 1.5, 1.2, 2);
+      // its prop, painted on the wall beside it
+      const [qx, qy] = [100, 22];
+      const PROP = {
+        Ant: () => { disc(null, qx, qy, 1.4, 1); disc(null, qx + 3, qy, 1.8, 1); disc(null, qx + 6.5, qy, 2.2, 1); for (const d of [0, 3, 6]) { stroke(null, [[qx + d, qy], [qx + d - 1, qy + 4]], 0.3, 1); } },
+        'Floppy Disk': () => { for (let y = -5; y <= 5; y++) for (let x = -5; x <= 5; x++) both(qx + x, qy + y, Math.abs(x) < 3 && y < -1 ? 4 : Math.abs(x) < 4 && y > 1 ? 4 : 1); },
+        Mug: () => { for (let y = -4; y <= 4; y++) for (let x = -3; x <= 3; x++) both(qx + x, qy + y, Math.abs(x) === 3 || y === 4 ? 1 : 2); stroke(null, [[qx + 4, qy - 2], [qx + 6, qy], [qx + 4, qy + 2]], 0.5, 1); },
+        Flower: () => { stroke(null, [[qx, qy + 7], [qx, qy]], 0.5, 1); for (let k = 0; k < 5; k++) disc(null, qx + Math.cos(k * 1.257) * 2.6, qy - 2 + Math.sin(k * 1.257) * 2.6, 1.3, 2); disc(null, qx, qy - 2, 1, 4); },
+        Cactus: () => { stroke(null, [[qx, qy + 7], [qx, qy - 6]], 1.2, 1); stroke(null, [[qx, qy], [qx - 4, qy], [qx - 4, qy - 4]], 0.8, 1); stroke(null, [[qx, qy + 2], [qx + 4, qy + 2], [qx + 4, qy - 2]], 0.8, 1); },
+        Grubs: () => { for (const d of [-5, 0, 5]) { stroke(null, [[qx + d - 1.5, qy + 1], [qx + d, qy - 1], [qx + d + 1.5, qy + 1]], 0.9, 4); } },
+      }[prop];
+      if (PROP) PROP();
+      // the cursor trait scratched small in the corner
+      const CUR = { Arrow: ['X....', 'XX...', 'XXX..', 'XXXX.', 'XX...', 'X.X..'], 'Pointing Hand': ['.X...', '.X...', '.XXX.', 'XXXXX', 'XXXXX', '.XXX.'], Wristwatch: ['.XXX.', 'X.X.X', 'X.XXX', 'X...X', '.XXX.'], Crosshair: ['..X..', '..X..', 'XX.XX', '..X..', '..X..'], 'Paint Bucket': ['.XXX.', 'X...X', 'XXXXX', 'XXXXX', '.XXX.'] }[cursor];
+      if (CUR) CUR.forEach((r, j) => { for (let q = 0; q < r.length; q++) if (r[q] === 'X') both(114 + q, 112 + j, 1); });
+      // the Window trait: a rock arch round the scene, tally marks along the top, or a painted cartouche
+      const FR = new Uint8Array(CV * CV);
+      for (let y = 0; y < CV; y++) for (let x = 0; x < CV; x++) {
+        const i = y * CV + x;
+        if (chrome === 'Window') { const e = ((x - 64) / 70) ** 2 + ((y - 70) / 66) ** 2 + vnoise(x, y, 7, seed + 13) * 0.12; if (e > 1) FR[i] = 1; }
+        if (chrome === 'Menu Bar' && y >= 5 && y <= 9 && x > 6 && x < 122 && x % 4 === 0) both(x, y, 1);
+        if (chrome === 'Dialog Box') { const d = Math.min(x - 4, y - 4, 123 - x, 123 - y); if (d >= 0 && d < 2 && hsh(x, y, seed + 14) > 0.2) both(x, y, 2); }
+      }
+      // facing right: the whole wall mirrored
+      if (MIR) for (const L of [ROCK, PA, PB, FR]) for (let y = 0; y < CV; y++) for (let x = 0; x < CV / 2; x++) { const a = y * CV + x, b = y * CV + CV - 1 - x, v = L[a]; L[a] = L[b]; L[b] = v; }
+      // the palette: rock tones, then pigment (in the Screen trait's colour), charcoal, yellow ochre, the flame
+      const PIG = { 'Blue Ink': [[20, 28, 70], [40, 64, 150], [80, 110, 210]], Sepia: [[60, 34, 16], [110, 66, 30], [160, 104, 56]], 'Amber Phosphor': [[90, 50, 6], [170, 100, 10], [240, 160, 30]], 'Green Phosphor': [[22, 54, 26], [50, 110, 50], [90, 170, 80]], 'Paper White': [[70, 26, 18], [126, 40, 26], [176, 66, 40]] }[screen] || [[86, 24, 12], [150, 42, 20], [200, 72, 32]];
+      const pal = [[30, 18, 10], [58, 38, 22], [88, 60, 36], [118, 84, 52], [148, 108, 70], [178, 136, 92], [206, 166, 118],   // (the rock: a warm, lit ochre-brown)
+       
+        PIG[0], PIG[1], PIG[2], [14, 10, 9], [42, 32, 26], [120, 90, 36], [200, 156, 60], [255, 248, 220], [255, 214, 110], [244, 140, 40], [190, 70, 20], [70, 40, 20], [255, 255, 255], [96, 8, 14], [236, 44, 40]];
+      return { ROCK, PA, PB, FR, pal, cv: Object.assign(document.createElement('canvas'), { width: CV, height: CV }), px: new Uint8Array(CV * CV), hands: [], tx: 64, ty: 50, still: 0, hold: -9, was: false, at: -9, mx: 0, my: 0, mv: 0, lastT: 0 };
+    }
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    function caveFrame(t) {
+      if (!CAVE) CAVE = caveSetup();
+      const K = CAVE, inp = c.input, px = K.px;
+      // the torch: where you hold it (or wandering slowly along the wall); hold it still and the hunt plays
+      if (inp.inside) { const nx = inp.x * CV, ny = inp.y * CV; if (Math.hypot(nx - K.tx, ny - K.ty) > 1.5) K.still = t; K.tx = nx; K.ty = ny; } else { K.tx = 58 + Math.sin(t * 0.33) * 30; K.ty = 54 + Math.sin(t * 0.51) * 10; K.still = t; }
+      inp.taps();
+      if (inp.down && !K.was) { K.at = t; K.mx = inp.x * CV; K.my = inp.y * CV; K.mv = 0; c.sound.hit('noise', 0.05, { cutoff: 900, dur: 0.3 }); }
+      if (inp.down) K.mv = Math.max(K.mv, Math.hypot(inp.x * CV - K.mx, inp.y * CV - K.my));
+      if (!inp.down && K.was) {
+        if (t - K.at < 0.3 && K.mv < 3) {
+          // a tap: a hand stencil blown onto the rock, ochre spat round a hand pressed to the wall
+          K.hands.push([Math.max(14, Math.min(114, K.mx - 16)), Math.max(14, Math.min(100, K.my - 4)), t, (K.hands.length * 0.37) % 1]);   // (beside the torch, so the flame never hides it) if (K.hands.length > 7) K.hands.shift();
+          c.sound.hit('noise', 0.12, { cutoff: 2400, dur: 0.35 }); c.sound.hit('noise', 0.08, { cutoff: 1600, dur: 0.3, at: 0.1 });
+        }
+      }
+      K.was = inp.down;
+      // the hunt plays when you hold the torch still: pressed for a moment, or just resting it on the wall a second
+      const pressHunt = inp.down && t - K.at > 0.45 && K.mv < 3, restHunt = inp.inside && !inp.down && t - (K.still ?? t) > 1.1;
+      const hunt = pressHunt || restHunt, ht = hunt ? (pressHunt ? t - K.at - 0.45 : t - K.still - 1.1) : -1;
+            // the flicker: the light's reach wavers, and with it which of the painted strides shows
+      const fl = Math.sin(t * 13.1) * 0.5 + Math.sin(t * 7.3 + 1) * 0.35 + Math.sin(t * 23.7) * 0.15;
+      const R = (hunt ? 68 : inp.inside ? 48 : 56) + fl * 4, useB = hunt ? Math.floor(ht * 6) % 2 === 1 : fl > 0.35;
+      const L = useB ? K.PB : K.PA, ROCK = K.ROCK, FR = K.FR;
+      // the spear's strike: the beast flinches (the painting jolts two dots) and a red wound stays on its flank
+      const hph = hunt ? (ht % 1.4) / 1.4 : -1, flinch = hph >= 0.6 && hph < 0.82 ? (MIR ? -3 : 3) * (hph < 0.7 ? 1 : 0.67) | 0 : 0, flinchY = hph >= 0.6 && hph < 0.7 ? 1 : 0;
+      if (hph >= 0.6 && (K.lastHit ?? -9) < t - 1) { K.lastHit = t; K.marks = (K.marks || []).concat([[t, K.marks ? K.marks.length : 0]]).slice(-3); }
+      const tx = K.tx, ty = K.ty;
+      for (let y = 0; y < CV; y++) for (let x = 0; x < CV; x++) {
+        // (a low glow everywhere, so the painting reads before the torch comes near; the torch's own light on top)
+        const i = y * CV + x, d = Math.hypot(x - tx, (y - ty) * 1.1), lit = Math.max(0, 1 - d / R) * 0.5 + 0.88 - (FR[i] ? 0.6 : 0);
+        // light banded into steps with an ordered dither, as a pixel artist would
+        const q = lit * 6 + (BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.5) * 0.9;
+        const p = flinch && x - flinch >= 0 && x - flinch < CV && y - flinchY >= 0 ? L[i - flinch - flinchY * CV] : L[i];
+        if (p === 1) { px[i] = q > 2.2 ? 11 : 10; continue; }
+        if (p >= 2) { px[i] = p === 4 ? (q > 3.4 ? 13 : 12) : p === 3 ? (q > 3.2 ? 8 : 7) : q > 3.4 ? 9 : q > 2 ? 8 : 7; continue; }
+        const r = ROCK[i], k = Math.max(0, Math.min(6, Math.floor(q * (0.3 + r * 0.42))));
+        px[i] = k;
+      }
+      // the hands you blew onto the wall (the spray comes in over a moment)
+      for (const [hx, hy, ht0, sv] of K.hands) {
+        const u = Math.min(1, (t - ht0) / 0.4);
+        for (let y = Math.floor(hy - 15); y <= hy + 14; y++) for (let x = Math.floor(hx - 14); x <= hx + 13; x++) {
+          if (x < 0 || y < 0 || x >= CV || y >= CV) continue;
+          const dx = (x - hx) / 1.5, dy = (y - hy) / 1.5;
+          let inH = dx * dx / 9 + (dy - 2) ** 2 / 12 < 1;
+          for (const [fx, fl2] of [[-2.6, 4.5], [-0.9, 6], [0.9, 6.3], [2.6, 5.4]]) if (Math.abs(dx - fx) < 0.75 && dy < 0 && dy > -fl2) inH = true;
+          if (dx < -2.4 && dx > -5.4 && Math.abs(dy + (dx + 2.4) * 0.6) < 1) inH = true;
+          if (inH) continue;
+          const r = Math.hypot(dx, dy + 1), hv = (((x * 73856093) ^ (y * 19349663) ^ Math.floor(sv * 1e6)) >>> 0) % 100 / 100;
+          if (r < 9.5 * u && (r < 7 || hv < 1.4 - r * 0.12)) px[y * CV + x] = r > 7.5 ? 8 : 9;
+        }
+      }
+      // the hunt: the hunters light up in yellow ochre and a spear flies from them in a high arc, trailing, and
+      // strikes the beast's flank in a burst of red; again and again while you hold the torch still
+      if (hunt) {
+        const MX = x => MIR ? CV - 1 - x : x, P = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < CV && y < CV) px[y * CV + x] = k; };
+        for (const [mx, my] of [[110, 104], [121, 106]]) {
+          const pts = [[0, -13], [0, -12], [-1, -13], [1, -13], [0, -14], [-1, -12], [1, -12]];
+          for (const [a, b] of pts) P(MX(mx + a), my + b, 19);
+          for (let k = -11; k <= -5; k++) P(MX(mx), my + k, 19);
+          for (let k = 0; k <= 5; k++) { P(MX(mx - k * 0.6), my - 5 + k, 19); P(MX(mx + k * 0.4), my - 5 + k, 19); }
+          if (hph >= 0.6) for (let k = 0; k <= 5; k++) { P(MX(mx - 1 - k * 0.5), my - 10 - k, 19); P(MX(mx + 1 + k * 0.5), my - 10 - k, 19); }   // a cheer: arms up
+          else for (let k = 0; k <= 4; k++) P(MX(mx - k * 0.75 - 0.5), my - 9 + k * 0.5, 19);
+        }
+        const per = 1.4, u = Math.min(1, ((ht % per) / per) / 0.6), hit = (ht % per) / per >= 0.6;
+        const sx = 106, sy = 92, ex = 76, ey = 56, arc = w => [sx + (ex - sx) * w, sy + (ey - sy) * w - Math.sin(w * Math.PI) * 30];
+        if (!hit) {
+          const [x, y] = arc(u), [x2, y2] = arc(Math.max(0, u - 0.06)), l = Math.hypot(x - x2, y - y2) || 1;
+          for (let k = 0; k < 14; k++) P(MX(x - (x - x2) / l * k), y - (y - y2) / l * k, k < 3 ? 19 : 10);   // (a charcoal shaft, a white point)
+          for (let k = 1; k <= 6; k++) { const [qx, qy] = arc(Math.max(0, u - k * 0.05)); if (k % 2) P(MX(qx), qy, 11); }
+        } else {
+          const v = ((ht % per) / per - 0.6) / 0.4;
+          for (let k = 0; k < 14; k++) { const a = k / 14 * 6.283, r = 3 + v * 10; P(MX(ex + Math.cos(a) * r), ey + Math.sin(a) * r * 0.8, v < 0.5 ? 14 : 9); }
+          for (let k = 0; k < 10; k++) P(MX(ex + 3 + k * 0.9), ey - 6 + k * 0.7, 13);
+          if (v < 0.25) for (let k = 0; k < 24; k++) { const a = k / 24 * 6.283, r = 6 + v * 20; P(MX(ex + Math.cos(a) * r), ey + Math.sin(a) * r * 0.7, 16); }
+        }
+        if (Math.floor(ht / per) !== Math.floor((ht - 1 / 20) / per)) { c.sound.hit('noise', 0.08, { cutoff: 1800, dur: 0.25 }); c.sound.hit('kick', 0.6, { at: per * 0.6 }); c.sound.note(36, { dur: 0.4, vel: 0.14, wave: 'square', cutoff: 300, at: per * 0.6 }); }
+      }
+      // the wounds the spears left: red ochre gashes on its flank, fading after a while
+      for (const [mt, mk] of K.marks || []) { if (t - mt > 6) continue; const P2 = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < CV && y < CV) px[y * CV + x] = k; }; const cx = 76 + (mk % 3) * 4 - 4, cy = 56 + (mk % 2) * 3, gr = Math.min(1, (t - mt) / 0.15); for (let y = -6; y <= 12; y++) for (let x = -6; x <= 6; x++) { const r = Math.hypot(x, y * 1.2), drip = y > 2 && Math.abs(x - ((x + 99) % 3 === 0 ? x : 99)) < 1 && y < 6 + ((x * 7 + 99) % 5); if ((r < 4.6 * gr && ((x * 5 + y * 3 + 99) % 7 || r < 3)) || (drip && gr >= 1)) P2(MIR ? CV - 1 - (cx + x) : cx + x, cy + y, r < 2.5 ? 20 : 21); } }
+      // the torch in your hand: its stick, and a flame that never holds still, sparks going up
+      const fx = Math.round(tx), fy = Math.round(ty);
+      for (let k = 0; k < 14; k++) { const X = fx + 1 + Math.round(k * 0.35), Y = fy + 3 + k; if (X >= 0 && Y >= 0 && X < CV && Y < CV) { px[Y * CV + X] = 18; if (X + 1 < CV) px[Y * CV + X + 1] = 17; } }
+      const fph = Math.floor(t * 14);
+      for (let y = -10; y <= 3; y++) for (let x = -4; x <= 4; x++) {
+        const w = (3.4 + (hunt ? 1 : 0)) * Math.sqrt(Math.max(0, (y + 10) / 13)) + (((fph + y) * 7) % 3 - 1) * 0.5;
+        if (Math.abs(x - Math.sin(t * 9 + y * 0.6) * 1.2 * (-y / 10)) > w) continue;
+        const X = fx + x, Y = fy + y; if (X < 0 || Y < 0 || X >= CV || Y >= CV) continue;
+        const core = Math.abs(x) < w * 0.4 && y > -6;
+        px[Y * CV + X] = core ? (y > -3 ? 14 : 15) : y < -7 ? 17 : 16;
+      }
+      for (let k = 0; k < 5; k++) { const u = (t * 0.9 + k * 0.21) % 1, X = Math.round(fx + Math.sin(t * 3 + k * 2) * 3 * u + (k - 2)), Y = Math.round(fy - 10 - u * 22); if (X >= 0 && Y >= 0 && X < CV && Y < CV && u < 0.85) px[Y * CV + X] = u < 0.4 ? 15 : 16; }
+      // the cursor, when the print has one, as a dark notch at the torch's grip
+      const ctx2 = K.cv.getContext('2d'), im = K.im || (K.im = ctx2.createImageData(CV, CV)), d = im.data, pal = K.pal;
+      for (let i = 0; i < CV * CV; i++) { const p = pal[px[i]]; d[i * 4] = p[0]; d[i * 4 + 1] = p[1]; d[i * 4 + 2] = p[2]; d[i * 4 + 3] = 255; }
+      ctx2.putImageData(im, 0, 0);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(K.cv, 0, 0, S, S);
+    }
+    // ---- Engraving: an engraved brass plate. The armadillo cut into polished brass with the burin, every hatch line
+    // laid along its form, on an engine-turned guilloche ground like a watch dial, inside a raised rope border with its
+    // name in a cartouche. Engraved metal is all about the light: each line catches it only when it lies across it, so
+    // as you move the light (the pointer) the hatching flares and dies line by line and the guilloche ground ripples.
+    // Drag to cut your own lines with the burin (they glint too); tap to buff the plate, a bright sweep across it.
+    // Drawn on its own grid, 128 dots across, in eight shades of brass. Its traits, in the plate's way: the shell's
+    // pattern, bands, ears, eyes, snout, pose and headwear cut into the armadillo, the prop engraved beside it, the
+    // ground (Ground) and the dial's turning (Desktop) under it, the cursor stamped in the cartouche, the border (Window).
+    const PG = 128;
+    let PLT = null;
+    function plateSetup() {
+      // per dot: 0 polished plate, 1 a hatch line (with its angle), 2 a deep cut, 3 the raised border, 4 the border's
+      // rope (with its angle); and for the dial's ground, its line angle too
+      const T = new Uint8Array(PG * PG), A = new Float32Array(PG * PG);
+      const set = (x, y, k, a) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < PG && y < PG) { T[y * PG + x] = k; A[y * PG + x] = a; } };
+      const tilt = pose === 'Rearing' ? -0.16 : 0, low = pose === 'Sniffing' || pose === 'Digging' ? 4 : 0, trot = pose === 'Trotting';
+      const IN = (x, y) => { const cs = Math.cos(-tilt), sn = Math.sin(-tilt), dx = x - 92, dy = y - 88; return [92 + dx * cs - dy * sn, 88 + dx * sn + dy * cs]; };
+      const DX = 66, DY = 74, RX = 31, RY = 30;
+      const dome = (x, y) => y <= DY + 2 && ((x - DX) / RX) ** 2 + ((y - DY) / RY) ** 2 <= 1;
+      const segD = (x, y, ax, ay, bx, by) => { const vx = bx - ax, vy = by - ay, u = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy))); return [Math.hypot(x - ax - vx * u, y - ay - vy * u), u]; };
+      const SN = snout === 'Stubby' || snout === 'Pig-Nosed' ? [26, 76 + low] : [16, 82 + low];
+      const head = (x, y) => { const [d, u] = segD(x, y, 40, 70 + low * 0.5, SN[0], SN[1]); return d < 7.5 * (1 - u) + (snout === 'Pig-Nosed' ? 3.2 : 2) || ((x - 39) / 8) ** 2 + ((y - 68 - low * 0.5) / 8) ** 2 <= 1; };
+      const EA = { Tall: [3, 8], Round: [3.6, 3.6], Floppy: [3, 6], Tufted: [2.8, 8], Huge: [4, 11] }[ears] || [3, 8];
+      const ear = (x, y) => [[37, 59 + low * 0.5], [43, 60 + low * 0.5]].some(([ex, ey]) => ((x - ex) / EA[0]) ** 2 + ((y - ey + (ears === 'Floppy' ? -2 : EA[1] * 0.5)) / EA[1]) ** 2 <= 1);
+      const legX = trot ? [[43, -3], [56, 3], [80, -3], [92, 3]] : [[44, 0], [55, 0], [80, 0], [91, 0]];
+      const leg = (x, y) => y > 74 && y <= 94 && legX.some(([lx, sk]) => Math.abs(x - lx - (y - 74) * sk / 20) < 4);
+      const tail = (x, y) => { const [d, u] = segD(x, y, 96, 76, 122, 90); return d < 5 * (1 - u) + 1.2; };
+      const beast = (x, y) => dome(x, y) || head(x, y) || ear(x, y) || leg(x, y) || tail(x, y);
+      const nb = bands;
+      for (let y = 8; y < 108; y++) for (let x = 8; x < 120; x++) {
+        const [X, Y] = IN(x, y);
+        if (!beast(X, Y)) continue;
+        set(x, y, 7, 0);                                                                  // (the figure is polished; the field round it is frosted)
+        const edge = !beast(X - 1, Y) || !beast(X + 1, Y) || !beast(X, Y - 1) || !beast(X, Y + 1);
+        if (edge) { set(x, y, 2, 0); continue; }
+        if (dome(X, Y)) {
+          // the shell: hatching that follows the dome round; the bands cut deep; the shields' pattern (Shell)
+          const nx = (X - DX) / RX, ny = (Y - DY) / RY, e = Math.sqrt(nx * nx + ny * ny), tang = Math.atan2(ny * RX, -nx * RY) + Math.PI / 2;
+          if (Y > DY - 1) { set(x, y, (X % 3) ? 1 : 2, Math.PI / 2); continue; }        // the skirt
+          const bw = 44 / (nb + 1), bx0 = DX - 22, kf = ((X - bx0) / bw), inBands = X > bx0 && X < DX + 22;
+          if (inBands && Math.abs(kf - Math.round(kf)) * bw < 0.6) { set(x, y, 2, 0); continue; }
+          let on = (e * 26) % 1 < 0.42;
+          if (!inBands) {
+            if (shell === 'Studded' || shell === 'Scales' || shell === 'Mixed') { const cx = Math.round(X / 5) * 5, cy = Math.round(Y / 5) * 5; if (Math.hypot(X - cx, Y - cy) < 1.2) { set(x, y, 2, 0); continue; } }
+            if (shell === 'Diamonds' || shell === 'Checkerboard' || shell === 'Plaid' || shell === 'Herringbone') { if (((X + Y) % 7 + 7) % 7 < 1 || ((X - Y) % 7 + 7) % 7 < 1) { set(x, y, 2, 0); continue; } }
+            if (shell === 'Stripes' || shell === 'Bricks & Weave') on = (X % 4) < 2;
+          }
+          // (the banded middle of the shell is inlaid in silver: the plate's one second metal, its focal point)
+          if (inBands) { set(x, y, on ? 9 : 8, shell !== 'Solid' ? Math.PI / 2 + (X - DX) * 0.01 : tang); continue; }
+          if (on) set(x, y, 1, tang);
+          continue;
+        }
+        if (head(X, Y) || ear(X, Y)) {
+          const ang = Math.atan2(SN[1] - 70, SN[0] - 40);
+          const across = (X - 40) * -Math.sin(ang) + (Y - 70) * Math.cos(ang);
+          if (ear(X, Y) && !head(X, Y)) { if ((Y % 2) === 0) set(x, y, 1, Math.PI / 2); continue; }
+          if (Math.round(across) % 2 === 0) set(x, y, 1, ang);
+          continue;
+        }
+        if (leg(X, Y)) { if (Y % 2 === 0) set(x, y, 1, 0); if (Y >= 92 && X % 2 === 0) set(x, y, 2, 0); continue; }
+        if (tail(X, Y)) { if ((X + Math.round(Y * 0.5)) % 4 < 2) set(x, y, 1, Math.PI / 2 + 0.5); continue; }
+      }
+      // its eye, nostril, and the Eyes and Snout traits' marks, cut deep
+      const [hx, hy] = (() => { const cs = Math.cos(tilt), sn = Math.sin(tilt), dx = 33 - 92, dy = 68 + low - 88; return [92 + dx * cs - dy * sn, 88 + dx * sn + dy * cs]; })();
+      const deep = (x, y) => set(x, y, 2, 0), polish = (x, y) => set(x, y, 7, 0);
+      for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) polish(hx + x, hy + y);
+      if (eyes === 'Big Round') { for (let a = 0; a < 16; a++) deep(hx + Math.cos(a / 2.5) * 2, hy + Math.sin(a / 2.5) * 2); deep(hx, hy); }
+      else if (eyes === 'Sleepy' || eyes === 'Wink') for (let x = -2; x <= 2; x++) deep(hx + x, hy + (Math.abs(x) === 2 ? -1 : 0));
+      else if (eyes === 'X') for (let k = -1; k <= 1; k++) { deep(hx + k, hy + k); deep(hx + k, hy - k); }
+      else if (eyes === 'Star' || eyes === 'Heart') { deep(hx, hy - 2); deep(hx - 1, hy - 1); deep(hx + 1, hy - 1); deep(hx - 2, hy); deep(hx + 2, hy); deep(hx, hy); deep(hx - 1, hy + 1); deep(hx + 1, hy + 1); deep(hx, hy + 2); }
+      else if (eyes === 'Spectacles') { for (let a = 0; a < 16; a++) { deep(hx + Math.cos(a / 2.5) * 2.5, hy + Math.sin(a / 2.5) * 2.5); deep(hx - 6 + Math.cos(a / 2.5) * 2, hy + 1 + Math.sin(a / 2.5) * 2); } }
+      else { deep(hx, hy); deep(hx + 1, hy); deep(hx, hy + 1); deep(hx + 1, hy + 1); }
+      const tip = [SN[0] + (MIR ? 0 : 0), SN[1]];
+      deep(tip[0] + 1, tip[1] - 1); deep(tip[0] + 2, tip[1] - 1);
+      if (snout === 'Whiskered') for (const d of [-3, 0, 3]) for (let k = 0; k < 7; k++) deep(tip[0] + 2 - k, tip[1] + d * k / 7);
+      if (snout === 'Moustache') for (let k = -4; k <= 4; k++) deep(tip[0] + 5 + k, tip[1] + 3 + Math.abs(k) * 0.3);
+      // the headwear, engraved on in outline with its own hatching
+      const [ax, ay] = [hx + 4, hy - 9];
+      const outline = (fn, ang) => { for (let y = -12; y <= 6; y++) for (let x = -10; x <= 10; x++) { if (!fn(x, y)) continue; const e = !fn(x - 1, y) || !fn(x + 1, y) || !fn(x, y - 1) || !fn(x, y + 1); set(ax + x, ay + y, e ? 2 : (y % 2 ? 7 : 1), ang); } };
+      const HAT = { Bowler: (x, y) => (x * x / 25 + (y + 2) ** 2 / 16 <= 1 && y <= 0) || (y >= 0 && y <= 1 && Math.abs(x) <= 8), Beret: (x, y) => x * x / 49 + (y + 1) ** 2 / 6 <= 1, Bow: (x, y) => ((x + 3) ** 2 + y * y <= 7) || ((x - 3) ** 2 + y * y <= 7), Sweatband: (x, y) => y >= 2 && y <= 4 && Math.abs(x) <= 7, Halo: (x, y) => Math.abs(Math.hypot(x / 7, (y + 8) / 2) - 1) < 0.25, Crown: (x, y) => (y >= -2 && y <= 0 && Math.abs(x) <= 6) || (y < -2 && y >= -6 && Math.abs(x) % 4 < 1.5 && Math.abs(x) <= 6), 'Party Hat': (x, y) => y <= 0 && y >= -10 && Math.abs(x) <= (y + 10) * 0.4, 'Top Hat': (x, y) => (y <= 0 && y >= -10 && Math.abs(x) <= 4) || (y >= 0 && y <= 1 && Math.abs(x) <= 8), 'Cowboy Hat': (x, y) => (y >= 0 && y <= 1 && Math.abs(x) <= 10) || (y < 0 && y >= -5 && Math.abs(x) <= 5), Bandana: (x, y) => (y >= 1 && y <= 3 && Math.abs(x) <= 7) || (x >= 6 && x <= 9 && y >= 3 && y <= 6) }[hat];
+      if (HAT) outline(HAT, 0.3);
+      // the ground under it (Ground), and its prop engraved beside it (Prop)
+      for (let x = 10; x < 118; x++) {
+        if (ground === 'Grass') { if (x % 5 === 0) for (let k = 0; k < 4; k++) set(x + (k > 1 ? 1 : 0), 96 - k, 1, Math.PI / 2); }
+        else if (ground === 'Sand') { if ((x * 7) % 5 < 2) set(x, 97 + (x % 3), 1, 0); }
+        else if (ground === 'Tiles') { set(x, 96, 2, 0); if (x % 10 === 0) for (let k = 0; k < 6; k++) set(x, 96 + k, 2, 0); }
+        else if (ground === 'Rug') set(x, 97 + Math.abs((x % 6) - 3), 1, 0.8);
+        else if (x % 3 === 0) set(x, 97, 2, 0);
+      }
+      const [qx, qy] = [104, 30];
+      const PRP = { Ant: (x, y) => [[0, 0, 1.6], [4, 0, 2], [8.5, 0, 2.5]].some(([a, b, r]) => (x - a) ** 2 + (y - b) ** 2 <= r * r), 'Floppy Disk': (x, y) => Math.abs(x) <= 6 && Math.abs(y) <= 6, Mug: (x, y) => (Math.abs(x) <= 4 && Math.abs(y) <= 5) || (x > 4 && x <= 7 && Math.abs(y) <= 3 && Math.abs(Math.hypot(x - 4, y) - 2.5) < 1), Flower: (x, y) => [0, 1, 2, 3, 4].some(k => Math.hypot(x - Math.cos(k * 1.257) * 3.5, y + 2 - Math.sin(k * 1.257) * 3.5) < 2) || (Math.abs(x) < 1 && y > 0 && y < 9), Cactus: (x, y) => (Math.abs(x) <= 2 && Math.abs(y) <= 8) || (x >= -6 && x <= -4 && y >= -4 && y <= 2) || (x >= -6 && x <= -2 && y >= 1 && y <= 2) || (x >= 4 && x <= 6 && y >= -6 && y <= 0) || (x >= 2 && x <= 6 && y >= -1 && y <= 0), Grubs: (x, y) => [-6, 0, 6].some(d => Math.abs(Math.hypot(x - d, y + 1) - 2.5) < 1 && y > -2) }[prop];
+      if (PRP) for (let y = -10; y <= 10; y++) for (let x = -10; x <= 10; x++) { if (!PRP(x, y)) continue; const e = !PRP(x - 1, y) || !PRP(x + 1, y) || !PRP(x, y - 1) || !PRP(x, y + 1); set(qx + x, qy + y, e ? 2 : (x + y) % 2 ? 1 : 7, 0.8); }
+      // facing right: mirrored (the lettering is laid after)
+      if (MIR) for (let y = 0; y < PG; y++) for (let x = 0; x < PG / 2; x++) { const a = y * PG + x, b = y * PG + PG - 1 - x; [T[a], T[b]] = [T[b], T[a]]; const va = A[a]; A[a] = Math.PI - A[b]; A[b] = Math.PI - va; }
+      // the dial's engine-turned ground, behind everything, in the Desktop trait's turning
+      for (let y = 0; y < PG; y++) for (let x = 0; x < PG; x++) {
+        const i = y * PG + x; if (T[i]) continue;
+        const dx = x - 64, dy = y - 60, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+        let on = false, ang = a + Math.PI / 2;
+        if (desk === 'Diagonal') { on = ((x + y) % 4) < 1; ang = -Math.PI / 4; }
+        else if (desk === 'Bricks') { on = y % 6 === 0 || (x + (Math.floor(y / 6) % 2) * 6) % 12 === 0; ang = y % 6 === 0 ? 0 : Math.PI / 2; }
+        else if (desk === 'Light Dots') on = (x % 4 === 0 && y % 4 === 0);
+        else if (desk === 'Waves') { on = ((y + Math.sin(x * 0.25) * 2.5) % 4 + 4) % 4 < 1; ang = Math.atan(Math.cos(x * 0.25) * 0.6); }
+        else if (desk === 'Black') { on = (x + y) % 2 === 0; ang = 0; }
+        else if (desk !== 'Plain') on = ((r + Math.sin(a * 14) * 1.6) % 3 + 3) % 3 < 1.1;
+        // (kept quiet: only every other line of the turning, so the armadillo stays the brightest thing)
+        if (on && (x + y) % 2 === 0) { T[i] = 5; A[i] = ang; }
+      }
+      // the raised border (Window: a guilloche frame) with its rope, and the cartouche for the name
+      for (let y = 0; y < PG; y++) for (let x = 0; x < PG; x++) {
+        const i = y * PG + x, d = Math.min(x, y, PG - 1 - x, PG - 1 - y);
+        if (d < 7) { T[i] = d === 0 || d === 6 ? 2 : d >= 2 && d <= 4 && (x + y) % 4 < 2 ? 4 : 3; A[i] = (y < 7 || y > PG - 8) ? Math.PI / 4 : -Math.PI / 4; }
+        if (y >= 106 && y <= 120 && x >= 26 && x <= 101) T[i] = (y === 106 || y === 120 || x === 26 || x === 101) ? 2 : 3;
+      }
+      const F7 = { A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'], R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'], M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'], D: ['11110', '10001', '10001', '10001', '10001', '10001', '11110'], I: ['111', '010', '010', '010', '010', '010', '111'], L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'], O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'] };
+      let lx = 64 - 26;
+      for (const ch of 'ARMADILLO') { const gl = F7[ch]; gl.forEach((r, j) => { for (let q = 0; q < r.length; q++) if (r[q] === '1') T[(110 + j) * PG + lx + q] = 2; }); lx += gl[0].length + 1; }
+      // the cursor trait, stamped small at the cartouche's end
+      const CUR = { Arrow: ['X...', 'XX..', 'XXX.', 'XXXX', 'X.X.'], 'Pointing Hand': ['.X..', '.XX.', 'XXXX', 'XXXX', '.XX.'], Wristwatch: ['.XX.', 'X..X', 'X.XX', '.XX.'], Crosshair: ['.X.', 'XXX', '.X.'], 'Paint Bucket': ['XXXX', 'X..X', 'XXXX', '.XX.'] }[cursor];
+      if (CUR) CUR.forEach((r, j) => { for (let q = 0; q < r.length; q++) if (r[q] === 'X') T[(110 + j) * PG + 94 + q] = 2; });
+      const pal = [[22, 12, 4], [52, 32, 12], [88, 58, 22], [130, 90, 36], [176, 128, 56], [214, 170, 84], [242, 210, 128], [255, 244, 200], [255, 255, 255],
+        [40, 44, 54], [86, 92, 106], [140, 148, 164], [194, 202, 216], [236, 242, 250], [255, 255, 255], [14, 8, 4], [26, 15, 7], [42, 26, 12], [66, 42, 18]];
+      // the ornament your cuts complete: laurel sprigs either side of the cartouche, engraved in once you've cut enough
+      const ORN = [];
+      // (two big sprigs curving up either side of the name plate, broad leaves in pairs along them)
+      for (const s2 of [-1, 1]) for (let k = 0; k <= 60; k++) {
+        const u = k / 60, a0 = Math.PI * (0.55 + u * 0.75), x = 64 + s2 * (46 - Math.cos(a0) * 6 + u * 4), y = 122 - u * 34, ang = Math.atan2(-34, s2 * 10);
+        ORN.push([Math.round(x), Math.round(y), ang, u]);
+        if (k % 6 === 3) for (const side of [-1, 1]) for (let q = 1; q <= 6; q++) for (const w of [0, 1]) {
+          const lx = x + side * (q * 0.9) + s2 * q * 0.3, ly = y - q * 0.7 + w * (q < 5 && q > 1 ? 1 : 0);
+          ORN.push([Math.round(lx), Math.round(ly), ang + side * 0.9, u]);
+        }
+      }
+      const cv = document.createElement('canvas'); cv.width = cv.height = PG;
+      return { T, A, ORN, CT: new Float32Array(PG * PG), ncut: 0, ornAt: -9, pal, cv, cx: cv.getContext('2d'), px: new Uint8Array(PG * PG), cut: [], lastCut: null, buffAt: -9, at: -9, was: false, mx: 0, my: 0, mv: 0, lx: 30, ly: 20 };
+    }
+    function plateFrame(t) {
+      if (!PLT) PLT = plateSetup();
+      const K = PLT, inp = c.input, T = K.T, A = K.A, px = K.px;
+      inp.taps();
+      // the light: the pointer, or drifting slowly over the plate
+      const tlx = inp.inside ? inp.x * PG : 64 + Math.cos(t * 0.4) * 46, tly = inp.inside ? inp.y * PG : 50 + Math.sin(t * 0.55) * 34;
+      K.lx += (tlx - K.lx) * 0.4; K.ly += (tly - K.ly) * 0.4;
+      // the burin: a drag cuts a line, its angle the way you drew it; a short still tap buffs the plate
+      if (inp.down && !K.was) { K.at = t; K.mx = inp.x * PG; K.my = inp.y * PG; K.mv = 0; }
+      if (inp.down) {
+        const x = inp.x * PG, y = inp.y * PG; K.mv = Math.max(K.mv, Math.hypot(x - K.mx, y - K.my));
+        if (K.mv >= 2) {
+          const a = K.lastCut || [x, y], dl = Math.hypot(x - a[0], y - a[1]), n = Math.ceil(dl * 1.5) + 1, ang = dl > 0.3 ? Math.atan2(y - a[1], x - a[0]) : 0;
+          for (let k = 0; k <= n; k++) { const cx = Math.round(a[0] + (x - a[0]) * k / n), cy = Math.round(a[1] + (y - a[1]) * k / n); if (cx > 7 && cy > 7 && cx < PG - 8 && cy < PG - 8) { const i = cy * PG + cx; if (T[i] !== 6) K.ncut++; T[i] = 6; A[i] = ang; K.CT[i] = t; } }
+          if (K.ncut > 90 && K.ornAt < 0) { K.ornAt = t; [72, 79, 84, 88, 91].forEach((m, i) => c.sound.note(m, { dur: 1.2, vel: 0.05, wave: 'sine', at: 0.1 + i * 0.12 })); }
+          if (dl > 3 || !K.lastCut) c.sound.hit('noise', 0.04, { cutoff: 6000 + (y | 0) * 20, dur: 0.04 });
+          K.lastCut = [x, y];
+        }
+      } else K.lastCut = null;
+      if (!inp.down && K.was && t - K.at < 0.3 && K.mv < 2) { K.buffAt = t; [79, 86, 91].forEach((m, i) => c.sound.note(m, { dur: 0.7, vel: 0.05, wave: 'sine', at: i * 0.08 })); }
+      K.was = inp.down;
+      const lx = K.lx, ly = K.ly, bu = (t - K.buffAt) / 0.7, bpos = bu >= 0 && bu < 1 ? -30 + bu * 290 : -999;
+      // the ornament engraving itself in, leaf by leaf
+      if (K.ornAt > 0) { const u = Math.min(1, (t - K.ornAt) / 1.4); for (const [x, y, ang, q] of K.ORN) if (q <= u) { const i = y * PG + x; if (T[i] !== 6) { T[i] = 6; A[i] = ang; K.CT[i] = K.ornAt + q * 1.4; } } }
+      for (let y = 0; y < PG; y++) for (let x = 0; x < PG; x++) {
+        const i = y * PG + x, k = T[i];
+        // the light's way to this dot: a line glints when it lies across it; the polished plate shines near it
+        const dx = x - lx, dy = y - ly, dd = Math.hypot(dx, dy), spot = Math.max(0, 1 - dd / 70), phi = Math.atan2(dy, dx);
+        let b;
+        let sil = false;
+        if (k === 2) b = 0.05;
+        else if (k === 5) { const cs = Math.abs(Math.sin(A[i] - phi)); b = 0.08 + cs ** 6 * (0.12 + spot * 0.2); }
+        else if (k === 1 || k === 4 || k === 6 || k === 9) { const cs = Math.abs(Math.sin(A[i] - phi)), gl = cs ** 6; b = 0.18 + gl * (0.45 + spot * 0.75) + (k === 6 ? 0.15 + Math.max(0, 1 - (t - K.CT[i]) / 4) * 0.6 : 0); sil = k === 9; }
+        else if (k === 7 || k === 8) { b = 0.5 + spot * 0.55; sil = k === 8; }
+        else if (k === 3) b = 0.44 + spot * spot * 0.5;
+        else b = 0.06 + spot * 0.14;   // the frosted field, dark
+        if (bpos > -999) { const q = x + y - bpos; if (q > -6 && q < 6) b += 0.5 * (1 - Math.abs(q) / 6); }
+        const v = b * 8 + (BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.5) * 0.8;
+        // (the ground in its own deep bronze, so the gold and the silver lines own the plate)
+        px[i] = sil ? 9 + Math.max(0, Math.min(5, Math.floor(v * 0.75))) : (k === 0 || k === 5) ? 15 + Math.max(0, Math.min(3, Math.floor(v * 1.4))) : Math.max(0, Math.min(8, Math.floor(v)));
+      }
+      // the burin's tip while it cuts: a fleck of bright metal
+      if (K.lastCut) { const X = Math.round(K.lastCut[0]), Y = Math.round(K.lastCut[1]); for (const [a, b2] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = X + a, yy = Y + b2; if (xx >= 0 && yy >= 0 && xx < PG && yy < PG) px[yy * PG + xx] = a || b2 ? 7 : 8; } }
+      const im = K.im || (K.im = K.cx.createImageData(PG, PG)), d = im.data, pal = K.pal;
+      for (let i = 0; i < PG * PG; i++) { const p = pal[px[i]]; d[i * 4] = p[0]; d[i * 4 + 1] = p[1]; d[i * 4 + 2] = p[2]; d[i * 4 + 3] = 255; }
+      K.cx.putImageData(im, 0, 0);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(K.cv, 0, 0, S, S);
+    }
     function frame(t) {
+      if (LEG === 'Glyptodon') return caveFrame(t);   // (a legendary is drawn whole, its own way, above)
+      if (LEG === 'Engraving') return plateFrame(t);
       const inp = c.input;
       const taps = inp.taps(), tp = taps[0];
       if (LEG && inp.inside && !wasIn) {
@@ -506,17 +973,16 @@ Proto.add({
       wasIn = inp.inside;
       if (tp && rosette && t - curlAt > 1.7 && Math.hypot(tp.x * N - (MIR ? N - 54 : 54), tp.y * N - 19) < 10) {
         if (t - rosAt > 1.2) { rosAt = t; [64, 67, 72, 76, 79].forEach((m, i) => c.sound.note(m, { dur: i === 4 ? 0.4 : 0.1, vel: 0.13, wave: 'square', cutoff: 2600, at: i * 0.1 })); }
-      } else if (tp && LEG === 'Glyptodon') {
-        if (t - clubAt > 1.1) { clubAt = t; c.sound.hit('noise', 0.12, { cutoff: 1500, dur: 0.2, at: 0.05 }); c.sound.hit('kick', 0.9, { at: 0.27 }); c.sound.note(36, { dur: 0.4, vel: 0.18, wave: 'square', cutoff: 260, at: 0.27 }); }
-      } else if (tp && LEG === 'Engraving') {
-        if (t - sealAt > 0.8) { sealAt = t; c.sound.hit('kick', 0.5); c.sound.hit('noise', 0.1, { cutoff: 3000, dur: 0.06 }); [76, 83, 88].forEach((m, i) => c.sound.note(m, { dur: 0.6, vel: 0.06, wave: 'sine', at: 0.15 + i * 0.12 })); }
+      } else if (tp && LEG) {
+        // (a legendary's taps are read from its own presses, below)
       } else if (tp && t - curlAt > 2.2) {
         curlAt = t;
         // a falling run as it tucks in, a rising one as it opens up again
         [76, 71, 67, 64].forEach((m, i) => c.sound.note(m, { dur: 0.06, vel: 0.16, wave: 'square', cutoff: 2200, at: i * 0.05 }));
         [64, 67, 71, 76].forEach((m, i) => c.sound.note(m, { dur: 0.06, vel: 0.14, wave: 'square', cutoff: 2200, at: 1.5 + i * 0.05 }));
       }
-      if (inp.inside && inp.down) {
+      const lg = null;
+      if (!LEG && inp.inside && inp.down) {
         const gx = inp.x * N, gy = inp.y * N;
         if (!wasDown) dragFrom = [gx, gy];
         if (dragFrom && Math.hypot(gx - dragFrom[0], gy - dragFrom[1]) > 3) ant = [dragFrom[0], dragFrom[1], gx, gy];
@@ -526,7 +992,7 @@ Proto.add({
       const curl = ct < 1.6 ? Math.min(1, ct * 6, (1.6 - ct) * 6) : 0;
       // repaint only when something visible has changed: every frame while it rolls, swings, stamps or spins,
       // otherwise when a blink, a twitch, a step, the ant, the steam, the halo, the clock, the ants or the cursor moves on
-      const live = curl > 0 || (LEG === 'Glyptodon' && t - clubAt < 1.05) || (LEG === 'Engraving' && (t - sealAt < 2.6 || inp.inside)) || (rosette && t - rosAt < 1.25);
+      const live = curl > 0 || LEG === 'Glyptodon' || LEG === 'Engraving' || (rosette && t - rosAt < 1.25);
       if (!live) {
         const antX = prop === 'Ant' ? 2 + ((t * 3 + antPh) % 16) : -9;
         const key = [((t + blinkOff) % 4.6) < 0.15, Math.floor((t + twOff) * 2.2) % 7 === 0, pose === 'Trotting' ? Math.floor(t * 6) % 2 : 0,
@@ -537,26 +1003,18 @@ Proto.add({
         lastKey = key;
       } else lastKey = '';
       paint(t, curl, ant, inp.inside ? [inp.x * N, inp.y * N] : null);
-      if (LEG === 'Engraving' && inp.inside) {
-        // a jeweller's loupe under the pointer: the engraving at twice the size, inside a heavy ring
-        lp.set(bit);
-        const cx = inp.x * N, cy = inp.y * N;
-        for (let y = Math.floor(cy - 11); y <= cy + 11; y++) for (let x = Math.floor(cx - 11); x <= cx + 11; x++) {
-          if (x < 0 || y < 0 || x >= N || y >= N) continue;
-          const r = Math.hypot(x - cx, y - cy);
-          if (r < 9) { const sx = Math.floor(cx + (x - cx) / 2), sy = Math.floor(cy + (y - cy) / 2); bit[y * N + x] = sx >= 0 && sy >= 0 && sx < N && sy < N ? lp[sy * N + sx] : 0; }
-          else if (r < 10.6) bit[y * N + x] = 1;
-          else if (r < 11.4) bit[y * N + x] = 0;
-        }
+      // (the Engraving is cut at twice the grain, into its own bitmap)
+      const src = off;
+      if (src === off) {
+        const d = img.data;
+        for (let i = 0; i < N * N; i++) { const p = bit[i] ? ink : paper; d[i * 4] = p[0]; d[i * 4 + 1] = p[1]; d[i * 4 + 2] = p[2]; d[i * 4 + 3] = 255; }
+        oc.putImageData(img, 0, 0);
       }
-      const d = img.data;
-      for (let i = 0; i < N * N; i++) { const p = bit[i] ? ink : paper; d[i * 4] = p[0]; d[i * 4 + 1] = p[1]; d[i * 4 + 2] = p[2]; d[i * 4 + 3] = 255; }
-      oc.putImageData(img, 0, 0);
       g.imageSmoothingEnabled = false; // keep the dots square
-      g.drawImage(off, 0, 0, S, S);
+      g.drawImage(src, 0, 0, S, S);
       // a phosphor screen glows a little past each dot
       if (screen === 'Amber Phosphor' || screen === 'Green Phosphor') {
-        g.globalAlpha = 0.18; g.imageSmoothingEnabled = true; g.drawImage(off, -S / 128, -S / 128, S + S / 64, S + S / 64); g.globalAlpha = 1;
+        g.globalAlpha = 0.18; g.imageSmoothingEnabled = true; g.drawImage(src, -S / 128, -S / 128, S + S / 64, S + S / 64); g.globalAlpha = 1;
       }
       // the rounded corners of a small compact screen
       g.fillStyle = '#0c0c0c';

@@ -189,8 +189,10 @@ Proto.add({
     const PT = pot[0], T = plant[0];
     const onShelf = companion !== 'None' && companion !== 'Ladybug' && companion !== 'Fairy Lights';
     const toeDir = onShelf ? -compSide : 1;
-    const PX = 32 - (onShelf && PT !== 'Rain Boot' ? compSide * 5 : 0);
-    const cx = PX + 0.5, SH = 54, LIFT = walker ? 6 : 0;   // a walker stands up on its legs, pot well off the shelf
+    // a Legendary stands alone in its own scene: centred (a walker a little ahead, room for a friend to follow)
+    const PX = legend ? (walker ? 35 : 32) : 32 - (onShelf && PT !== 'Rain Boot' ? compSide * 5 : 0);
+    // a walker stands up on its legs, pot well off the ground; a gilded pot sits up on its cushion; a cosmos pot floats
+    const cx = PX + 0.5, SH = 54, LIFT = walker ? 6 : gilded ? 5 : cosmos ? 4 : 0;
     let PR = 35, PB = 58, A = 12.5, Bw = 9.5, form = 'taper', band = 0;
     if (PT === 'Terracotta') band = 6;
     else if (PT === 'Belly Bowl') { PR = 36; Bw = 8.5; form = 'belly'; }
@@ -702,15 +704,23 @@ Proto.add({
     }
 
     // ---------- the two legendary materials repaint the plant and pot ----------
-    const goldRamp = ['#7a4e12', '#c58b25', '#efc14a', '#fff1a6'].map(K), cosRamp = ['#15163a', '#2d3274', '#5a4fb0', '#9d86f0'].map(K);
+    const goldRamp = ['#7a4e12', '#c58b25', '#efc14a', '#fff1a6'].map(K), cosRamp = (cosmos ? ['#272c74', '#3b46ac', '#6c64d4', '#aa9cfa'] : ['#15163a', '#2d3274', '#5a4fb0', '#9d86f0']).map(K);
     const isGold = new Uint8Array(256), starCells = [], facePatch = lay();
     if (gilded || cosmos) {
       const ramp = gilded ? goldRamp : cosRamp, remap = {};
       const re = k => { if (!k || k === O) return k; if (remap[k] === undefined) { const l = lum[k]; remap[k] = ramp[gilded ? (l < 0.25 ? 0 : l < 0.6 ? 1 : l < 0.88 ? 2 : 3) : (l < 0.42 ? 0 : l < 0.62 ? 1 : l < 0.8 ? 2 : 3)]; } return remap[k]; };
       // the pot itself: its body and rim (not the plant trailing over it)
       const inPot = i => { const x = i % N, y = (i / N) | 0; return potM[i] || (y >= PR - 2 - band && y <= PR + 1 && Math.abs(x - PX) <= A + 2) || (PT === 'Teacup' && y > PB) || (PT === 'Teacup' && Math.abs(x - PX) > A - 4 && y >= PR && y <= PR + 13); };
-      // gilded: the plant stays green and only the pot and its rim are gold; cosmos: everything goes to the night
-      if (cosmos) for (let i = 0; i < N * N; i++) plantL[i] = re(plantL[i]);
+      // gilded: Midas's touch, the plant turns to gold with its pot; cosmos: the pot goes to the night and the
+      // plant to nebula, violet to pink
+      if (gilded) {   // the plant turns to pale champagne gold with bright highlights, so it never melts into the deep-gold pot
+        const rose = ['#6a5418', '#b8962e', '#ecd476', '#fffbe2'].map(K), rr = {};
+        for (let i = 0; i < N * N; i++) { const k = plantL[i]; if (!k || k === O) continue; if (rr[k] === undefined) { const l = lum[k]; rr[k] = rose[l < 0.25 ? 0 : l < 0.6 ? 1 : l < 0.88 ? 2 : 3]; } plantL[i] = rr[k]; }
+      }
+      if (cosmos) {
+        const neb = ['#3b1c6e', '#7440b8', '#cf68d4', '#ffd2f2'].map(K), rn = {};
+        for (let i = 0; i < N * N; i++) { const k = plantL[i]; if (!k || k === O) continue; if (rn[k] === undefined) { const l = lum[k]; rn[k] = neb[l < 0.42 ? 0 : l < 0.62 ? 1 : l < 0.8 ? 2 : 3]; } plantL[i] = rn[k]; }
+      }
       for (let i = 0; i < N * N; i++) if (cosmos || inPot(i)) potL[i] = re(potL[i]);
       for (const k of ramp) isGold[k] = 1;
       if (cosmos) {
@@ -730,6 +740,21 @@ Proto.add({
         for (let k = 0, made = 0; k < 40 && made < 3; k++) { const x = PX - 8 + Math.floor(fr() * 17), y = PR + 2 + Math.floor(fr() * (PB - PR - 3)); if (faceBox(x, y) || facePatch[y * N + x] || !inPot(y * N + x)) continue; made++; potL[y * N + x] = WH; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (isGold[get(potL, x + a, y + b)]) potL[(y + b) * N + x + a] = bright; }
         for (let i = 0; i < 420 && starCells.length < 80; i++) { const x = Math.floor(fr() * N), y = Math.floor(fr() * N); if (facePatch[y * N + x]) continue; if (isGold[potL[y * N + x]] || isGold[plantL[y * N + x]]) starCells.push([x, y, fr() * 6.28, potL[y * N + x] ? 1 : 0]); }
       }
+    }
+    // the gilded pot's jewels: a row of set stones round the rim, gem buds on the golden plant, a crown cocked on the rim
+    if (gilded) {
+      const ruby = K('#e8364f'), rubyD = K('#a81c3a'), sapph = K('#4a7af0'), emer = K('#2fbf78'), gemL = K('#fff4f0');
+      const gy = band ? PR + Math.floor(band / 2) - 2 : PR + 2, gems = [ruby, sapph, emer];
+      for (let x = PX - Math.round(A) + 3, j = 0; x <= PX + Math.round(A) - 4; x += 5, j++) {
+        if (faceBox(x, gy) || faceBox(x + 1, gy + 1)) continue;
+        if (!isGold[get(potL, x, gy)] || !isGold[get(potL, x + 1, gy + 1)]) continue;
+        const g = gems[j % 3];
+        potL[gy * N + x] = gemL; potL[gy * N + x + 1] = g; potL[(gy + 1) * N + x] = g; potL[(gy + 1) * N + x + 1] = g === ruby ? rubyD : O;
+      }
+      for (const [tx, ty] of tips.slice(0, 4)) { const x = Math.round(tx), y = Math.round(ty) + 1; if (get(plantL, x, y)) { put(plantL, x, y, gemL); put(plantL, x + 1, y, ruby); put(plantL, x, y + 1, ruby); put(plantL, x + 1, y + 1, rubyD); } }
+      const crY = (band ? PR - 2 : R) - 5, crX = PX - Math.round(A) - 1;
+      spT(crX, crY, ['r...b...r', 'y...y...y', 'yy.yYy.yy', 'yyyyYyyyy', 'yrYybyYry', 'YYYYYYYYY'], { y: goldRamp[2], Y: goldRamp[1], r: ruby, b: sapph });
+      stamp(potL, O);
     }
 
     // ---------- the face's still parts: cheeks, brows, mouth ----------
@@ -848,6 +873,7 @@ Proto.add({
       const dt = Math.max(0, Math.min(0.1, t - tPot)); tPot = t;
       for (const tap of c.input.taps()) {
         const x = tap.x * N, y = tap.y * N;
+        if (scene && scene.tap) { scene.tap(x, y, t); continue; }
         if (legend && onChar(x, y)) {
           if (walker && t - hopAt > 0.55) { hopAt = t; c.sound.note(drip[0] - 12, { dur: 0.12, vel: 0.3, wave: 'triangle' }); c.sound.note(drip[2] - 12, { dur: 0.16, vel: 0.26, wave: 'triangle', at: 0.08 }); c.sound.note(drip[4] - 12, { dur: 0.2, vel: 0.22, wave: 'sine', at: 0.16 }); }
           if (gilded) { chimeAt = t; for (let i = 0; i < 10; i++) sparks.push({ x: PX + (wr() - 0.5) * 2 * A, y: PR + wr() * (PB - PR) - 6, t0: t + i * 0.04 }); [0, 2, 4, 6].forEach((k, i) => c.sound.note(drip[k % drip.length] + 5, { dur: 0.9, vel: 0.16, wave: 'sine', at: i * 0.07 })); }
@@ -885,10 +911,7 @@ Proto.add({
       const want = c.input.inside ? Math.max(-1, Math.min(1, (c.input.x * N - cx) / 27)) * 0.13 : 0;
       reach += (want - reach) * Math.min(1, dt * 2.5);
       perk = Math.max(0, perk - dt * 1.2); glad = Math.max(0, glad - dt);
-      if (walker) {   // it shuffles toward the pointer, a cell at a time
-        const goal = c.input.inside ? Math.max(-6, Math.min(6, Math.round(c.input.x * N - cx))) : 0;
-        if (goal !== walkX && t - walkT > 0.28 && t - hopAt > 0.5) { walkT = t; walkDir = Math.sign(goal - walkX); walkX += walkDir; step++; c.sound.hit('click', 0.12); }
-      }
+      if (scene && scene.tick) scene.tick(t, dt);
     };
 
     // ---------- live drawing helpers ----------
@@ -943,6 +966,547 @@ Proto.add({
     };
     const glanceX = companion !== 'None' ? compSide : 1;
     const noBlink = Ek => Ek === 'Sleepy' || Ek === 'Pressed Holes' || Ek === 'Folk Painted';   // holes and paint don't blink
+
+    // ================= the Legendary scenes: each its own set, palette and motion =================
+    // (built only for a Legendary: an ordinary pot never reaches any of this)
+    //   Gilded        Midas's pot, all gold and jewels, on a velvet cushion on a marble plinth between red
+    //                 curtains, in a spotlight with dust drifting in it; sparkles run over the gold
+    //   Cosmos        the pot adrift in deep space: dithered nebulae, a ringed planet, a ring of its own,
+    //                 a little moon going round it, stardust spilling from its base, shooting stars
+    //   Up and About  it has climbed out of the window into the view it always looked at, and walks along a
+    //                 path through it with a bindle on its shoulder, the land scrolling past in layers
+    let scene = null, trek = 0, wclk = 0, tripAt = -9;
+    if (legend) {
+      const bay = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+      const dith = (x, y, v) => v * 16 > bay[(y & 3) * 4 + (x & 3)] + 0.5;   // an ordered dither: on for about v of the cells
+      const ls = (parseInt(c.hash.slice(10, 18), 16) ^ 0x6a09e667) >>> 0;
+      const hs = (a, b) => { let h = (Math.imul(a | 0, 0x27d4eb2d) ^ Math.imul((b | 0) + 0x9e37, 0x165667b1) ^ ls) >>> 0; h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0; h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+      const plus = (D, x, y, r, kc, ka) => { put(D, x, y, kc); for (let k = 1; k <= r; k++) for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(D, x + a * k, y + b * k, ka); };
+      const stage = lay();
+      if (gilded) {
+        const gR = goldRamp, wine = K('#5c1b42'), wineD = K('#3e0f2c'), dam = K('#70284f'), lit = K('#a04e6a'), lit2 = K('#c7728c');
+        const cv = ['#f2717f', '#c9304b', '#93193a', '#5a0c25'].map(K), marb = K('#f4eff6'), marbD = K('#d5c8e0'), vein = K('#b39fc6'), mote = K('#ffeccb'), boards = K('#2c0a20');
+        const beamW = y => 2.5 + Math.max(0, y - 5) * 0.42;
+        // the wall: a damask trellis, warm in the cone of the spotlight
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const d1 = (x + y) % 10, d2 = (x - y + 640) % 10, dx = Math.abs(x + 0.5 - 32), w = beamW(y);
+          const inB = dx < w - 1.4 || (dx < w && (x + y) % 2 === 0);
+          stage[y * N + x] = d1 === 5 && d2 === 5 ? gR[inB ? 2 : 1] : d1 === 0 || d2 === 0 ? (inB ? lit2 : dam) : inB ? lit : wine;
+        }
+        const floorY = PB + 7;
+        for (let y = floorY; y < N; y++) for (let x = 0; x < N; x++) stage[y * N + x] = y === floorY ? O : ((x >> 2) + (y >> 1)) % 2 ? wineD : boards;
+        // the plinth: a gilt capital on a fluted marble column, and the cushion on top
+        const capY = PB + 5;
+        box(PX - 12, capY, 26, 2, (a, b) => b === 0 ? (a < 4 ? gR[3] : gR[2]) : a > 20 ? gR[0] : gR[1]); stamp(stage, O);
+        box(PX - 9, capY + 2, 20, N - capY - 2, (a) => a > 14 ? (a % 3 === 1 ? vein : marbD) : a % 3 === 1 ? marbD : marb); stamp(stage, O);
+        for (let y = capY + 3, x = PX - 3; y < N; y++) { put(stage, x, y, vein); x += hs(y, 7) < 0.5 ? 1 : -1; x = Math.max(PX - 7, Math.min(PX + 5, x)); }
+        ell(cx, PB + 1.4, Bw + 6.5, 2.5, (p, q) => q < -0.4 && p < 0.25 ? cv[0] : p > 0.55 || q > 0.45 ? cv[2] : cv[1]); stamp(stage, O);
+        for (const s2 of [-1, 1]) { const tx = Math.round(cx - 0.5 + s2 * (Bw + 7)); for (let k = 0; k < 3; k++) put(stage, tx, PB + 1 + k, k === 2 ? gR[1] : gR[2]); put(stage, tx - 1, PB + 4, gR[1]); put(stage, tx + 1, PB + 4, gR[1]); put(stage, tx, PB + 4, gR[3]); }
+        // the valance across the top: pleated velvet, a gold braid, a fringe and tassels
+        const val = lay();
+        for (let x = 0; x < N; x++) {
+          const yb = 4 + Math.round(2.2 * Math.abs(Math.sin((x + 0.5) * Math.PI / 16)));
+          for (let y = 0; y < yb; y++) val[y * N + x] = y === yb - 1 ? gR[2] : y === yb - 2 ? O : x % 4 === 0 ? cv[2] : y === 1 ? cv[0] : cv[1];
+          val[yb * N + x] = x % 2 ? gR[1] : O;
+          if (x % 16 === 0 || x % 16 === 15) for (let k = 1; k < 4; k++) val[(yb + k) * N + x] = k === 3 ? gR[1] : gR[2];
+        }
+        // the curtains, drawn each frame: folds gathered into the tie-backs, swaying a little below them
+        const edge = (y, sw) => y < 31 ? 6 + 9.5 * Math.pow((31 - y) / 26, 1.5) : 6 + 6 * Math.pow((y - 31) / 32, 0.8) + sw * (y - 31) / 32;
+        const curtains = (D, t, ob) => {
+          const sw = Math.sin(t * 0.8) * 1.6 + Math.sin(t * 1.9 + 1) * 0.6;
+          for (let y = 0; y < N; y++) {
+            const E = Math.round(edge(y, sw));
+            for (let x = 0; x <= E; x++) {
+              const f = Math.sin(x / E * 9.4 + (y > 31 ? (y - 31) * 0.04 * sw : 0) - 0.4);
+              const k = x === E ? O : x === E - 1 ? (f > 0 ? cv[2] : cv[3]) : f > 0.6 ? cv[0] : f > -0.25 ? cv[1] : f > -0.75 ? cv[2] : cv[3];
+              D[y * N + x] = k; D[y * N + N - 1 - x] = k;
+              if (ob) { ob[y * N + x] = 7; ob[y * N + N - 1 - x] = 8; }
+            }
+          }
+          const E = Math.round(edge(30, 0)) + 1;
+          for (const right of [false, true]) {
+            for (let x = 0; x <= E; x++) { const xx = right ? N - 1 - x : x; D[29 * N + xx] = O; D[30 * N + xx] = (x + 1) % 3 ? gR[2] : gR[3]; D[31 * N + xx] = x % 3 ? gR[1] : gR[2]; D[32 * N + xx] = O; if (ob) for (let y = 29; y < 33; y++) ob[y * N + xx] = 9; }
+            const tx = right ? N - 1 - E : E, swing = Math.round(Math.sin(t * 1.1 + (right ? 1.4 : 0)) * 0.6);
+            for (let y = 33; y < 40; y++) { const w2 = y < 35 ? 0 : 1, ox = y > 35 ? swing : 0; for (let d = -w2; d <= w2; d++) put(D, tx + d + ox, y, y === 39 ? (d ? gR[1] : O) : d === -1 ? gR[3] : d === 1 ? gR[1] : gR[2]); }
+          }
+        };
+        const motes = (D, t) => {
+          for (let i = 0; i < 16; i++) {
+            const y = 7 + Math.floor((hs(i, 1) * 48 + t * (0.5 + hs(i, 2) * 0.9)) % 48), w = beamW(y) - 1;
+            const x = Math.round(32 + (hs(i, 3) * 2 - 1) * w + Math.sin(t * 0.7 + i * 2.1) * 0.8), k = D[y * N + x];
+            if (k === lit || k === lit2) D[y * N + x] = mote;
+          }
+        };
+        const goldCells = [];
+        for (let i = 0; i < N * N; i++) if (isGold[potL[i]] && !faceBox(i % N, (i / N) | 0)) goldCells.push(i);
+        // Midas's touch: what a finger touches turns to gold, and the gold runs through that whole thing first (a curtain,
+        // the plinth, the cushion, the wall) and creeps across to whatever it touches, until the room is gold; then it
+        // melts, running down the room in drips into a pool of molten gold that drains away, and the room is back
+        const midas = lay(), front0 = [], ob = lay(), obStage = lay();
+        let rs = (ls ^ 0x1b873593) >>> 0 || 1, meltAt = -1, lastChime = -9, gold = 0, nextFront = 0;
+        const rnd = () => { rs ^= rs << 13; rs >>>= 0; rs ^= rs >>> 17; rs ^= rs << 5; rs >>>= 0; return rs / 4294967296; };
+        // what each cell of the set is: 1 wall, 2 floor, 3 capital, 4 column, 5 cushion, 6 valance (7, 8, 9 the curtains)
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const i = y * N + x, dx2 = x - PX, cu = Math.hypot((x + 0.5 - cx) / (Bw + 7.5), (y + 0.5 - PB - 1.4) / 3.6) < 1;
+          obStage[i] = cu ? 5 : y >= capY - 1 && y <= capY + 2 && dx2 >= -13 && dx2 <= 14 ? 3 : y > capY + 1 && dx2 >= -10 && dx2 <= 11 ? 4 : y >= floorY ? 2 : 1;
+        }
+        const gild = i => { if (!midas[i]) { midas[i] = 1; gold++; front0.push(i); } };
+        const touch = (x0, y0, r) => { for (let y = Math.floor(y0 - r); y <= y0 + r; y++) for (let x = Math.floor(x0 - r); x <= x0 + r; x++) { if (x < 0 || y < 0 || x >= N || y >= N || Math.hypot(x + 0.5 - x0, y + 0.5 - y0) > r) continue; gild(y * N + x); } };
+        const tone = new Uint8Array(256), toneOf = k => { if (!tone[k]) { const l = lum[k]; tone[k] = 1 + (l < 0.22 ? 0 : l < 0.42 ? 1 : l < 0.7 ? 2 : 3); } return gR[tone[k] - 1]; };
+        const coins = [];
+        const cushionTop = x => Math.abs(x - cx) < A + 1 ? PB : Math.abs(x - cx) < Bw + 6.5 ? PB - 1 : floorY - 1;
+        const melted = (x, t) => { const q = (t - meltAt - 0.7) / 2.2 - hs(x, 301) * 0.25; return q * (N + 10); };   // how far the melt has run down column x
+        scene = {
+          tap(x, y, t) {
+            if (onChar(x, y)) {
+              for (let i = 0; i < 9; i++) { if (coins.length > 44) coins.shift(); coins.push({ x: cx - 0.5 + (rnd() - 0.5) * 6, y: R - 1, vx: (rnd() - 0.5) * 26, vy: -20 - rnd() * 14, rest: false, b: 0 }); }
+              [0, 4, 7, 12].forEach((k, i) => c.sound.note(drip[0] + k, { dur: 0.25, vel: 0.12, wave: 'triangle', at: i * 0.05 }));
+            } else if (meltAt < 0) touch(x, y, 2.6);
+          },
+          tick(t, dt) {
+            const inp = c.input;
+            if (inp.down && inp.inside && meltAt < 0) {
+              const x = inp.x * N, y = inp.y * N;
+              if (!onChar(x, y)) { touch(x, y, 2.6); if (t - lastChime > 0.18) { lastChime = t; c.sound.note(drip[Math.floor(rnd() * drip.length)] + 12, { dur: 0.3, vel: 0.06, wave: 'sine' }); } }
+            }
+            if (meltAt < 0 && front0.length) {
+              // the gold's front: each cell on it gilds its neighbours, at once if they're the same thing, now and then if not
+              for (let n = Math.min(front0.length, Math.ceil(dt * 420) + Math.ceil(front0.length * dt * 2.6)); n > 0; n--) {
+                const i = front0.shift(), x = i % N, y = (i / N) | 0;
+                let left = false;
+                for (const j of [x > 0 ? i - 1 : -1, x < N - 1 ? i + 1 : -1, y > 0 ? i - N : -1, y < N - 1 ? i + N : -1]) {
+                  if (j < 0 || midas[j]) continue;
+                  if (ob[j] === ob[i] || rnd() < 0.1) gild(j); else left = true;
+                }
+                if (left) front0.push(i);
+              }
+              if (t >= nextFront) { nextFront = t + 0.12; c.sound.note(drip[Math.floor(gold / 300) % drip.length] + 12, { dur: 0.12, vel: 0.03, wave: 'sine' }); }
+              if (gold >= N * N) { meltAt = t; front0.length = 0; [12, 7, 4, 0, -5].forEach((k, i) => c.sound.note(drip[0] + k, { dur: 0.6, vel: 0.1, wave: 'sine', at: 0.6 + i * 0.12 })); }
+            }
+            if (meltAt >= 0 && t - meltAt > 4.4) { midas.fill(0); gold = 0; meltAt = -1; }
+            for (const k of coins) {
+              if (k.rest) continue;
+              k.vy += 70 * dt; k.x += k.vx * dt; k.y += k.vy * dt;
+              if (k.x < 1 || k.x > N - 2) { k.vx = -k.vx * 0.6; k.x = Math.max(1, Math.min(N - 2, k.x)); }
+              const fl = cushionTop(k.x);
+              if (k.y >= fl && k.vy > 0) {
+                k.y = fl; k.b++;
+                c.sound.note(drip[(k.b + Math.floor(k.x)) % drip.length] + 19, { dur: 0.06, vel: 0.05 / k.b, wave: 'triangle' });
+                if (k.b > 2 || Math.abs(k.vy) < 6) { k.rest = true; k.vy = 0; } else { k.vy *= -0.38; k.vx *= 0.6; }
+              }
+            }
+          },
+          back(D, t) {
+            ob.set(obStage);
+            D.set(stage); motes(D, t); curtains(D, t, ob); for (let i = 0; i < 10 * N; i++) if (val[i]) { D[i] = val[i]; ob[i] = 6; }
+            if (!gold) return;
+            // gold in four tones by how light the thing was, a bright lip where the gold meets what isn't yet, cells twinkling
+            const tw = Math.floor(t * 7), melt = meltAt >= 0 && t - meltAt > 0.7;
+            for (let i = 0; i < N * N; i++) {
+              if (!midas[i]) continue;
+              const x = i % N, y = (i / N) | 0;
+              if (melt) { const m = melted(x, t); if (y < m - 2) continue; if (y < m) { D[i] = y < m - 1 ? gR[3] : WH; continue; } }
+              const edge = !melt && ((x > 0 && !midas[i - 1]) || (x < N - 1 && !midas[i + 1]) || (y > 0 && !midas[i - N]) || (y < N - 1 && !midas[i + N]));
+              D[i] = edge ? gR[3] : hs(i, tw) < 0.012 ? WH : toneOf(D[i]);
+            }
+            if (meltAt >= 0) {
+              // the gleam that runs over the gold the moment it's all gold, then the molten pool at the foot of the room
+              const g = (t - meltAt) / 0.7;
+              if (g < 1) for (let i = 0; i < N * N; i++) { const x = i % N, y = (i / N) | 0, d = x + y - g * 130; if (d > -3 && d < 0) D[i] = d > -1.5 ? WH : gR[3]; }
+              const pool = Math.max(0, Math.min(1, (t - meltAt - 1.2) / 1.4)) * (1 - Math.max(0, (t - meltAt - 3.4) / 1.0)) * 6;
+              for (let y = Math.floor(N - pool); y < N; y++) for (let x = 0; x < N; x++) { const wv = Math.sin(x * 0.5 + t * 6) > 0.6 && y === Math.floor(N - pool) ? WH : y === Math.floor(N - pool) ? gR[3] : (x + y + Math.floor(t * 10)) % 9 === 0 ? gR[2] : gR[1]; D[y * N + x] = wv; }
+            }
+          },
+          front(D, t, dx, dy) {
+            for (const k of coins) { const x = Math.round(k.x), y = Math.round(k.y) - 1, spin = k.rest ? 0 : Math.floor(t * 12 + k.x) % 2; spT(x, y, spin ? ['y', 'Y'] : ['yY', 'YZ'], { y: gR[3], Y: gR[2], Z: gR[1] }); stamp(D, O); }
+            // sparkles flaring over the gold, each in its own time
+            for (let s2 = 0; s2 < 6; s2++) {
+              const ph = t / 1.7 + s2 * 0.37, n = Math.floor(ph), q = ph - n, i = goldCells[Math.floor(hs(n, s2 + 20) * goldCells.length)];
+              if (i === undefined) continue;
+              const r = q < 0.12 ? 0 : q < 0.26 ? 1 : q < 0.4 ? 2 : q < 0.52 ? 1 : q < 0.6 ? 0 : -1;
+              if (r >= 0) plus(D, i % N + dx, ((i / N) | 0) + dy, r, WH, gR[3]);
+            }
+          },
+        };
+      } else if (cosmos) {
+        const s0 = K('#090920'), s1 = K('#13123c'), nb = ['#261249', '#47196c', '#7a2a8c', '#b84c9e'].map(K), tl = ['#0f2a40', '#18506a', '#2c8798'].map(K);
+        const plc = ['#f8dcae', '#eaa878', '#c9785c', '#7a3c4c'].map(K), ringC = [K('#86d6ea'), K('#3a86a6')], pring = [K('#f2e4c2'), K('#b39a7a')], glowK = [K('#2a2266'), K('#3a2c86')];
+        const p1 = hs(1, 1) * 6.28, p2 = hs(2, 2) * 6.28, fl = hs(3, 3) < 0.5 ? 1 : -1, star = K('#fff6cc'), star2 = K('#c9b8ff'), star3 = K('#8fd3ff');
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const xx = fl > 0 ? x : N - 1 - x;
+          let k = dith(x, y, y / 75) ? s1 : s0;
+          // a ragged band of magenta nebula, and a teal cloud low on the other side
+          const m = Math.exp(-Math.pow((xx * 0.75 - y + 8) / 12, 2)) * (0.62 + 0.38 * Math.sin(xx * 0.31 + y * 0.17 + p1) * Math.sin(xx * 0.13 - y * 0.29 + p2));
+          if (m > 0.2) k = m > 0.72 ? nb[3] : m > 0.52 ? nb[2] : m > 0.34 ? nb[1] : nb[0];
+          else if (m > 0.1 && dith(x, y, (m - 0.1) * 10)) k = nb[0];
+          const tc = Math.exp(-(Math.pow((xx - 55) / 10, 2) + Math.pow((y - 54) / 7, 2))) * (0.7 + 0.3 * Math.sin(xx * 0.4 + y * 0.3 + p2));
+          if (tc > 0.5) k = tc > 0.68 ? tl[1] : tl[0];
+          // a soft glow of light behind the pot, so it reads against the night
+          const gd = Math.hypot((x + 0.5 - cx) / (A + 7), (y + 0.5 - (PR + PB) / 2 - 1) / 15);
+          if (gd < 1) k = gd < 0.72 || dith(x, y, (1 - gd) / 0.28) ? (gd < 0.5 ? glowK[1] : glowK[0]) : k;
+          stage[y * N + x] = k;
+        }
+        // a ringed planet up in the corner, half out of frame
+        const qx = fl > 0 ? 54 : 9, qy = 10, qr = 8.6, tilt = 0.28 * fl;
+        const ringPts = (front) => { const o = []; for (let i = 0; i < 220; i++) { const a = i / 220 * 6.283, ex = Math.cos(a) * 16, ey = Math.sin(a) * 3.4; if ((ey > 0) !== front) continue; o.push([qx + ex * Math.cos(tilt) - ey * Math.sin(tilt), qy + ex * Math.sin(tilt) + ey * Math.cos(tilt)]); } return o; };
+        for (const [x, y] of ringPts(false)) { put(stage, Math.round(x), Math.round(y), pring[1]); }
+        area(qx - qr - 1, qy - qr - 1, qx + qr + 1, qy + qr + 1, (px, py, x, y) => {
+          const dx = (px - qx) / qr, dy = (py - qy) / qr; if (dx * dx + dy * dy > 1) return 0;
+          const band = Math.floor((dy * 3.2 + dx * 0.7 + 4) * 1.6), lit2 = -dx * 0.55 - dy * 0.6 + 0.35;
+          const k = plc[band % 3];
+          return lit2 < -0.25 && dith(x, y, 0.5 - lit2) ? plc[3] : k;
+        });
+        stamp(stage, O);
+        for (const [x, y] of ringPts(true)) { put(stage, Math.round(x), Math.round(y), pring[0]); put(stage, Math.round(x), Math.round(y) + 1, pring[1]); }
+        // the stars: fixed, some twinkling, a few big ones
+        const stars = [];
+        for (let i = 0; i < 70; i++) stars.push([Math.floor(hs(i, 31) * N), Math.floor(hs(i, 32) * N), hs(i, 33), hs(i, 34) * 6.28]);
+        const sky = new Uint8Array(256); for (const k of [s0, s1, ...nb, ...tl, ...glowK]) sky[k] = 1;
+        const rcY = PB - 3, rRX = A + 8.5, rRY = 2.6, midY = (PR + PB) / 2;
+        // starlight catches the pot's outline, so the night pot stands out from the night
+        const rimK = K('#6f6ad8');
+        for (let i = N; i < N * N - N; i++) if (potL[i] === O && (!potL[i - 1] || !potL[i + 1] || !potL[i - N] || !potL[i + N]) && !plantL[i] && (i / N | 0) > R) potL[i] = rimK;
+        const potRing = (D, dy, back, t) => {
+          for (let i = 0; i < 200; i++) {
+            const a = i / 200 * 6.283; if ((Math.sin(a) < 0) !== back) continue;
+            const x = Math.round(cx - 0.5 + Math.cos(a) * rRX), y = Math.round(rcY + dy + Math.sin(a) * rRY);
+            const glint = Math.sin(a * 3 - t * 2.2) > 0.85, gl = t - glowAt < 2.5;
+            put(D, x, y, glint ? WH : gl ? gold2[0] : ringC[0]); put(D, x, y + 1, gl ? gold2[1] : ringC[1]);
+          }
+        };
+        const moon = (D, t, dy, back) => {
+          const a = t * 0.85 + p1, s = Math.sin(a); if ((s < 0) !== back) return;
+          const x = Math.round(cx - 0.5 + Math.cos(a) * (A + 14) - 2), y = Math.round(midY - 3 + s * 6 + dy - 2);
+          spT(x, y, ['.mmm.', 'mmMmm', 'mMmmm', 'mmmMm', '.mmm.'], { m: K('#e4e0f6'), M: K('#a9a2d2') });
+          stamp(D, O);
+        };
+        // moons you fling: pull back from where it should start and let go; they fall round the pot under its pull,
+        // trailing light, and crash into it in a burst of stars if they come too close
+        const moons = [], moonCols = ['#ffd27a', '#9fe8ff', '#ffb3e6', '#c9ff9a', '#ffffff'].map(K), moonDim = ['#c08a3a', '#4a8ab0', '#b0609a', '#7ab04a', '#a0a0c0'].map(K);
+        let aim = null, launched = 0, wobbleAt = -9, glowAt = -9;
+        const bursts = [], gold2 = [K('#ffe27a'), K('#c9962e')];
+        const GM = 520, potY = () => (PR + PB) / 2 + scene.bob(tPot);
+        // a fling, helped into an orbit: most of the throw toward or away from the pot is taken out, and its speed
+        // round the pot is kept between a slow and a fast orbit, so an ordinary fling goes round at least once
+        const launchFrom = (x0, y0, vx, vy) => {
+          const cy0 = potY();
+          let dx = x0 - cx + 0.5, dy = y0 - cy0, r = Math.hypot(dx, dy);
+          if (r < A + 6) { const k = (A + 6) / Math.max(r, 0.1); dx *= k; dy *= k; r = A + 6; if (!isFinite(dx)) { dx = A + 6; dy = 0; } }
+          const rx = dx / r, ry = dy / r, tx = -ry, ty = rx, vc = Math.sqrt(GM / Math.pow(r * r + 6, 0.5));
+          let vr = vx * rx + vy * ry, vt = vx * tx + vy * ty;
+          vr *= 0.3; vt = (vt >= 0 ? 1 : -1) * Math.max(0.8 * vc, Math.min(1.18 * vc, Math.abs(vt) + Math.abs(vr) * 0.5));
+          return { x: cx - 0.5 + dx, y: cy0 + dy, vx: rx * vr + tx * vt, vy: ry * vr + ty * vt };
+        };
+        const stepMoon = (m, h, cy0) => { const dx = cx - 0.5 - m.x, dy = cy0 - m.y, r2 = dx * dx + dy * dy, a = GM / Math.pow(r2 + 6, 1.5); m.vx += dx * a * h; m.vy += dy * a * h; m.x += m.vx * h; m.y += m.vy * h; };
+        scene = {
+          tap(x, y, t) { rings.push({ x, y, t0: t }); },
+          tick(t, dt) {
+            const inp = c.input;
+            if (inp.down && inp.inside) { const x = inp.x * N, y = inp.y * N; if (!aim) aim = { x0: x, y0: y }; aim.x1 = x; aim.y1 = y; }
+            else if (aim) {
+              const dx = aim.x0 - aim.x1, dy = aim.y0 - aim.y1;
+              if (Math.hypot(dx, dy) > 1.5) {
+                if (moons.length > 2) moons.shift();
+                const l = launchFrom(aim.x0, aim.y0, dx * 2.4, dy * 2.4);
+                moons.push(Object.assign(l, { k: launched++ % moonCols.length, tr: [], ang: Math.atan2(l.y - potY(), l.x - cx + 0.5), turned: 0, laps: 0 }));
+                c.sound.note(drip[0] - 12, { dur: 0.5, vel: 0.18, wave: 'sine' }); c.sound.note(drip[3], { dur: 0.3, vel: 0.08, wave: 'triangle', at: 0.08 });
+              }
+              aim = null;
+            }
+            const cy0 = potY();
+            for (let i = moons.length - 1; i >= 0; i--) {
+              const m = moons[i];
+              for (let s3 = 0; s3 < 4; s3++) stepMoon(m, dt / 4, cy0);
+              m.tr.unshift([m.x, m.y]); if (m.tr.length > 18) m.tr.pop();
+              // laps round the pot: on the third, the pot beams and its ring glows gold
+              const a = Math.atan2(m.y - cy0, m.x - cx + 0.5); let da = a - m.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); m.ang = a; m.turned += da;
+              if (Math.abs(m.turned) >= 6.283 * (m.laps + 1)) { m.laps++; c.sound.note(drip[m.laps % drip.length] + 12, { dur: 0.3, vel: 0.1, wave: 'triangle' }); if (m.laps === 3) { glowAt = t; glad = 2.5; [0, 4, 7, 12, 16].forEach((k, j) => c.sound.note(drip[0] + k + 12, { dur: 0.6, vel: 0.12, wave: 'sine', at: j * 0.08 })); } }
+              const r = Math.hypot(m.x - cx + 0.5, m.y - cy0);
+              if (r < A * 0.75) { bursts.push({ x: m.x, y: m.y, t0: t, k: m.k }); rings.push({ x: m.x, y: m.y, t0: t }); rings.push({ x: m.x, y: m.y, t0: t - 0.3 }); wobbleAt = t; moons.splice(i, 1); c.sound.note(drip[0] - 24, { dur: 0.9, vel: 0.22, wave: 'sine' }); c.sound.hit('noise', 0.14, { cutoff: 900, dur: 0.4 }); }
+              else if (r > 95) moons.splice(i, 1);
+            }
+          },
+          bob: t => Math.round(Math.sin(t * 1.25) * 1.3),
+          shake: t => t - wobbleAt < 0.45 ? (Math.floor(t * 18) % 2) * 2 - 1 : 0,
+          back(D, t) {
+            D.set(stage);
+            for (const [x, y, kind, ph] of stars) {
+              if (!sky[D[y * N + x]]) continue;
+              const v = Math.sin(t * (1.2 + kind * 1.6) + ph);
+              if (kind > 0.88) { if (v > -0.2) plus(D, x, y, v > 0.6 ? 2 : 1, WH, star2); else D[y * N + x] = star; }
+              else D[y * N + x] = v > 0.3 ? (kind > 0.5 ? star : star3) : kind > 0.4 ? star2 : nb[1];
+            }
+            // a shooting star now and then
+            const per = 6.5, q = ((t + hs(9, 9) * per) % per) / 0.8, n = Math.floor((t + hs(9, 9) * per) / per);
+            if (q < 1) {
+              const x0 = 6 + hs(n, 41) * 40, y0 = 4 + hs(n, 42) * 14, x = x0 + q * 22, y = y0 + q * 9;
+              for (let k = 0; k < 6; k++) { const xx = Math.round(x - k * 1.6), yy = Math.round(y - k * 0.65); if (xx >= 0 && yy >= 0 && xx < N && yy < N && sky[D[yy * N + xx]]) D[yy * N + xx] = k === 0 ? WH : k < 3 ? star : star2; }
+            }
+          },
+          behind(D, t, dx, dy) {
+            moon(D, t, dy, true);
+            potRing(D, dy, true, t);
+            // stardust spilling from its base and drifting down
+            for (let k = 0; k < 7; k++) {
+              const q = (t * 0.45 + k / 7) % 1, x = Math.round(cx - 0.5 + (hs(k, 51) - 0.5) * 2 * (Bw - 1) + Math.sin(t + k) * 0.6), y = Math.round(PB + 2 + dy + q * 11);
+              put(D, x, y, q < 0.4 ? WH : q < 0.75 ? star2 : nb[2]);
+            }
+          },
+          front(D, t, dx, dy) {
+            potRing(D, dy, false, t); moon(D, t, dy, false);
+            for (const m of moons) {   // a fat moon with a long tail of its own light
+              m.tr.forEach(([x, y], j) => { if (j > 1) { const k = j < 5 ? WH : j < 10 ? moonCols[m.k] : j < 14 ? moonDim[m.k] : nb[2]; put(D, Math.round(x), Math.round(y), k); if (j < 8) put(D, Math.round(x) + 1, Math.round(y), k); } });
+              ell(m.x, m.y, 2.6, 2.6, (p, q) => p < -0.25 && q < -0.25 ? WH : p > 0.35 || q > 0.35 ? moonDim[m.k] : moonCols[m.k]); stamp(D, O);
+            }
+            for (const b of bursts) {   // a crash: a burst of rays and stars
+              const q = (t - b.t0) / 0.8; if (q > 1) continue;
+              for (let j = 0; j < 12; j++) { const an = j / 12 * 6.283, r0 = 2 + q * 14, r1 = r0 + 3 * (1 - q); for (let rr = r0; rr < r1; rr += 1) put(D, Math.round(b.x + Math.cos(an) * rr), Math.round(b.y + Math.sin(an) * rr), j % 3 ? moonCols[b.k] : WH); }
+              if (q < 0.3) plus(D, Math.round(b.x), Math.round(b.y), 3, WH, moonCols[b.k]);
+            }
+            if (aim) {   // the slingshot: a rubber band back to the finger, and where it would go
+              const L = Math.hypot(aim.x1 - aim.x0, aim.y1 - aim.y0);
+              for (let j = 1; j < L; j += 1) put(D, Math.round(aim.x0 + (aim.x1 - aim.x0) * j / L), Math.round(aim.y0 + (aim.y1 - aim.y0) * j / L), j % 2 ? WH : star2);
+              if (L > 1.5) { const g = launchFrom(aim.x0, aim.y0, (aim.x0 - aim.x1) * 2.4, (aim.y0 - aim.y1) * 2.4), cy0 = potY(); for (let j = 0; j < 90; j++) { stepMoon(g, 1 / 30, cy0); if (Math.hypot(g.x - cx + 0.5, g.y - cy0) < A * 0.75) break; if (j % 3 === 0) put(D, Math.round(g.x), Math.round(g.y), j < 45 ? moonCols[launched % moonCols.length] : star2); } }
+              ell(aim.x0, aim.y0, 2.6, 2.6, moonCols[launched % moonCols.length]); stamp(D, O);
+            }
+          },
+        };
+      } else {
+        // ---------- Up and About: out in the view, walking ----------
+        const V2 = walled ? 'Hills' : night ? 'Night' : view;
+        const pal2 = {   // sky top and bottom, far land (fill, shade), near land, path (fill, mark), verge (fill, dark)
+          Hills: ['#9fd6ff', '#e2f4ff', '#b5e2b6', '#97cfa0', '#71c58a', '#52a571', '#eed4a6', '#cfa878', '#5fb86e', '#3f9656'],
+          Sea: ['#9fd8ff', '#e6f6ff', '#5a9ad8', '#3f7cc0', '#f2dcae', '#e2c28e', '#c99a6a', '#a87a4e', '#a8c86a', '#7aa04e'],
+          Rooftops: ['#ffc9b4', '#ffe6cc', '#d4a8bc', '#bc90a6', '#a07c9c', '#86638a', '#cbc3d4', '#a59cb8', '#8a7f9a', '#6e6480'],
+          Snowfall: ['#c2cfea', '#e6edf8', '#f4f6ff', '#d6deef', '#ffffff', '#dfe6f4', '#f6f9ff', '#c7d3eb', '#e8eef9', '#b9c6e2'],
+          Sunset: ['#ffadc0', '#ffd99e', '#e7a3b6', '#d48da6', '#b07898', '#966284', '#f2caa2', '#d4a27a', '#8e8a5c', '#6e6c48'],
+          'Blossom Branch': ['#a9dcff', '#eaf6ff', '#bfe4bc', '#a3d4a6', '#7ccb8e', '#5aac74', '#f0d6aa', '#d2ab7c', '#68bc72', '#47995a'],
+          Rain: ['#9ea3bd', '#c4c8dc', '#8fb29c', '#7b9c88', '#6c987c', '#588468', '#b5a68f', '#938570', '#5f8f68', '#4a7552'],
+          Rainbow: ['#a0d8ff', '#e6f6ff', '#b5e2b6', '#97cfa0', '#71c58a', '#52a571', '#eed4a6', '#cfa878', '#5fb86e', '#3f9656'],
+          Night: ['#1c1d46', '#3b3d7c', '#2d3568', '#262c5a', '#1f2a52', '#182140', '#4c4c74', '#3a3a5e', '#2a4a5c', '#203a4a'],
+        }[V2] || [];
+        const [skT, skB, fa, faD, ne, neD, pa, paD, gr, grD] = pal2.map(K), skM = K(mix(pal2[0], pal2[1], 0.5));
+        const GY = 46, FG = 50, WX = 18;   // the path's top edge, the row its feet stand on, the column it walks in
+        const sunK = K(V2 === 'Sunset' ? '#fff3c0' : '#fff2a8'), sunR = K(V2 === 'Sunset' ? '#ffcf8a' : '#ffe066'), cloudK = K(V2 === 'Rain' ? '#d8dae8' : V2 === 'Sunset' ? '#ffe8e0' : '#ffffff'), cloudD = K(V2 === 'Rain' ? '#a9adc4' : mix(pal2[1], '#9aa8d0', 0.35));
+        const moonK = K('#fff6cc'), starK = K('#fff6cc'), starD = K('#9a9ad8');
+        const rb = ['#ff9e9e', '#ffd09a', '#fff2a0', '#b9eea6', '#9cc8ff', '#c9b0ff'].map(K);
+        const tree = V2 === 'Blossom Branch' ? ['#ffc2d4', '#ff94b4', '#fff0f4'] : V2 === 'Night' ? ['#2a3a62', '#1e2a4a', '#3a4c78'] : V2 === 'Sunset' ? ['#8a5a7a', '#6e4664', '#a8708e'] : V2 === 'Rain' ? ['#5a8a68', '#467254', '#78a684'] : ['#5cb878', '#3f9a5e', '#8fd89c'];
+        const trK = tree.map(K), trunk = K(V2 === 'Night' ? '#2a2440' : '#9a6a52');
+        const hf = xw => 31 - 3.4 * Math.sin(xw * 0.105 + 1.3) - 1.8 * Math.sin(xw * 0.23 + 0.4);
+        const hn = xw => 40.5 - 2.4 * Math.sin(xw * 0.16 + 2.2) - 1.2 * Math.sin(xw * 0.41 + 0.9);
+        const cloudRows = [['...ww....', '.wwwwww..', 'wwwwwwwww', '.dddddd..'], ['..ww...', '.wwwww.', 'wwwwwww', '.ddddd.']];
+        const lamp = K('#fff3c4'), postK = K('#4a3a5c');
+        // rocks along the path: tap to jump them (it jumps them itself until someone taps); a rock it walks into trips it up
+        const rockK = [K(V2 === 'Snowfall' ? '#e4e9f6' : '#c9c0cf'), K(V2 === 'Snowfall' ? '#b4c0dc' : '#958aa6'), K('#fffaf2')];
+        // what's on the path: a boulder, a fallen log, a sleeping cat (it wakes as you leap it), a puddle (it splashes)
+        const rockX = k => 60 + k * 30 + Math.floor(hs(k, 201) * 14);
+        const kindOf = k => { const v = hs(k, 205); return v < 0.36 ? 'rock' : v < 0.62 ? 'log' : v < 0.82 ? 'cat' : 'puddle'; };
+        const halfW = { rock: 4, log: 4.5, cat: 3, puddle: 0 }, tall = { rock: 9, log: 9, cat: 9, puddle: 0 };
+        const logK = [K('#a8744a'), K('#7a4e30'), K('#e8c99a')], catK = [K(['#f2a65a', '#8a8a96', '#3a3040', '#f4efe6'][Math.floor(hs(1, 207) * 4)]), K('#ff9db4')], wetK = [K(mix(pal2[0], '#ffffff', 0.3)), K(mix(pal2[1], '#3d2a4a', 0.15))];
+        const signK = [K('#b07a48'), K('#7e5230'), K('#fff6dc'), K('#ffd23a')], signR = K('#e8364f');
+        const puffs = [], speed = [];
+        let lastLand = 0, wasAir = false, splashAt = -9;
+        let resetAt = -9, auto = true, lastTap = -99, passed = -1, cleared = 0, best = 0, hitK = -1, wokeK = -1, wokeAt = -9;
+        const footW = () => trek + WX + 0.5, hopH = t => { const h = t - hopAt; return h < 0.9 ? Math.sin(h / 0.9 * Math.PI) * 13 : 0; };
+        const dust = (x, y, n) => { for (let j = 0; j < n; j++) puffs.push({ x, y, vx: (j - (n - 1) / 2) * 5, t0: tPot }); };
+        const jump = t => { if (t - hopAt > 0.92 && t - tripAt > 1.6) { hopAt = t; dust(WX + 0.5, FG, 5); c.sound.note(drip[0] - 12, { dur: 0.12, vel: 0.26, wave: 'triangle' }); c.sound.note(drip[4] - 12, { dur: 0.18, vel: 0.2, wave: 'sine', at: 0.09 }); } };
+        const digits = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001010010', '111101111101111', '111101111001111'];
+        // the walker at half size: its own picture shrunk two cells to one (dark face marks win, a fresh outline round
+        // it), legs and boots, the bindle on its shoulder; on a trip it tumbles onto its side, legs kicking in the air
+        const M2 = 32, mini = new Uint8Array(M2 * M2), mfr = new Uint8Array(M2 * M2), bun = K('#4a7af0'), bunL = K('#bcd0ff'), stick = K('#a87650');
+        const shrink = (L, out) => {
+          for (let my = 0; my < M2; my++) for (let mx = 0; mx < M2; mx++) {
+            const i = my * 2 * N + mx * 2, v = [L[i], L[i + 1], L[i + N], L[i + N + 1]];
+            let k = 0, empty = 0, best = 0; const cnt = {};
+            for (const q of v) if (!q) empty++;
+            if (empty < 3) { if (v.includes(INK) && INK !== O) k = INK; else for (const q of v) if (q) { cnt[q] = (cnt[q] || 0) + 1; if (cnt[q] > best) { best = cnt[q]; k = q; } } if (k === O && best < 2) for (const q of v) if (q && q !== O) { k = q; break; } }
+            out[my * M2 + mx] = k;
+          }
+        };
+        const blit = (D, src, ox, oy, rot) => {   // with a one-cell outline round it; rot turns it a quarter onto its side
+          const at = (mx, my) => rot ? src[mx * M2 + (M2 - 1 - my)] : src[my * M2 + mx];
+          for (let my = 0; my < M2; my++) for (let mx = 0; mx < M2; mx++) if (!at(mx, my)) { let edge = false; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x2 = mx + a, y2 = my + b; if (x2 >= 0 && y2 >= 0 && x2 < M2 && y2 < M2 && at(x2, y2)) edge = true; } if (edge) put(D, ox + mx, oy + my, O); }
+          for (let my = 0; my < M2; my++) for (let mx = 0; mx < M2; mx++) { const k = at(mx, my); if (k) put(D, ox + mx, oy + my, k); }
+        };
+        const walkerDraw = (D, t, CH) => {
+          shrink(CH, mini);
+          const h = t - hopAt, lift = Math.round(hopH(t)), land = h >= 0.9 && h < 1.02 ? 1 : 0, trip = t - tripAt < 1.6, down = trip && t - tripAt > 0.25 && t - tripAt < 1.35;
+          const limb = K(mix(PC1, '#3d2a4a', 0.25)), boot = HOT;
+          if (down) {
+            // on its side, plant to the back, legs kicking up in the air, big dizzy stars wheeling over it
+            const ox = WX + 3 - Math.floor(PB / 2), oy = FG - (M2 - 1) + Math.floor((PX - A) / 2);
+            blit(D, mini, ox, oy, true);
+            const bx = ox + Math.floor(PB / 2) + 1, by = FG - 3, kick = Math.floor(t * 10) % 2;
+            for (const [l, j] of [[0, 0], [1, 3]]) { for (let k2 = 0; k2 < 3; k2++) put(D, bx + k2, by - j - k2 * (kick ^ l ? 1 : 0.5) | 0, limb); put(D, bx + 3, by - j - 3 + (kick ^ l), boot); put(D, bx + 4, by - j - 3 + (kick ^ l), boot); }
+            for (let k2 = 0; k2 < 3; k2++) { const a = t * 6 + k2 * 2.09; plus(D, Math.round(WX + 2 + Math.cos(a) * 6), Math.round(FG - 12 + Math.sin(a) * 2), 1, WH, YEL); }
+            return;
+          }
+          const ox = WX - Math.floor(PX / 2), oy = FG - 4 - Math.floor(PB / 2) - lift + land + (trip ? (Math.floor(t * 16) % 2) : 0);
+          // the friend from the shelf trots behind
+          if (['Snail', 'Frog', 'Mini Me', 'Pebble Pals'].includes(companion)) {
+            shrink(comp, mfr); const fx = WX - 14 - Math.floor(compX / 2) + (compSide > 0 ? 0 : 0), fy = FG - Math.floor(CB / 2) - 1 - (scene.running ? Math.floor(t * 8) % 2 : Math.floor(wclk / 0.32) % 4 === 1 ? 1 : 0);
+            blit(D, mfr, fx, fy, false);
+          }
+          // legs and boots, from under the pot to the path, one stepping as it walks, both tucked as it leaps
+          const stride = Math.floor(wclk / (scene.running ? 0.16 : 0.28)) % 2, top0 = oy + Math.floor(PB / 2) + 1;
+          for (const sd of [-1, 1]) {
+            const lx = WX + (sd < 0 ? -2 : 1), step = lift > 0 || (stride === (sd < 0 ? 0 : 1) && !trip);
+            const footY = lift > 0 ? top0 + 2 : FG - (step ? 1 : 0);
+            for (let y = top0; y < footY; y++) put(D, lx, y, limb);
+            put(D, lx, footY, boot); put(D, lx + 1, footY, boot); put(D, lx - 1, footY + 1, O); put(D, lx, footY + 1, O); put(D, lx + 1, footY + 1, O);
+          }
+          blit(D, mini, ox, oy, false);
+          // the bindle on its shoulder
+          const hx = WX + Math.ceil(A / 2) + 1, hy = oy + Math.floor(R / 2) + 1, ex = WX - Math.ceil(A / 2) - 3, ey = oy + Math.floor(R / 2) - 5;
+          ribbon([[hx, hy], [ex, ey]], () => 0.45, stick); stamp(D, O);
+          spT(ex - 2, ey - 1, ['bLb', 'LbL', 'bLb'], { b: bun, L: bunL }); stamp(D, O);
+          if (scene.running) for (let j = 0; j < 4; j++) { const y = oy + Math.floor(PR / 2) + 2 + j * 3, x0 = ox + Math.floor((PX - A) / 2) - 3 - ((Math.floor(t * 12) + j * 2) % 3); for (let k = 0; k < 3; k++) put(D, x0 - k, y, wetK[0]); }   // speed lines
+        };
+        scene = {
+          walker: walkerDraw,
+          tap(x, y, t) { auto = false; lastTap = t; jump(t); },
+          tick(t, dt) {
+            const inp = c.input, run = inp.down && inp.inside && t - lastTap > 0.25 ? 2.2 : 1;
+            if (t - lastTap > 9) auto = true;   // left alone a while, it watches its own feet again
+            const tripping = t - tripAt < 1.6;
+            scene.running = run > 1 && !tripping;
+            const air = t - hopAt < 0.9;
+            if (wasAir && !air) { dust(WX + 0.5, FG, 8); lastLand = t; c.sound.hit('noise', 0.06, { cutoff: 900, dur: 0.1 }); }
+            wasAir = air;
+            if (!tripping) {
+              const was = Math.floor(wclk / 0.32);
+              trek += dt * 4 * run * (air ? 5.6 : 1); if (!air) wclk += dt * run * (run > 1 ? 1.6 : 1);
+              if (Math.floor(wclk / 0.32) !== was) c.sound.hit('click', 0.05, { pan: 0.2 * ((was & 1) * 2 - 1) });
+            }
+            const f = footW();
+            for (let k = Math.max(0, Math.floor((f - 70) / 30)); k < Math.floor((f + 20) / 30) + 1; k++) {
+              const d = rockX(k) - f;
+              const kind = kindOf(k), hw2 = halfW[kind];
+              if (kind === 'puddle') { if (Math.abs(d) < 3 && hopH(t) < 0.5 && t - splashAt > 0.5) { splashAt = t; for (let j = 0; j < 6; j++) puffs.push({ x: WX + 0.5, y: FG, vx: (j - 2.5) * 7, t0: t, wet: 1 }); c.sound.note(drip[3], { dur: 0.15, vel: 0.15, wave: 'sine' }); } continue; }
+              if (auto && d > hw2 + 5.2 && d < hw2 + 5.8) jump(t);
+              if (kind === 'cat' && Math.abs(d) < hw2 + 3 && hopH(t) > 1 && wokeK !== k) { wokeK = k; wokeAt = t; c.sound.note(drip[4] + 12, { dur: 0.25, vel: 0.1, wave: 'triangle' }); }
+              if (Math.abs(d) < hw2 + 3 && hopH(t) < tall[kind] - 5 && hitK !== k && !tripping) { hitK = k; tripAt = t; resetAt = t; best = Math.max(best, cleared); cleared = 0; dust(WX + 0.5, FG, 10); c.sound.hit('noise', 0.14, { cutoff: 600, dur: 0.2 }); c.sound.note(drip[0] - 24, { dur: 0.35, vel: 0.22, wave: 'triangle' }); c.sound.note(drip[0] - 29, { dur: 0.4, vel: 0.18, wave: 'triangle', at: 0.18 }); }
+              if (d < -hw2 - 2 && k > passed) { passed = k; if (hitK !== k) { cleared++; best = Math.max(best, cleared); [0, 7].forEach((m, i) => c.sound.note(drip[2] + m + 12, { dur: 0.12, vel: 0.08, wave: 'sine', at: i * 0.06 })); } }
+            }
+          },
+          back(D, t) {
+            const s1 = Math.floor(trek * 0.22), s2 = Math.floor(trek * 0.5), s3 = Math.floor(trek), sc = trek * 0.06 + t * 0.3;
+            for (let y = 0; y < GY; y++) for (let x = 0; x < N; x++) D[y * N + x] = y < 16 ? skT : y < 21 ? (dith(x, y, (y - 15.5) / 5) ? skM : skT) : y < 31 ? skM : y < 36 ? (dith(x, y, (y - 30.5) / 5) ? skB : skM) : skB;
+            // the sky's own things
+            if (V2 === 'Night') {
+              for (let i = 0; i < 34; i++) { const x = Math.floor(hs(i, 61) * N), y = Math.floor(hs(i, 62) * 34); D[y * N + x] = Math.sin(t * 1.5 + i * 2.3) > 0.2 ? starK : starD; }
+              for (let y = 4; y < 16; y++) for (let x = 42; x < 56; x++) { const a = Math.hypot(x + 0.5 - 49, y + 0.5 - 10), b = Math.hypot(x + 0.5 - 51.2, y + 0.5 - 8.6); if (a <= 4.8 && b > 4.3) D[y * N + x] = moonK; }
+            } else if (V2 !== 'Rain') {
+              const sx = V2 === 'Sunset' ? 22 : 11, sy = V2 === 'Sunset' ? 34 : 10, sr = V2 === 'Sunset' ? 8.5 : 4.6;
+              for (let y = Math.max(0, sy - 11); y < sy + 11; y++) for (let x = Math.max(0, sx - 11); x < sx + 11; x++) { const d = Math.hypot(x + 0.5 - sx, y + 0.5 - sy); if (d <= sr) D[y * N + x] = sunK; else if (d <= sr + 1.6 && (x + y) % 2 === 0) D[y * N + x] = sunR; }
+            }
+            if (V2 === 'Rainbow') for (let y = 6; y < GY; y++) for (let x = 0; x < N; x++) { const i = Math.floor(31 - Math.hypot(x + 0.5 - 32, y + 0.5 - 50)); if (i >= 0 && i < 6) D[y * N + x] = rb[i]; }
+            // clouds drift slowly, faster than the land behind
+            if (V2 !== 'Night') for (let k = 0; k < 3; k++) {
+              const rows = cloudRows[k % 2], x0 = Math.floor(((k * 27 + hs(k, 71) * 20 - sc * (1 + k * 0.3)) % 92 + 92) % 92) - 12, y0 = 5 + k * 6 + (V2 === 'Rain' ? -2 : 0);
+              for (let j = 0; j < rows.length; j++) for (let i = 0; i < rows[j].length; i++) { const ch = rows[j][i]; if (ch !== '.') put(D, x0 + i, y0 + j, ch === 'w' ? cloudK : cloudD); }
+            }
+            // far: hills (a town on the rooftop walk, the sea by the shore)
+            for (let x = 0; x < N; x++) {
+              const xw = x + s1;
+              if (V2 === 'Sea') { for (let y = 29; y < GY; y++) D[y * N + x] = y === 29 ? faD : ((x + y * 3 + Math.floor(t * 2.5)) % 13 === 0 && y < 38 ? skB : y > 36 && dith(x, y, (y - 36) / 6) ? faD : fa); continue; }
+              if (V2 === 'Rooftops') {
+                const seg = Math.floor(xw / 7), w0 = seg * 7, top = 22 + Math.floor(hs(seg, 81) * 9), peak = hs(seg, 82) < 0.5 ? 2 : 0;
+                const dx = xw - w0, h = top - (peak ? peak - Math.abs(dx - 3) * 0.7 : 0);
+                for (let y = Math.max(0, Math.round(h)); y < GY; y++) D[y * N + x] = (dx === 2 || dx === 4) && (y - top) % 4 === 2 && y > top + 1 && hs(seg * 31 + y, 83) < 0.5 ? lamp : dx === 6 ? faD : fa;
+                continue;
+              }
+              const h = Math.round(hf(xw));
+              for (let y = h; y < GY; y++) D[y * N + x] = V2 === 'Snowfall' && y > h + 2 && dith(x, y, 0.35) ? faD : y === h ? (V2 === 'Night' ? faD : fa) : y > h + 5 && dith(x, y, (y - h - 5) / 10) ? faD : fa;
+            }
+            // near: the rolling land just behind the path, and its trees (pines in snow, blossom, lamps in town)
+            for (let x = 0; x < N; x++) {
+              const h = Math.round(hn(x + s2) + (V2 === 'Sea' ? 2 : 0));
+              for (let y = h; y < GY; y++) D[y * N + x] = y === h ? neD : dith(x, y, (y - h) / 9) ? neD : ne;
+            }
+            if (V2 === 'Rooftops') for (let j = Math.floor(s3 / 22) - 1; j <= Math.floor((s3 + N) / 22) + 1; j++) {
+              const x = j * 22 + 9 - s3;
+              for (let y = 30; y < GY + 1; y++) put(D, x, y, postK);
+              plus(D, x, 29, 1, lamp, lamp); put(D, x - 1, 30, postK); put(D, x + 1, 30, postK);
+            } else if (V2 !== 'Sea') for (let j = Math.floor(s2 / 13) - 1; j <= Math.floor((s2 + N) / 13) + 1; j++) {
+              if (hs(j, 91) < 0.35) continue;
+              const xw = j * 13 + Math.floor(hs(j, 92) * 6), x = xw - s2, base = Math.round(hn(xw)) + 1, big = hs(j, 93) < 0.5 ? 1 : 0;
+              if (V2 === 'Snowfall') {
+                for (let k = 0; k < 9 + big * 2; k++) { const w = Math.floor(k / 2.2); for (let d = -w; d <= w; d++) put(D, x + d, base - 10 - big * 2 + k, k % 3 === 0 && Math.abs(d) === w ? K('#ffffff') : d > 0 ? K('#2f6a52') : K('#3f8a64')); }
+                put(D, x, base - 1, trunk); put(D, x, base, trunk);
+              } else {
+                for (let k = 0; k < 4; k++) put(D, x, base - k, trunk);
+                const r = 2.6 + big;
+                for (let y = -4; y <= 4; y++) for (let d = -4; d <= 4; d++) { const q = Math.hypot(d, y * 1.1); if (q <= r) put(D, x + d, base - 5 - big + y, q > r - 1 && (d > 0 || y > 0) ? trK[1] : d < 0 && y < 0 && q < r - 1.5 ? trK[2] : trK[0]); }
+              }
+            }
+            // the path, scrolling past at the walker's pace, with its verge
+            for (let y = GY; y < N; y++) for (let x = 0; x < N; x++) {
+              const xw = x + s3;
+              let k = pa;
+              if (V2 === 'Sea') k = (xw % 5 === 0) ? paD : pa;
+              else if (V2 === 'Rooftops') k = y % 2 === 0 || (xw + (y >> 1) * 2) % 4 === 0 ? paD : pa;
+              else if (hs(xw, y * 7) < 0.07) k = paD;
+              if (y === GY) k = (V2 === 'Rooftops' || V2 === 'Sea') ? grD : gr;
+              if (y === GY + 1 && V2 !== 'Rooftops' && V2 !== 'Sea' && hs(xw, 5) < 0.5) k = grD;
+              D[y * N + x] = k;
+            }
+            for (let x = 0; x < N; x++) { const xw = x + s3; if (V2 !== 'Rooftops' && hs(xw, 77) < 0.28) put(D, x, GY - 1, hs(xw, 78) < 0.15 && V2 !== 'Night' && V2 !== 'Snowfall' ? K(hs(xw, 79) < 0.5 ? '#ff9db4' : '#fff2a0') : gr); }
+            if (V2 === 'Rain') for (let j = Math.floor(s3 / 19) - 1; j <= Math.floor((s3 + N) / 19) + 1; j++) {   // puddles, rippling
+              const x0 = j * 19 + 4 - s3, r = 1 + Math.floor((t * 2 + j) % 3);
+              for (let d = -4; d <= 4; d++) { put(D, x0 + d, 57, Math.abs(d) === r ? K('#e8ecf8') : skB); if (Math.abs(d) < 3) put(D, x0 + d, 58, skM); }
+            }
+            for (let k = Math.max(0, Math.floor((s3 - 12) / 26)); k < Math.floor((s3 + N + 12) / 26) + 1; k++) {   // what's on the path
+              const x = rockX(k) - s3, kind = kindOf(k);
+              if (kind === 'rock') { ell(x + 0.5, FG - 3.6, 4.4, 4.4, (p, q) => p < -0.25 && q < -0.35 ? rockK[2] : p > 0.35 || q > 0.4 ? rockK[1] : (Math.abs(p - q) < 0.07 ? rockK[1] : rockK[0])); stamp(D, O); }
+              else if (kind === 'log') {   // two logs stacked, ring-ends showing
+                for (const [ox, oy] of [[-4, FG - 4], [-3, FG - 8]]) { box(x + ox, oy, 8, 4, (a, b) => a >= 6 ? (b === 0 || b === 3 ? (a === 7 ? 0 : logK[1]) : logK[2]) : b === 0 ? logK[2] : b === 3 || (a + b * 3) % 5 === 0 ? logK[1] : logK[0]); stamp(D, O); }
+              }
+              else if (kind === 'puddle') { ell(x + 0.5, FG + 0.5, 4.6, 1.3, (p) => p < -0.2 ? wetK[0] : wetK[1]); stamp(D, 0); }
+              else {   // a cat sat up asleep; leap it and it wakes, eyes wide, tail high
+                const up = wokeK === k && t - wokeAt < 2.5;
+                spT(x - 3, FG - 9 - (up ? 1 : 0), ['c...c..', 'cc.cc..', 'ccccc..', up ? 'cwcwc.c' : 'cOcOc..', 'ccpcc.c', '.cccc.c', 'cccccc.', 'cccccc.', 'c.cc.c.'], { c: catK[0], O: O, w: WH, p: catK[1] }); stamp(D, O);
+                if (up) { put(D, x - 2, FG - 7 - 1, O); put(D, x, FG - 7 - 1, O); }
+              }
+            }
+            ell(WX + 0.5, FG + 0.6, Math.max(2, (Bw + 2) / 2 - hopH(t) * 0.15), 1, paD); stamp(D, 0);   // its shadow on the path, shrinking as it leaps
+          },
+          front(D, t, dx, dy) {
+
+            if (V2 === 'Rain') { const rk = K('#e6e9f6'); for (let i = 0; i < 26; i++) { const y = Math.floor((hs(i, 101) * 64 + t * 34) % 64), x = Math.floor((hs(i, 102) * 70 - t * 6 + y * 0.25) % 70 + 70) % 70 - 3; put(D, x, y, rk); put(D, x - 0, y + 1, rk); } }
+            if (V2 === 'Snowfall') for (let i = 0; i < 26; i++) { const y = Math.floor((hs(i, 111) * 64 + t * (3 + hs(i, 112) * 3)) % 64), x = Math.floor((hs(i, 113) * 64 + Math.sin(t * 0.9 + i) * 1.5 - trek * 0.6) % 64 + 64) % 64; put(D, x, y, WH); }
+            if (V2 === 'Blossom Branch') for (let i = 0; i < 12; i++) { const y = Math.floor((hs(i, 121) * 64 + t * (4 + hs(i, 122) * 2)) % 64), x = Math.floor((hs(i, 123) * 64 + Math.sin(t * 1.3 + i) * 2 - trek * 0.7) % 64 + 64) % 64; put(D, x, y, K(i % 3 ? '#ffb3c7' : '#fff0f4')); }
+            if (V2 === 'Night') for (let i = 0; i < 9; i++) { if (Math.sin(t * 2.1 + i * 1.7) < 0.1) continue; const x = Math.floor((hs(i, 131) * 64 + Math.sin(t * 0.6 + i) * 3 - trek * 0.5) % 64 + 64) % 64, y = 36 + Math.floor(hs(i, 132) * 20 + Math.sin(t * 0.8 + i * 2) * 2); put(D, x, y, K('#fff27a')); }
+            // dust kicked up at take-off and landing, splashes in puddles
+            for (let j = puffs.length - 1; j >= 0; j--) { const f = puffs[j], q = (t - f.t0) / 0.45; if (q > 1) { puffs.splice(j, 1); continue; } const x = Math.round(f.x + f.vx * q * 0.45), y = Math.round(f.y - (f.wet ? Math.sin(q * Math.PI) * 4 : q * 2)); put(D, x, y, f.wet ? wetK[0] : q < 0.5 ? WH : paD); }
+            // the score on a little wooden sign: rocks cleared now, and the best run, under a crown
+            const row = (str, x0, y0, col) => { for (let j = 0; j < str.length; j++) { const g = digits[+str[j]]; for (let b = 0; b < 15; b++) if (g[b] === '1') put(D, x0 + j * 4 + (b % 3), y0 + Math.floor(b / 3), col); } };
+            const sw2 = 10 + Math.max(String(cleared).length, String(best).length) * 4, sx0 = N - sw2 - 2;
+            for (const xx of [sx0 + 2, sx0 + sw2 - 3]) for (let y = 0; y < 2; y++) put(D, xx, y, signK[1]);
+            const red = t - resetAt < 0.9 && Math.floor((t - resetAt) * 6) % 2 === 0;   // a run lost: the sign flashes red
+            box(sx0, 2, sw2, 14, (a, b) => b === 0 || b === 7 ? signK[1] : red ? signR : signK[0]); stamp(D, O);
+            spT(sx0 + 2, 4, ['.oo.', 'oggo', 'oggo'], { o: rockK[1], g: rockK[0] });
+            spT(sx0 + 2, 10, ['y.y.y', 'yyyyy', 'yyyyy'], { y: signK[3] });
+            for (let i = 0; i < N * N; i++) if (tmp[i]) { D[i] = tmp[i]; tmp[i] = 0; }
+            qx0 = qy0 = N; qx1 = qy1 = -1;
+            row(String(cleared), sx0 + 8, 3, t - lastLand < 0.3 && cleared ? signK[3] : signK[2]); row(String(best), sx0 + 8, 9, signK[3]);
+            // left alone, a little bubble over the next thing on the path says what to do
+            if (t - lastTap > 6) {
+              const f = footW();
+              for (let k = Math.max(0, Math.floor((f - 70) / 30)); k < Math.floor((f + 60) / 30) + 1; k++) {
+                const d = rockX(k) - f; if (kindOf(k) === 'puddle' || d < 10 || d > 34 || Math.floor(t * 2) % 3 === 2) continue;
+                const bx = Math.round(WX + d) - 7, by = FG - tall[kindOf(k)] - 11;
+                box(bx, by, 15, 7, () => WH); stamp(D, O); put(D, bx + 7, by + 7, WH); put(D, bx + 6, by + 7, O); put(D, bx + 8, by + 7, O); put(D, bx + 7, by + 8, O);
+                const gl = { T: '111010010010010', A: '010101111101101', P: '110101110100100' };
+                ['T', 'A', 'P'].forEach((ch, j) => { for (let b = 0; b < 15; b++) if (gl[ch][b] === '1') put(D, bx + 2 + j * 4 + (b % 3), by + 1 + Math.floor(b / 3), O); });
+                break;
+              }
+            }
+            if (V2 === 'Sea' || V2 === 'Hills') for (let i = 0; i < 2; i++) { const x = Math.floor(((hs(i, 141) * 64 + t * (3 + i)) % 80)) - 8, y = 14 + i * 7 + Math.round(Math.sin(t * 2 + i) * 1.2), up = Math.floor(t * 5 + i) % 2; for (const [a, b] of up ? [[-2, -1], [-1, 0], [1, 0], [2, -1]] : [[-2, 0], [-1, 0], [1, 0], [2, 0]]) put(D, x + a, y + b, O); put(D, x, y + 1, O); }
+          },
+        };
+      }
+    }
 
     // ================= compose a frame =================
     const scr = lay(), chr = lay(), plF = lay();
@@ -1019,7 +1583,9 @@ Proto.add({
           if (a === INK || b === INK || d === INK || e === INK || a === WH || b === WH || d === WH || e === WH) chr[i] = O;
         }
       }
-      // the background and weather
+      // the background and weather (a Legendary paints its own scene)
+      if (scene) scene.back(scr, t);
+      else {
       scr.set(bg);
       if (!walled && !night) {
         const cloud = K(VIEW === 'Rain' ? mix(skyTop, '#ffffff', 0.3) : mix(wallH, '#ffffff', 0.5));
@@ -1031,27 +1597,41 @@ Proto.add({
         if (VIEW === 'Snowfall') for (let i = 0; i < 24; i++) { const y = 7 + Math.floor((mj[i] * 47 + t * (2.2 + mj[i + 20] * 2)) % 47), x = 13 + Math.floor(mj[(i + 9) % 48] * 39 + Math.sin(t * 0.8 + i) * 1.2); if (get(glass, x, y)) scr[y * N + x] = WH; }
         if (VIEW === 'Rain') { const rk = K(mix(skyTop, '#ffffff', 0.55)); for (let i = 0; i < 22; i++) { const y = 7 + Math.floor((mj[i] * 47 + t * 30) % 47), x = 13 + Math.floor(mj[(i + 9) % 48] * 39); if (get(glass, x, y)) scr[y * N + x] = rk; if (get(glass, x, y + 1)) scr[(y + 1) * N + x] = rk; } }
       }
+      }
       // the character goes down (walking and hopping, if it can)
       let cdy = 0;
-      if (walker) { const h = t - hopAt; cdy = h < 0.5 ? -Math.round(Math.sin(h / 0.5 * Math.PI) * 4) : 0; }
-      const cdx = walkX;
-      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const k = chr[y * N + x]; if (k) put(scr, x + cdx, y + cdy, k); }
-      if (walker) {   // two little legs, always mid-stride (one planted, one stepping), red boots, stubby arms that wave
-        const stride = Math.floor(t / 0.7 + step) % 2, limb = K(mix(PC1, '#3d2a4a', 0.25)), limbL = P0, boot = HOT;
+      if (walker) { const h = t - hopAt; cdy = h < 0.8 ? -Math.round(Math.sin(h / 0.8 * Math.PI) * 5) : h < 0.92 ? 1 : 0; }   // and a squash as it lands
+      const tripping = walker && t - tripAt < 1.6, hopping = cdy < 0, striding = walker && !hopping && !tripping;
+      if (tripping && t - tripAt > 0.3 && t - tripAt < 1.35) cdy = 3;   // a tumble: it sits down hard in the path
+      if (striding && (wclk / 0.32) % 1 < 0.5) cdy = -1;   // out walking, it bobs up on every step
+      if (scene && scene.bob) cdy += scene.bob(t);
+      const cdx = walkX + (tripping && t - tripAt < 0.4 ? (Math.floor(t * 16) % 2) * 2 - 1 : 0) + (scene && scene.shake ? scene.shake(t) : 0);   // a stumble or a knock: it wobbles on the spot
+      if (scene && scene.behind) scene.behind(scr, t, cdx, cdy);
+      if (scene && scene.walker) scene.walker(scr, t, chr);
+      else for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const k = chr[y * N + x]; if (k) put(scr, x + cdx, y + cdy, k); }
+      if (walker && !(scene && scene.walker)) {   // two little legs striding along (one planted, one stepping), red boots, stubby arms; it stops to wave when a hand comes near
+        const stride = Math.floor(wclk / (scene && scene.running ? 0.18 : 0.32)) % 2, limb = K(mix(PC1, '#3d2a4a', 0.25)), limbL = P0, boot = HOT;
         for (const s2 of [-1, 1]) {
-          const stepping = cdy < 0 || stride === (s2 < 0 ? 0 : 1);
-          // long legs from under the pot (below a saucer or egg cup) down to the shelf, the foot on row 58
-          const fx = PX + cdx + (s2 < 0 ? -5 : 3), top0 = PB + (PT === 'Teacup' ? 3 : PT === 'Eggshell' ? 5 : 1), legN = Math.max(3, 58 - top0), fy = top0 + cdy - (stepping ? 1 : 0);
+          const stepping = hopping || (striding && stride === (s2 < 0 ? 0 : 1));
+          // long legs from under the pot (below a saucer or egg cup) down to the path, the foot on row 58
+          const fx = PX + cdx + (s2 < 0 ? -5 : 3), top0 = PB + (PT === 'Teacup' ? 3 : PT === 'Eggshell' ? 5 : 1), legN = Math.max(3, 58 - top0 - (hopping ? 0 : cdy)), fy = top0 + cdy - (stepping ? 1 : 0);
           const legRows = []; for (let j = 0; j < legN; j++) legRows.push(stepping && j >= legN / 2 ? '.ll' : 'll.'); legRows.push(stepping ? '.fff' : 'fff.');
           spT(fx - (walkDir < 0 ? 1 : 0), fy, legRows, { l: limb, f: boot }, walkDir < 0); stamp(scr, O);
-          const wave = s2 > 0 && (c.input.inside || glad > 0 || cdy < 0) ? Math.floor(t * 4) % 2 : 0;
-          const ax = s2 < 0 ? PX + cdx - Math.ceil(hw(FY + 2)) - 3 : PX + cdx + Math.ceil(hw(FY + 2)) + 1, ay = FY + 2 + cdy - (wave ? 3 : 0);
-          spT(ax, ay, wave ? ['.ll', 'lll', 'll.'] : ['ll.', 'lll', '.ll'].map(r => s2 < 0 ? r : r.split('').reverse().join('')), { l: limbL }); stamp(scr, O);
+          // the right hand holds the bindle up on its shoulder; the left swings as it walks, and waves when greeted
+          const greet = s2 < 0 && (glad > 0 || hopping || tripping), wave = s2 > 0 ? 1 : greet ? Math.floor(t * 4) % 2 : striding ? stride : 0;
+          const ax = s2 < 0 ? PX + cdx - Math.ceil(hw(FY + 2)) - 3 : PX + cdx + Math.ceil(hw(FY + 2)) + 1, ay = FY + 2 + cdy - (wave ? (s2 < 0 && !greet ? 1 : 3) : 0);
+          spT(ax, ay, wave ? ['.ll', 'lll', 'll.'].map(r => s2 > 0 ? r : r.split('').reverse().join('')) : ['ll.', 'lll', '.ll'].map(r => s2 < 0 ? r : r.split('').reverse().join('')), { l: limbL }); stamp(scr, O);
         }
       }
-      for (let i = 0; i < N * N; i++) if (comp[i]) scr[i] = comp[i];
+      if (!scene) for (let i = 0; i < N * N; i++) { if (comp[i]) scr[i] = comp[i]; }
+      else if (walker && !scene.walker && ['Snail', 'Frog', 'Mini Me', 'Pebble Pals'].includes(companion)) {
+        // a friend from the shelf trots along behind, a hop on every other step
+        const fy = striding && Math.floor(wclk / (scene.running ? 0.16 : 0.32)) % 4 === 1 ? -1 : 0;
+        for (let i = 0; i < N * N; i++) { if (!comp[i]) continue; const x = i % N, y = (i / N) | 0, nx = compSide > 0 ? 2 * compX - x - 40 : x + 2; put(scr, nx, y + 1 + fy, comp[i]); }
+      }
+      if (scene && scene.front) scene.front(scr, t, cdx, cdy);
       // things in the air
-      if (companion === 'Tea Mug') {
+      if (companion === 'Tea Mug' && !scene) {
         const steam = K(mix(wallH, '#ffffff', 0.7));
         for (let k = 0; k < 2; k++) { const ph = (t * 0.35 + k * 0.5) % 1; for (let j = 0; j < 4; j++) { const y = CB - 11 - Math.floor(ph * 5) - j * 1, x = X - 1 + k * 2 + Math.round(Math.sin(j * 0.9 + t * 1.5 + k) * 0.7); if ((j + Math.floor(ph * 5)) % 2 || ph < 0.6) put(scr, x, y, steam); } }
       }

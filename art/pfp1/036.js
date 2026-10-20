@@ -14,7 +14,7 @@
     num: 36,
     name: 'Gremlin Works',
     fam: 'Creatures & Monsters',
-    recipe: 'Cartoon gremlins as pixel-art portraits on a 64-cell grid: one-cell ink outlines, stepped shading with a dither on the shadow side, each one clutching something it took apart. Head shape, build, how it holds its loot, hide and its markings, ears, horns, eyes, nose, grin, hair, headgear, outfit, loot, a pet and the workshop backdrop vary, with rare gold hides, light-bulb heads and tiny rockets; legendary ones are clockwork, phantoms or the Scrap King.',
+    recipe: 'Cartoon gremlins as pixel-art portraits on a 64-cell grid: one-cell ink outlines, stepped shading with a dither on the shadow side, each one clutching something it took apart. Head shape, build, how it holds its loot, hide and its markings, ears, horns, eyes, nose, grin, hair, headgear, outfit, loot, a pet and the workshop backdrop vary, with rare gold hides, light-bulb heads and tiny rockets; legendary ones are a clockwork automaton seen through a thermal camera, phantoms on a haunted night, or the Scrap King in an illuminated initial.',
     interactive: 'Hover to make it jumpy. Tap to startle it.',
     music: true,
     seed: 788,
@@ -366,9 +366,9 @@
       const elbow = [Math.max(handX + 0.08, sx0 + 0.04), 0.93], wrist = [handX + 0.012, handY + 0.04];
 
       // the Scrap King's throne of junk, behind everything: a ragged back of crate planks, pipe posts and tin-can arms
-      let kingBulb = null;
+      let kingBulb = null, capeAt = null;
       if (legend === 'Scrap King') {
-        const tw = sw + 0.2, tTop = topY + 0.02, PLANK = ramp('#a8743e', '#6a4424', '#d4a466');
+        const tw = sw + 0.2, tTop = topY + 0.02, PLANK = ramp('#6e4a30', '#45291a', '#8e6640');
         fill([[0.5 - tw, tTop + 0.03], [0.5 - tw * 0.55, tTop - 0.02], [0.5 - tw * 0.2, tTop + 0.01], [0.5 + tw * 0.3, tTop - 0.04], [0.5 + tw * 0.7, tTop], [0.5 + tw, tTop - 0.01], [0.5 + tw - 0.01, 1.08], [0.5 - tw + 0.01, 1.08]]); paint(PLANK, { dither: true });
         for (let k = 1; k < 10; k++) { const y = tTop + k * 0.07; ink([[0.5 - tw, y + 0.01 + (k % 3) * 0.006], [0.5 + tw, y - 0.008]], PLANK[0]); }
         for (let k = 0; k < 10; k++) { const [x, y] = cellOf([0.5 + (k % 2 ? 1 : -1) * (tw - 0.035), tTop + 0.05 + Math.floor(k / 2) * 0.14]); setD(x, y, DSTEEL[0]); }
@@ -379,6 +379,12 @@
           fill([[0.5 + s * (tw - 0.005), 0.86], [0.5 + s * (tw - 0.14), 0.86], [0.5 + s * (tw - 0.14), 1.08], [0.5 + s * (tw - 0.005), 1.08]]); paint(STEEL, { dither: true });
           fill([[0.5 + s * (tw - 0.005), 0.9], [0.5 + s * (tw - 0.14), 0.9], [0.5 + s * (tw - 0.14), 0.96], [0.5 + s * (tw - 0.005), 0.96]]); paint(s < 0 ? ramp('#3c8c5a') : ramp('#d9a93a'));
         }
+        // a royal cape falls from his shoulders, crimson velvet trimmed down both edges with ermine
+        const CAPE = ramp('#b01e2c', '#62101a', '#e4505c'), ERM = ramp('#f4efe4', '#c8c0b0', '#ffffff');
+        const capeL = [[0.5 - sw * 0.8, shY - 0.04], [0.5 - sw - 0.12, shY + 0.05], [0.5 - sw - 0.25, 0.95], [0.5 - sw - 0.3, 1.09], [0.5 + sw + 0.3, 1.09], [0.5 + sw + 0.25, 0.95], [0.5 + sw + 0.12, shY + 0.05], [0.5 + sw * 0.8, shY - 0.04]];
+        fill(capeL); paint(CAPE, { dither: true });
+        for (const s of [-1, 1]) { fill([[0.5 + s * (sw + 0.12), shY + 0.05], [0.5 + s * (sw + 0.25), 0.95], [0.5 + s * (sw + 0.3), 1.09], [0.5 + s * (sw + 0.22), 1.09], [0.5 + s * (sw + 0.17), 0.95], [0.5 + s * (sw + 0.05), shY + 0.07]]); paint(ERM); }
+        capeAt = capeL;
       }
 
       // neck and shoulders, hunched forward
@@ -440,6 +446,13 @@
         stamp(['kk...kk', 'krk.krk', 'krrkrrk', 'krrkrrk', 'kdk.kdk', 'kk...kk'], bx - 3, by - 3, { k: INK, r: C('#d23a3a'), d: C('#8a1c24') });
       }
       if (marks === 'Spots' || hide === 'Glow') { CLIP = TM; for (let k = 0; k < 4; k++) { const [a, b2] = extra[k]; const [x, y] = cellOf([0.36 + a * 0.28, 0.9 + b2 * 0.1]); stamp(['.ss', 'sss', 'ss.'], x - 1, y - 1, { s: SKD[1] }); } CLIP = null; }
+      if (legend === 'Scrap King') {
+        // an ermine collar round his shoulders, and the black tails dotted over it and down the cape's edges
+        const ERM = ramp('#f4efe4', '#c8c0b0', '#ffffff');
+        fill(curve([0.5 - sw - 0.04, shY + 0.04], [hx - 0.12, shY - 0.07], [hx + 0.12, shY - 0.07], [0.5 + sw + 0.04, shY + 0.04], 12).concat(curve([0.5 + sw + 0.02, shY + 0.1], [hx + 0.1, shY + 0.03], [hx - 0.1, shY + 0.03], [0.5 - sw - 0.02, shY + 0.1], 12)));
+        paint(ERM);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const v = L[y * N + x]; if ((v === ERM[1] || v === ERM[2] || v === ERM[0]) && ((x * 5 + y * 3) % 11 === 0)) { setD(x, y, INK); if (y + 1 < N && L[(y + 1) * N + x] !== INK) setD(x, y + 1, INK); } }
+      }
       if (legend === 'Scrap King') {
         // a chain of office strung from bottle caps, red and steel by turns
         const ch = curve([0.5 - sw * 0.8, shY + 0.01], [hx - 0.1, shY + 0.13], [hx + 0.1, shY + 0.13], [0.5 + sw * 0.8, shY + 0.01], 9);
@@ -928,9 +941,104 @@
       }
       XF = null;
 
+      // ---------- the legendaries' own scenes (the backdrop is replaced; live parts are drawn in show) ----------
+      const hcc = T([hx, hy]), hcX = hcc[0] * N, hcY = hcc[1] * N;
+      const LG = {}, gears = [], heap = [];
+      if (legend === 'Clockwork') {
+        // inside a clock tower: dark teal panelling, a great clock face behind the head (its hands are live),
+        // brass gears turning in the corners, steam from the vents behind its ears
+        D = B;
+        const PW = [C('#0f1e22'), C('#132629'), C('#1a3234')], RIV = C('#2e4c4a');
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) B[y * N + x] = x % 9 === 0 ? PW[2] : (x % 9 === 8 ? PW[0] : PW[1]);
+        for (let y = 4; y < N; y += 9) for (let x = 4; x < N; x += 9) B[y * N + x] = RIV;
+        const R = Math.min(26, Math.max(21, Math.min(hcX, N - hcX, hcY + 6) + 4)), BR = [C('#7a5a2c'), C('#b8904e'), C('#ecca84')], DIAL = C('#e4d6b0'), DIALS = C('#c8b690'), TICK = C('#2a2018');
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const dx = x + 0.5 - hcX, dy = y + 0.5 - hcY, d = Math.hypot(dx, dy); if (d >= R) continue;
+          B[y * N + x] = d > R - 2 ? (dx + dy < -R * 0.3 ? BR[2] : dx + dy > R * 0.3 ? BR[0] : BR[1]) : d > R - 2.9 ? BR[0] : (dx + dy > R * 0.55 && ((x + y) & 1)) || dx + dy > R * 0.95 ? DIALS : DIAL;
+        }
+        for (let k = 0; k < 60; k++) {
+          const a = k / 60 * Math.PI * 2, cx = Math.cos(a), sy = Math.sin(a);
+          if (k % 5) { const r = R - 4; setD(Math.floor(hcX + cx * r), Math.floor(hcY + sy * r), DIALS); continue; }
+          for (let r = R - 7; r <= R - 3.6; r += 0.5) { setD(Math.floor(hcX + cx * r), Math.floor(hcY + sy * r), TICK); if (k % 15 === 0) setD(Math.floor(hcX + cx * r - sy * 0.9), Math.floor(hcY + sy * r + cx * 0.9), TICK); }
+        }
+        LG.dialR = R; LG.HAND = C('#1c1612'); LG.SEC = C('#c8302a'); LG.BR = BR; LG.HOLE = PW[0];
+        LG.STEAM = [C('#dfe8e6'), C('#9db2b0')];
+        LG.vents = [-1, 1].map(s2 => cellOf([hx + s2 * hrx * 0.95, hy - hry * 0.55]));
+        gears.push([hcX < 32 ? 61 : 3, 58, 13, 12, 0.45], [hcX < 32 ? 3 : 61, 7, 10, 10, -0.6], [hcX < 32 ? 57 : 7, 40, 6, 7, 0.95]);
+        for (const g of gears) {
+          const [cx, cy, r, teeth] = g, poses = [];
+          for (let q = 0; q < 48; q++) {
+            const a0 = q * Math.PI / 24, cs = [];
+            for (let y = Math.max(0, cy - r - 1); y <= Math.min(N - 1, cy + r + 1); y++) for (let x = Math.max(0, cx - r - 1); x <= Math.min(N - 1, cx + r + 1); x++) {
+              const dx = x + 0.5 - cx, dy = y + 0.5 - cy, rr = Math.hypot(dx, dy); if (rr > r + 0.5) continue;
+              const a = Math.atan2(dy, dx), out = Math.cos(teeth * (a - a0)) > 0.1 ? r : r - 2;
+              if (rr > out) continue;
+              let v = rr > out - 1 ? BR[0] : dx + dy < -r * 0.45 ? BR[2] : BR[1];
+              if (rr < 1.6) v = BR[2]; else if (rr > r * 0.32 && rr < r - 3.2 && Math.cos(4 * (a - a0)) < 0.7) v = rr < r * 0.32 + 1 ? BR[0] : PW[0];
+              cs.push(y * N + x, v);
+            }
+            poses.push(Int32Array.from(cs));
+          }
+          g.push(poses);
+        }
+        D = L;
+      } else if (legend === 'Phantom') {
+        // a haunted night: a deep violet sky, stars, a great moon, a bare tree and old headstones, fog drifting along
+        // the ground; the ghost floats, its tail rippling into the mist, a cold light round it and wisps circling
+        D = B;
+        const SKY = ['#110d24', '#16112c', '#1c1534', '#22193e', '#2a1f4a'].map(C), BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) B[y * N + x] = SKY[Math.min(4, Math.floor(y / N * 4.6 + BAY[(y & 3) * 4 + (x & 3)] / 16))];
+        const STAR = C('#b6b0dc');
+        for (let i = 0; i < 22; i++) { const [a, b2] = dots[i]; setD(Math.floor(a * N), Math.floor(b2 * N * 0.55), STAR); }
+        const mx = hcX > 32 ? 11 : 52, my = 11, MOON = C('#e6ead2'), CRAT = C('#c2c6ac'), HALO = C('#36305e');
+        for (let y = 0; y < 26; y++) for (let x = Math.max(0, mx - 13); x < Math.min(N, mx + 14); x++) { const d = Math.hypot(x + 0.5 - mx, y + 0.5 - my); if (d < 7.5) B[y * N + x] = (Math.hypot(x - mx + 2, y - my - 1) < 1.6 || Math.hypot(x - mx - 3, y - my + 2) < 1.2 || Math.hypot(x - mx + 1, y - my + 4) < 1) ? CRAT : MOON; else if (d < 11 && ((x + y) & 1) && d < 9.5 + (x & 1)) B[y * N + x] = HALO; }
+        const TREE = C('#08061a'), tx = hcX > 32 ? 4 : 59, td = hcX > 32 ? 1 : -1;
+        for (let y = 26; y < N; y++) { const w = 1 + Math.floor((y - 26) / 14); for (let k = -w; k <= w; k++) setD(tx + k + Math.round(Math.sin(y * 0.15) * 1.5), y, TREE); }
+        for (const [y0, l, up] of [[30, 9, 6], [38, 12, 5], [46, 8, 7], [33, 6, -1]]) { const x0 = tx + Math.round(Math.sin(y0 * 0.15) * 1.5); bres([x0, y0], [x0 + td * l, y0 - up], TREE); bres([x0 + td * l, y0 - up], [x0 + td * (l + 3), y0 - up - 3], TREE); bres([x0 + td * Math.floor(l / 2), y0 - Math.floor(up / 2)], [x0 + td * (Math.floor(l / 2) + 1), y0 - up - 2], TREE); }
+        const STONE = C('#251f40'), STONEH = C('#3c3464');
+        for (const [gx, gw, gh] of [[hcX > 32 ? 15 : 46, 7, 9], [hcX > 32 ? 24 : 38, 5, 6]]) for (let y = N - gh; y < N; y++) for (let x = gx - (gw >> 1); x <= gx + (gw >> 1); x++) { const top = N - gh, r = gw / 2, cy = top + r; if (y < cy && Math.hypot(x + 0.5 - gx - 0.5, y + 0.5 - cy) > r) continue; setD(x, y, (y === top || (y < cy && Math.hypot(x + 0.5 - gx - 0.5, y + 0.5 - cy) > r - 1)) ? STONEH : STONE); }
+        LG.FOG = [C('#4a4278'), C('#6a62a0')]; LG.NIGHT = C('#07050f'); LG.LAMP = C('#6a5a2a'); LG.GLOWG = C('#2e5a66'); LG.WISP = [C('#9cf0dc'), C('#f0fff8')];
+        D = L;
+      } else if (legend === 'Scrap King') {
+        // the throne room: crimson drapes tied back under a scalloped, gold-fringed valance, gold rays fanning out
+        // behind the crown, a heap of golden scrap in front of him, glints on it and gold dust in the light
+        D = B;
+        const W1 = C('#2a0e26'), W2 = C('#4a1c3a'), CR = [C('#560a16'), C('#8a1424'), C('#ba2a3c')], GF = C('#e0b040'), GFD = C('#9a6a1c');
+        const cx = hcX, cy = Math.max(2, hcY - hry * N * 1.6);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const a = Math.atan2(y + 0.5 - cy, x + 0.5 - cx); B[y * N + x] = Math.floor((a + Math.PI) / (Math.PI * 2) * 28 + 0.5) % 2 ? W1 : W2; }
+        for (let y = 0; y < N; y++) {
+          const w = Math.round(12 - 6 * Math.exp(-Math.pow((y - 42) / 6, 2)));
+          for (let x = 0; x < w; x++) for (const xx of [x, N - 1 - x]) { const f = Math.sin(xx * 1.15 + y * 0.04); B[y * N + xx] = x === w - 1 ? CR[0] : f > 0.35 ? CR[2] : f < -0.45 ? CR[0] : CR[1]; }
+          if (Math.abs(y - 42) <= 1) for (let x = 0; x < w + 1; x++) for (const xx of [x, N - 1 - x]) B[y * N + xx] = y === 43 ? GFD : GF;
+        }
+        for (let x = 0; x < N; x++) {
+          const e = 5 + Math.round(2.4 * Math.abs(Math.sin((x + 0.5) * Math.PI / 8)));
+          for (let y = 0; y <= e; y++) B[y * N + x] = y === 0 ? CR[0] : (x % 4 === 0 && y < e - 1) ? CR[0] : CR[1];
+          B[(e + 1) * N + x] = GF; if ((x & 1) === 0) B[(e + 2) * N + x] = GFD;
+          if (x % 8 === 4) { B[(e + 3) * N + x] = GF; B[(e + 4) * N + x] = GFD; }
+        }
+        LG.SPARK = C('#fffbe0'); LG.DUST = C('#d8a840');
+        D = L;
+        // the heap of golden scrap across the bottom, in front of everything: coins in rows, a red cap, a bolt, a cog
+        const hb = x => N - (5 + Math.round(2.2 * Math.sin(x * 0.33 + lumps[0]) + 1.4 * Math.sin(x * 0.9 + 1)) + (Math.abs(x - hcX) < 10 ? -1 : 0));
+        for (let x = 0; x < N; x++) {
+          const top = hb(x);
+          for (let y = top; y < N; y++) {
+            const v = (x + (Math.floor(y / 2) % 2) * 2) % 4, row = y % 2;
+            L[y * N + x] = y === top ? INK : v === 3 ? GOLD[0] : row === 0 && v === 0 ? GOLD[2] : GOLD[1];
+            if (y > top) heap.push(y * N + x);
+          }
+        }
+        const ck = (x0, sp, map) => { const top = hb(x0) - sp.length + 2; stamp(sp, x0 - (sp[0].length >> 1), top, map); };
+        ck(9, ['.kkkk.', 'kRrrRk', 'kRrrRk', '.kkkk.'], { k: INK, R: RED[2], r: RED[1] });
+        ck(53, ['.k.k.', 'kssSk', 'ksdsk', 'kSssk', '.k.k.'], { k: INK, s: STEEL[1], S: STEEL[2], d: STEEL[0] });
+        ck(Math.round(hcX + (hcX < 32 ? 16 : -16)), ['kkkkk', 'kSssk', '.kdk.', '.kdk.', '.kdk.'], { k: INK, s: STEEL[1], S: STEEL[2], d: STEEL[0] });
+      }
+
       // a phantom is the same gremlin in ghost light, see-through below the waist
       if (legend === 'Phantom') {
         const GH = ['#123038', '#356f72', '#6fb8b0', '#bdf0e6', '#f0fffa'].map(C);
+        LG.GH = GH;
         for (let i = 0; i < NN; i++) if (L[i] !== 255) {
           const h = pal[L[i]], lum = parseInt(h.slice(1, 3), 16) * 0.3 + parseInt(h.slice(3, 5), 16) * 0.59 + parseInt(h.slice(5, 7), 16) * 0.11;
           L[i] = GH[lum < 45 ? 0 : lum < 95 ? 1 : lum < 150 ? 2 : lum < 205 ? 3 : 4];
@@ -1041,6 +1149,7 @@
       const lootLamp = (() => { XF = LT; const q = cellOf([handX, handY - 0.1]); XF = null; return q; })();
       const [lampX, lampY] = hat === 'Headlamp' ? cellOf([hx, topY - 0.025]) : horns === 'Light Bulb' ? cellOf([hx, topY - 0.085]) : lootLamp;
 
+      const chestAt = cellOf([hx, Math.min(shY + 0.11, 0.95)]);
       const keyAt = cellOf([0.5 - sw - 0.03 - belly * 0.5, pose === 'Workbench' ? Math.min(shY + 0.13, benchY - 0.05) : shY + 0.13]);
       XF = LT; const burstAt = pose === 'Held Up' ? null : cellOf([handX + lcx, handY + lmid]); XF = null;
       const headS = T([hx, hy]);
@@ -1062,10 +1171,333 @@
       };
       const cv = document.createElement('canvas'); cv.width = cv.height = N;
       const cg = cv.getContext('2d'), img = cg.createImageData(N, N), PX = new Uint32Array(img.data.buffer);
+      // ---------- the legendaries' live parts ----------
+      const GM = new Uint8Array(NN), ghostC = new Int16Array(256).fill(-1);
+      const tailY = Math.floor(T([hx, shY + 0.06])[1] * N), tailW = Math.max(8, sw * ZK * N + 2);
+      // the fog's two banks, laid out wide once and slid along (the back one drifts right, the front one left)
+      const fogB = new Uint8Array(14 * 320), fogF = new Uint8Array(10 * 320);
+      if (legend === 'Phantom') for (let x = 0; x < 320; x++) { for (let y = 0; y < 14; y++) fogB[y * 320 + x] = Math.sin(x * 0.18 + (y + 50) * 0.7) + Math.sin(x * 0.07 - (y + 50) * 0.3) + y * 0.12 > 1.1 ? 1 : 0; for (let y = 0; y < 10; y++) fogF[y * 320 + x] = Math.sin(x * 0.21 + (y + 54) * 0.9) + Math.sin(x * 0.09) + y * 0.18 > 1.25 ? 1 : 0; }
+      const ghostOf = v => { if (ghostC[v] < 0) { const h = pal[v], lum = parseInt(h.slice(1, 3), 16) * 0.3 + parseInt(h.slice(3, 5), 16) * 0.59 + parseInt(h.slice(5, 7), 16) * 0.11; ghostC[v] = LG.GH[lum < 45 ? 0 : lum < 95 ? 1 : lum < 150 ? 2 : lum < 205 ? 3 : 4]; } return ghostC[v]; };
+      const put = (x, y, v) => { if (x >= 0 && y >= 0 && x < N && y < N) O[y * N + x] = v; };
+      const line = (x0, y0, x1, y1, v) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2); for (let k = 0; k <= n; k++) put(Math.floor(x0 + (x1 - x0) * k / n), Math.floor(y0 + (y1 - y0) * k / n), v); };
+      // clockwork: circling the head winds it (the key and the clock's hands follow your finger); let go and it runs
+      // wild for as long as it was wound. phantom: your pointer is a lantern in the dark; the ghost flees the light,
+      // and caught in it for a moment it bursts into wisps and comes back from the far side. scrap king: tap his heap
+      // and a coin flies up and bounces; he counts them, and every tenth brings a fanfare and a shower of gold.
+      const ghostLim = 9;
+      let press0 = null, clockTap = null, wind = 0, windA = null, runAt = -9, runFor = 0, lastTick = 0, wasDown = false, ghostX = 0, litFor = 0, caughtAt = -9, coinsN = 0, fanAt = -9;
+      const coins = [], burstW = [];
+      const hTop = new Int16Array(N); for (let x = 0; x < N; x++) { hTop[x] = N; for (let y = 0; y < N; y++) if (heap.length && L[y * N + x] === INK && y > N - 12) { hTop[x] = y; break; } }
+      const DIG = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001010010', '111101111101111', '111101111001111'];
+      const running = t => t - runAt < runFor;
+      const toyStep = (t, dt, inp) => {
+        const px = inp.x * N, py = inp.y * N;
+        if (legend === 'Clockwork') {
+          if (inp.down && !wasDown) press0 = { x: inp.x, y: inp.y, t, moved: 0 };
+          if (press0 && inp.down) press0.moved = Math.max(press0.moved, Math.hypot(inp.x - press0.x, inp.y - press0.y) * N);
+          if (press0 && !inp.down) { if (press0.moved < 1.5 && t - press0.t < 0.45) clockTap = { x: press0.x, y: press0.y }; press0 = null; }
+          if (inp.down && inp.inside) {
+            const a = Math.atan2(py - hcY, px - hcX);
+            if (windA !== null) { let d = a - windA; d = ((d + Math.PI * 3) % (Math.PI * 2)) - Math.PI; if (Math.hypot(px - hcX, py - hcY) > 4) { const w0 = wind; wind = Math.min(Math.PI * 10, wind + Math.abs(d)); keyPh += Math.abs(d) * 2; if (Math.floor(w0 / 1.2) !== Math.floor(wind / 1.2)) c.sound.hit('click', 0.2); } }
+            windA = a;
+          } else {
+            if (wasDown && wind > Math.PI) { runAt = t; runFor = Math.min(9, wind / Math.PI * 1.2); c.sound.hit('blip', 0.3, { freq: 900 }); [0, 4, 7, 12].forEach((n, i) => c.sound.note(yelpKey + n, { dur: 0.08, vel: 0.1, wave: 'square', cutoff: 2400, at: i * 0.06 })); }
+            if (!inp.down) { windA = null; if (!running(t)) wind = Math.max(0, wind - dt * 0.5); else wind = Math.max(0, wind - dt * Math.PI * 10 / 9); }
+          }
+          if (running(t) && Math.floor(t * 10) !== lastTick) { lastTick = Math.floor(t * 10); c.sound.hit('click', 0.1); if (lastTick % 4 === 0) c.sound.note(yelpKey + [0, 7, 12, 7][(lastTick / 4) % 4], { dur: 0.06, vel: 0.06, wave: 'square', cutoff: 2000 }); }
+        } else if (legend === 'Phantom') {
+          // it drifts away from the lantern, cornered only at the edges
+          const gx = hcX + ghostX, d = inp.inside ? Math.hypot(px - gx, (py - hcY) * 0.7) : 99, back = t - caughtAt > 2.4;
+          // it slides away from the beam, and when the beam goes it peeks back toward the middle; once the light has held
+          // it for a moment it freezes, trembling and pale, and can be caught. It never leaves the frame.
+          if (inp.inside && d < 26 && back && litFor < 0.35) ghostX += Math.sign(gx - px || 1) * (26 - d) / 26 * 34 * dt;
+          else if (litFor < 0.35) ghostX += (0 - ghostX) * Math.min(1, dt * 0.8);
+          ghostX = Math.max(-ghostLim, Math.min(ghostLim, ghostX));
+          if (inp.inside && d < 12 && back) litFor += dt; else litFor = Math.max(0, litFor - dt * 1.5);
+          if (litFor > 1.2) {
+            litFor = 0; caughtAt = t; burstW.length = 0;
+            for (let k = 0; k < 14; k++) { const a = k / 14 * 6.283; burstW.push([gx, hcY, Math.cos(a) * (20 + k % 3 * 8), Math.sin(a) * (16 + k % 4 * 6)]); }
+            c.sound.hit('noise', 0.2, { cutoff: 2600, dur: 0.6 }); [24, 19, 15, 12, 7, 3, 0].forEach((n, i) => c.sound.note(yelpKey - 12 + n, { dur: 0.3, vel: 0.08, wave: 'sine', at: i * 0.07 }));
+            ghostX = ghostX > 0 ? -ghostLim * 0.6 : ghostLim * 0.6;   // it will come back at a free spot on the other side
+          }
+        } else if (legend === 'Scrap King') {
+          for (const cn of coins) {
+            if (cn[4]) continue;
+            cn[0] += cn[2] * dt; cn[1] += cn[3] * dt; cn[3] += 70 * dt;
+            if (cn[0] < 1 || cn[0] > N - 2) { cn[2] = -cn[2]; cn[0] = Math.max(1, Math.min(N - 2, cn[0])); }
+            const top = hTop[Math.max(0, Math.min(N - 1, Math.floor(cn[0])))] - 1;
+            if (cn[1] >= top && cn[3] > 0) { cn[1] = top; cn[3] *= -0.45; cn[2] *= 0.7; cn[5]++; c.sound.note(yelpKey + 12 + cn[5] * 2, { dur: 0.05, vel: 0.07, wave: 'square', cutoff: 3000 }); if (cn[5] >= 3 || Math.abs(cn[3]) < 6) { cn[4] = t; coinsN++; if (coinsN % 10 === 0) { fanAt = t; legT = t; [[0, 0], [4, 0.12], [7, 0.24], [12, 0.36], [7, 0.5], [12, 0.62]].forEach(([n, at]) => c.sound.note(yelpKey - 5 + n, { dur: 0.18, vel: 0.12, wave: 'square', cutoff: 2000, at })); } } }
+          }
+          for (let k = coins.length - 1; k >= 0; k--) if (coins[k][4] && t - coins[k][4] > 0.6) coins.splice(k, 1);
+        }
+        wasDown = inp.down;
+      };
+      const legendBack = t => {
+        if (legend === 'Clockwork') {
+          // the gears turn in clockwork steps of 7.5 degrees (each pose laid ready)
+          const gt = t + (running(t) ? (t - runAt) * 5 : 0) + wind * 0.6;
+          for (const g of gears) { const q = ((Math.floor(gt * g[4] / (Math.PI / 24)) % 48) + 48) % 48, cs = g[5][q]; for (let j = 0; j < cs.length; j += 2) O[cs[j]] = cs[j + 1]; }
+          // the hands: the hour hand and the minute hand move on, the red second hand ticks
+          const race = running(t) ? -(t - runAt) * 9 : 0, R = LG.dialR, hA = t * 0.03 + lumps[0] + wind / 12 + race / 12, mA = t * 0.35 + lumps[0] * 5 + wind + race, sA = (running(t) ? Math.floor(t * 8) : Math.floor(t)) * Math.PI / 30 - Math.PI / 2;
+          for (const [a, l, w] of [[hA, R * 0.5, 1], [mA, R - 7, 0]]) { line(hcX, hcY, hcX + Math.cos(a) * l, hcY + Math.sin(a) * l, LG.HAND); if (w) line(hcX + 0.7, hcY + 0.7, hcX + 0.7 + Math.cos(a) * l, hcY + 0.7 + Math.sin(a) * l, LG.HAND); }
+          line(hcX - Math.cos(sA) * 3, hcY - Math.sin(sA) * 3, hcX + Math.cos(sA) * (R - 4), hcY + Math.sin(sA) * (R - 4), LG.SEC);
+        } else if (legend === 'Phantom') {
+          // fog drifting along behind the ghost
+          const sh = Math.floor(t * 3) % 256;
+          for (let y = 50; y < N; y++) for (let x = 0; x < N; x++) if (fogB[(y - 50) * 320 + x + sh] && ((x + y) & 1)) O[y * N + x] = LG.FOG[0];
+        } else if (legend === 'Scrap King') {
+          // gold dust drifting down through the rays
+          for (let k = 0; k < 9; k++) { const x = Math.floor(hcX + (k - 4) * 5 + Math.sin(t * 0.8 + k * 2) * 2), y = Math.floor((t * (4 + k % 3) + k * 13) % 56) + 6; put(x, y, LG.DUST); }
+        }
+      };
+      const legendFront = t => {
+        if (legend === 'Clockwork') {
+          // steam puffs from the vents behind its ears, rising and thinning
+          for (let k = 0; k < 2; k++) {
+            const [vx, vy] = LG.vents[k], p = running(t) ? ((t * 3 + k * 0.5) % 1) : ((t + k * 1.3) % 2.4) / 2.4, s2 = k ? 1 : -1, cx = vx + s2 * (1 + p * 4) + Math.sin(p * 6) * 1.2, cy = vy - 2 - p * 13, r = 1 + p * 2.6;
+            for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) { const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); if (d < r && ((x * 3 + y * 5 + Math.floor(p * 9)) % 7) / 7 > p * 0.9 - 0.1) put(x, y, d < r - 1 ? LG.STEAM[0] : LG.STEAM[1]); }
+          }
+          // the spring: a little brass gauge in the corner fills as you wind and empties as it runs
+          if (wind > 0.05) { const h = Math.round(wind / (Math.PI * 10) * 14); for (let y = 0; y < 16; y++) for (const x of [N - 4, N - 3]) put(x, N - 3 - y, y === 15 || y === 0 ? LG.BR[0] : y <= h ? LG.BR[2] : LG.HOLE); }
+        } else if (legend === 'Phantom') {
+          // the lantern: away from its pool the night swallows everything but the ghost's own light
+          if (c.input.inside) {
+            const px = c.input.x * N, py = c.input.y * N;
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+              const i = y * N + x, dx = x + 0.5 - px, dy = y + 0.5 - py, d2 = dx * dx + dy * dy;
+              if (d2 < 81) continue;
+              const dark = d2 > 196 || (d2 > 144 ? ((x + y) & 3) !== 0 : ((x + y) & 1) === 1);
+              if (!dark) continue;
+              O[i] = GM[i] === 2 && t - caughtAt > 2.4 ? LG.GH[2] : LG.NIGHT;   // its eyes still glow in the dark
+            }
+            // the lantern's own warm rim
+            for (let a = 0; a < 40; a++) { const x = Math.floor(px + Math.cos(a * 0.157) * 12.5), y = Math.floor(py + Math.sin(a * 0.157) * 12.5); if (x >= 0 && y >= 0 && x < N && y < N && (a & 1) && !GM[y * N + x]) O[y * N + x] = LG.LAMP; }
+          }
+          // caught: a white flash, then wisps flying apart
+          const ct = t - caughtAt;
+          if (ct < 1.4) for (const [x0, y0, vx, vy] of burstW) { const x = Math.floor(x0 + vx * ct), y = Math.floor(y0 + vy * ct + 6 * ct * ct); put(x, y, LG.WISP[ct < 0.7 ? 1 : 0]); if (ct < 0.5) put(x + 1, y, LG.WISP[0]); }
+          // a cold light round the ghost, fog in front of its tail, and wisps circling its head
+          const lpx = c.input.inside ? c.input.x * N : -999, lpy = c.input.y * N, lit = (x, y) => !c.input.inside || (x + 0.5 - lpx) ** 2 + (y + 0.5 - lpy) ** 2 < 100;
+          for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) { const i = y * N + x; if (!GM[i] && ((x + y) & 1) && (GM[i - 1] || GM[i + 1] || GM[i - N] || GM[i + N]) && lit(x, y)) O[i] = LG.GLOWG; }
+          const sf = 255 - Math.floor(t * 4) % 256;
+          for (let y = 54; y < N; y++) for (let x = 0; x < N; x++) if (fogF[(y - 54) * 320 + x + sf] && ((x + y) & 1) === 0) O[y * N + x] = LG.FOG[1];
+          for (let k = 0; k < 3; k++) { const a = t * (0.8 + k * 0.15) + k * 2.1, x = Math.floor(hcX + Math.cos(a) * (19 + k * 3)), y = Math.floor(hcY - 3 + Math.sin(a) * 10 + Math.sin(t * 2 + k) * 2); put(x, y, LG.WISP[1]); put(x + 1, y, LG.WISP[0]); put(x - 1, y, LG.WISP[0]); put(x, y + 1, LG.WISP[0]); put(x, y - 1, LG.WISP[0]); }
+        } else if (legend === 'Scrap King' && heap.length) {
+          // the flicked coins, edge-on and face-on by turns as they spin
+          for (const cn of coins) { const x = Math.floor(cn[0]), y = Math.floor(cn[1]), spin = Math.floor((cn[0] + cn[1]) * 0.8) % 2; if (cn[4]) { if ((x + y) & 1) put(x, y - 1, LG.SPARK); continue; } put(x, y, GOLD[1]); put(x, y - 1, spin ? GOLD[2] : GOLD[1]); if (!spin) { put(x + 1, y, GOLD[0]); put(x + 1, y - 1, GOLD[1]); } put(x, y + 1, INK); }
+          // the tally, top left: a coin and the count
+          if (coinsN) { const s = String(coinsN); put(2, 3, GOLD[2]); put(3, 3, GOLD[1]); put(2, 4, GOLD[1]); put(3, 4, GOLD[0]); for (let d = 0; d < s.length; d++) { const g = DIG[+s[d]]; for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (g[j * 3 + i] === '1') put(5 + d * 4 + i, 2 + j, LG.SPARK); } }
+          // the fanfare: gold showers down the whole picture
+          if (t - fanAt < 2.2) for (let k = 0; k < 40; k++) { const x = (k * 37 + Math.floor(fanAt * 7)) % N, y = Math.floor(((t - fanAt) * (30 + k % 7 * 6) + k * 5) % 70) - 6; put(x, y, k % 3 ? GOLD[2] : LG.SPARK); put(x, y - 1, GOLD[1]); }
+          // glints wink across the heap of gold
+          for (let k = 0; k < 4; k++) { const ph = t * 1.6 + k * 0.25, i = heap[((Math.floor(ph) * 7919 + k * 104729) % heap.length + heap.length) % heap.length], x = i % N, y = (i - x) / N; if (ph % 1 < 0.5) { put(x, y, LG.SPARK); if (ph % 1 > 0.12 && ph % 1 < 0.38) { put(x + 1, y, GOLD[2]); put(x - 1, y, GOLD[2]); put(x, y - 1, GOLD[2]); put(x, y + 1, GOLD[2]); } } }
+        }
+      };
+      // ---------- the two redrawn legendaries: a thermal camera and an illuminated initial, on a 128 grid ----------
+      const RD = legend === 'Clockwork' || legend === 'Scrap King', FIG = new Uint8Array(NN);
+      const rcv = RD ? document.createElement('canvas') : null; if (rcv) rcv.width = rcv.height = 128;
+      const rctx = rcv && rcv.getContext('2d'), rimg = rcv && rctx.createImageData(128, 128), R32 = RD ? new Uint32Array(rimg.data.buffer) : null;
+      const rgbw = (r, g, b) => (0xff000000 | b << 16 | g << 8 | r) >>> 0;
+      const hexw = h => rgbw(parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16));
+      const LUM = RD ? pal.map(h => (parseInt(h.slice(1, 3), 16) * 0.3 + parseInt(h.slice(3, 5), 16) * 0.59 + parseInt(h.slice(5, 7), 16) * 0.11) / 255) : [];
+      const FONT = { A: '010101111101101', B: '110101110101110', C: '011100100100011', E: '111100110100111', F: '111100110100100', G: '011100101101011', H: '101101111101101', I: '111010010010111', K: '101101110101101', L: '100100100100111', M: '101111111101101', N: '111101101101101', O: '010101101101010', P: '110101110100100', R: '110101110101101', S: '011100010001110', T: '111010010010010', U: '101101101101111', V: '101101101101010', W: '101101111111101', X: '101101010101101', Y: '101101010010010', '.': '000000000000010', '-': '000000111000000', '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001111001111', '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001001010010', '8': '111101111101111', '9': '111101111001111', ' ': '000000000000000' };
+      const rtext = (str, x0, y0, col) => { for (let d = 0; d < str.length; d++) { const g = FONT[str[d]] || FONT[' ']; for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (g[j * 3 + i] === '1') { const X = x0 + d * 4 + i, Y = y0 + j; if (X >= 0 && Y >= 0 && X < 128 && Y < 128) R32[Y * 128 + X] = col; } } };
+      const rput = (X, Y, col) => { X = Math.round(X); Y = Math.round(Y); if (X >= 0 && Y >= 0 && X < 128 && Y < 128) R32[Y * 128 + X] = col; };
+
+      // the thermal camera: the automaton seen as heat in an iron palette (black, violet, magenta, orange, yellow, white):
+      // its body a warm silhouette, its lamp eyes and grin hot;
+      // winding heats its mainspring and key white-hot, and when it runs the heat floods out through the body while it
+      // jolts and throws sparks; a spot reading, a crosshair and a scale bar, as the camera shows them
+      const IRON = [[0, 0, 0], [22, 0, 52], [62, 0, 104], [112, 0, 132], [160, 12, 122], [200, 42, 92], [230, 82, 40], [250, 132, 0], [255, 182, 0], [255, 222, 64], [255, 246, 156], [255, 255, 255]].map(q => rgbw(q[0], q[1], q[2]));
+      const HEAT = new Float32Array(NN), HB = new Float32Array(NN), sparks = [], BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+      const MMs = MM; let hmBot = -1;
+      const thermal = (t, ox, oy) => {
+        const run = running(t), w = wind / (Math.PI * 10), [cx0, cy0] = chestAt, sxC = cx0 + ox, syC = cy0 + oy, kx = keyAt[0] + ox, ky = keyAt[1] + oy;
+        const flood = run ? (t - runAt) * 40 : -1;
+        if (hmBot < 0) { for (let i = 0; i < NN; i++) if (HM[i]) hmBot = Math.max(hmBot, i >> 6); hmBot = Math.max(hmBot, 8); }
+        for (let i = 0; i < NN; i++) {
+          const x = i & 63, y = i >> 6;
+          let h = 0.015 + 0.012 * Math.sin(x * 0.4 + t * 0.7) * Math.sin(y * 0.33 - t * 0.5);   // the room: cold, near black
+          if (FIG[i]) {
+            const sx = x - ox, sy = y - oy, inH = sx >= 0 && sy >= 0 && sx < N && sy < N, head = inH && HM[sy * N + sx], v = O[i];
+            // the body a plain shape cooling from the shoulders down; the head warm, its features drawn in heat
+            h = head ? (v === INK ? 0.4 : 0.52) : 0.4 - 0.2 * Math.min(1, Math.max(0, (y - oy - hmBot) / (N - hmBot)));
+            if (inH && MMs[sy * N + sx]) h = 0.72;   // the grin breathes out warm
+            if (FIG[i] === 2 && head && LUM[v] > 0.55) h = 0.94;   // the lamp eyes
+            const ds = Math.hypot(x - sxC, y - syC), dk = Math.hypot(x - kx, y - ky);
+            if (ds < 6) { const coil = 0.5 + 0.5 * Math.cos(ds * 1.9 - Math.atan2(y - syC, x - sxC)); h = Math.max(h, 0.42 + coil * 0.1 + w * 0.6 * (0.5 + coil * 0.5) * (1 - ds / 9) + (run ? 0.4 : 0)); }   // the mainspring's coil, heating as it's wound
+            if (dk < 6 && FIG[i] === 2) h = Math.max(h, 0.35 + w * 0.65);
+            if (run && ds < flood && !head) h = Math.min(1, h + 0.26 * Math.min(1, (flood - ds) / 12) * (1 - Math.min(1, (t - runAt) / runFor) * 0.7));
+          }
+          HEAT[i] = Math.min(1, h);
+        }
+        // running wild, the head spins round on its neck about once a second: over eight frames the face squeezes to its
+        // edge, the plain back of the head comes round, and the face swings back
+        if (run) {
+          const p = ((t - runAt) % 1) / 0.34;
+          if (p < 1) {
+            const cs = Math.cos(p * Math.PI * 2), sc = Math.max(0.12, Math.abs(cs)), back = cs < 0, hxs = hcX + ox, y0 = Math.max(0, Math.floor(hcY + oy - 18)), y1 = Math.min(N - 1, Math.ceil(hcY + oy + 16));
+            const hm = (q, yy) => { const sx = q - ox, sy = yy - oy; return sx >= 0 && sy >= 0 && sx < N && sy < N && HM[sy * N + sx]; };
+            for (let y = y0; y <= y1; y++) {
+              const row = HB.subarray(0, N); for (let x = 0; x < N; x++) row[x] = HEAT[y * N + x];
+              for (let x = Math.max(0, Math.floor(hxs - 20)); x <= Math.min(N - 1, Math.ceil(hxs + 20)); x++) {
+                const src = Math.round(hxs + (x + 0.5 - hxs) / sc - 0.5);
+                if (src >= 0 && src < N && hm(src, y)) HEAT[y * N + x] = back ? 0.5 : row[src]; else if (hm(x, y)) HEAT[y * N + x] = 0.015;
+              }
+            }
+          }
+        }
+        // the camera's softness: one box blur
+        for (let i = 0; i < NN; i++) { const x = i & 63, y = i >> 6; let sm = 0, n = 0; for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) { const xx = x + u, yy = y + v; if (xx >= 0 && yy >= 0 && xx < N && yy < N) { sm += HEAT[yy * N + xx] * (u || v ? 1 : 4); n += u || v ? 1 : 4; } } HB[i] = sm / n; }
+        for (let Y = 0; Y < 128; Y++) for (let X = 0; X < 128; X++) { const k = Math.max(0, Math.min(11, Math.floor(HB[(Y >> 1) * N + (X >> 1)] * 11 + BAY[(Y & 3) * 4 + (X & 3)] / 40 + 0.3))); R32[Y * 128 + X] = IRON[k]; }
+        // sparks from the spring while it runs
+        if (run && sparks.length < 40) for (let k = 0; k < 2; k++) sparks.push([sxC * 2, syC * 2, Math.sin(t * 37 + k * 2) * 40, -30 - Math.abs(Math.cos(t * 23 + k)) * 40, t]);
+        for (let q = sparks.length - 1; q >= 0; q--) { const sp = sparks[q], k = t - sp[4]; if (k > 0.8) { sparks.splice(q, 1); continue; } const X = Math.round(sp[0] + sp[2] * k), Y = Math.round(sp[1] + sp[3] * k + 60 * k * k); rput(X, Y, IRON[11]); rput(X + 1, Y, IRON[9]); rput(X, Y + 1, IRON[8]); }
+        // the camera's overlay: a crosshair on the spring, the spot temperature, the material, a scale bar
+        const tx = Math.round(sxC * 2), ty = Math.round(syC * 2), WHT = IRON[11];
+        for (let d = 3; d <= 6; d++) { rput(tx + d, ty, WHT); rput(tx - d, ty, WHT); rput(tx, ty + d, WHT); rput(tx, ty - d, WHT); }
+        const temp = (20 + HB[Math.max(0, Math.min(NN - 1, Math.round(syC) * N + Math.round(sxC)))] * 600).toFixed(1);
+        for (let Y = 4; Y <= 18; Y++) for (let X = 4; X <= 44; X++) R32[Y * 128 + X] = IRON[0];
+        rtext(temp + 'C', 6, 6, WHT); rtext(hide.toUpperCase().slice(0, 5), 6, 12, IRON[8]);
+        for (let Y = 20; Y <= 108; Y++) { const k = Math.round((108 - Y) / 88 * 11); for (let X = 120; X <= 123; X++) R32[Y * 128 + X] = IRON[k]; R32[Y * 128 + 119] = IRON[0]; R32[Y * 128 + 124] = IRON[0]; }
+        for (const [x0, y0, dx, dy] of [[2, 2, 1, 1], [125, 2, -1, 1], [2, 125, 1, -1], [125, 125, -1, -1]]) for (let k = 0; k < 7; k++) { rput(x0 + dx * k, y0, WHT); rput(x0, y0 + dy * k, WHT); }
+      };;
+
+      // the illuminated initial: a vellum page; a great gilded K on lapis with white filigree, and inside it the king drawn
+      // afresh in flat colours with a black ink line (his hide, head, ears, horns, eyes, nose and grin, his crown, his
+      // robe, the scepter tipped with his loot, his throne, his hoard); a vine down the margin with his pet and little
+      // gremlins in it, and lines of script below. Tap and a coin flies onto the hoard, which grows; every tenth crowns him.
+      const VEL = hexw('#efe3c4'), VEL2 = hexw('#e4d4ae'), LAPIS = hexw('#1f3d8c'), LAPIS2 = hexw('#2c52a8'), VERM = hexw('#c8321e'), VERMD = hexw('#8a1e12'), GOLDM = hexw('#e0b040'), GOLDH = hexw('#fff0a0'), GOLDS = hexw('#a8761e'), INKM = hexw('#1a1210'), WHITEM = hexw('#fbf6e8'), GREENM = hexw('#3a7a32'), GREENL = hexw('#6aa84a');
+      const HIDEM = hexw(HIDES[hide][0]), HIDED = hexw(HIDES[hide][1]);
+      const ROBE = hexw({ Nothing: '#7a2a6a', Overalls: '#3a6fb0', 'Aviator Scarf': '#c8321e', Raincoat: '#d8a820', 'Bow Tie': '#7a2a6a', Hoodie: outfitHue, 'Lab Coat': '#e8e2d0', 'Leather Jacket': '#4a3428', 'Hawaiian Shirt': '#d8483a', 'Patched Sweater': '#a8603a', Tuxedo: '#2a2832' }[outfit] || '#7a2a6a');
+      const MC = new Uint32Array(128 * 128), mm = new Uint8Array(128 * 128);
+      let mReady = false, mCoinsN = 0, crownAt = -9, crowns = 0;
+      const mCoins = [];
+      // a flat shape with a black outline: fill where test(x, y) holds inside the box, then ink the edge just outside
+      const mBlob = (x0, y0, x1, y1, test, col) => {
+        x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(127, Math.ceil(x1)); y1 = Math.min(127, Math.ceil(y1));
+        for (let Y = y0; Y <= y1; Y++) for (let X = x0; X <= x1; X++) { const n = Y * 128 + X; mm[n] = test(X + 0.5, Y + 0.5) ? 1 : 0; if (mm[n]) MC[n] = col; }
+        for (let Y = Math.max(0, y0 - 1); Y <= Math.min(127, y1 + 1); Y++) for (let X = Math.max(0, x0 - 1); X <= Math.min(127, x1 + 1); X++) {
+          const n = Y * 128 + X, inb = X >= x0 && X <= x1 && Y >= y0 && Y <= y1; if (inb && mm[n]) continue;
+          const nb = (X > x0 && X - 1 <= x1 && Y >= y0 && Y <= y1 && mm[n - 1]) || (X < x1 && X + 1 >= x0 && Y >= y0 && Y <= y1 && mm[n + 1]) || (Y > y0 && Y - 1 <= y1 && X >= x0 && X <= x1 && mm[n - 128]) || (Y < y1 && Y + 1 >= y0 && X >= x0 && X <= x1 && mm[n + 128]);
+          if (nb) MC[n] = INKM;
+        }
+        for (let Y = y0; Y <= y1; Y++) for (let X = x0; X <= x1; X++) mm[Y * 128 + X] = 0;
+      };
+      const mTri = (ax, ay, bx, by, cx, cy) => (X, Y) => { const d1 = (X - bx) * (ay - by) - (ax - bx) * (Y - by), d2 = (X - cx) * (by - cy) - (bx - cx) * (Y - cy), d3 = (X - ax) * (cy - ay) - (cx - ax) * (Y - ay); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); };
+      const mEll = (cx, cy, rx, ry) => (X, Y) => ((X - cx) / rx) ** 2 + ((Y - cy) / ry) ** 2 <= 1;
+      const mRect = (x0, y0, x1, y1) => (X, Y) => X >= x0 && X <= x1 && Y >= y0 && Y <= y1;
+      const mtext = (str, x0, y0, col) => { for (let d = 0; d < str.length; d++) { const g = FONT[str[d]] || FONT[' ']; for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (g[j * 3 + i] === '1') MC[(y0 + j) * 128 + x0 + d * 4 + i] = col; } };
+      const pileTop = () => 80 - 3 * Math.min(7, Math.floor(mCoinsN / 2));   // a row of coins more for every two
+      const paintPage = () => {
+        // vellum, with a faint grain
+        for (let n = 0; n < 128 * 128; n++) { const X = n & 127, Y = n >> 7; MC[n] = (X * 13 + Y * 7) % 23 === 0 ? VEL2 : VEL; }
+        // the initial's square: a gold frame, lapis inside with white filigree crosses
+        mBlob(8, 8, 90, 90, mRect(8, 8, 90, 90), GOLDM);
+        for (let Y = 9; Y <= 89; Y++) for (let X = 9; X <= 89; X++) if (X === 9 || Y === 9) MC[Y * 128 + X] = GOLDH; else if (X === 89 || Y === 89) MC[Y * 128 + X] = GOLDS;
+        for (let Y = 12; Y <= 86; Y++) for (let X = 12; X <= 86; X++) { const n = Y * 128 + X; MC[n] = ((X >> 3) + (Y >> 3)) & 1 ? LAPIS : LAPIS2; const u = (X - 12) % 8, v = (Y - 12) % 8; if ((u === 4 && v >= 3 && v <= 5) || (v === 4 && u >= 3 && u <= 5)) MC[n] = WHITEM; }
+        for (let k = 11; k <= 87; k++) { MC[11 * 128 + k] = INKM; MC[87 * 128 + k] = INKM; MC[k * 128 + 11] = INKM; MC[k * 128 + 87] = INKM; }
+        // the letter K in vermilion, gold-edged: a stem and two arms
+        const K = (X, Y) => (X >= 15 && X <= 25 && Y >= 15 && Y <= 83) || mTri(23, 52, 23, 40, 52, 15)(X, Y) || mTri(52, 15, 64, 15, 25, 50)(X, Y) || mTri(25, 46, 33, 46, 66, 83)(X, Y) || mTri(66, 83, 54, 83, 25, 52)(X, Y);
+        mBlob(14, 14, 67, 84, K, VERM);
+        for (let Y = 15; Y <= 83; Y++) MC[Y * 128 + 16] = GOLDH;
+        // the throne: a gilt back with a round top, behind him
+        mBlob(34, 20, 80, 76, (X, Y) => X >= 36 && X <= 78 && Y >= 34 && Y <= 76 || ((X - 57) ** 2 + (Y - 34) ** 2 <= 21 * 21 && Y < 34), GOLDS);
+        mBlob(40, 27, 74, 70, (X, Y) => X >= 41 && X <= 73 && Y >= 36 && Y <= 70 || ((X - 57) ** 2 + (Y - 36) ** 2 <= 15 * 15 && Y < 36), VERMD);
+        const pt = 86;
+        // his robe and cape, by build
+        const bw = { Scrawny: 11, Hunched: 13, Stocky: 15, Potbelly: 14 }[build] || 12;
+        mBlob(57 - bw - 8, 52, 57 + bw + 8, pt + 1, mTri(57, 50, 57 - bw - 8, pt + 1, 57 + bw + 8, pt + 1), VERM);
+        mBlob(57 - bw, 52, 57 + bw, pt + 1, (X, Y) => Math.abs(X - 57) <= bw * (0.6 + 0.4 * (Y - 52) / (pt - 52)) && Y >= 52 && Y <= pt, ROBE);
+        mBlob(57 - bw - 2, 50, 57 + bw + 2, 56, mEll(57, 53, bw + 2, 3.5), WHITEM);   // the ermine collar
+        for (let k = -bw; k <= bw; k += 4) MC[53 * 128 + 57 + k] = INKM;
+        // the scepter with his loot at its tip, held up on his right
+        const lootK = ['Wrench', 'Fork', 'Screwdriver', 'Plunger'].includes(loot) ? 0 : ['Light Bulb', 'Battery', 'Spark Plug', 'Tiny Rocket'].includes(loot) ? 1 : ['Gear', 'Golden Gear', 'Magnet', 'Duct Tape'].includes(loot) ? 2 : 3;
+        const scX = pose === 'Hugged' ? 66 : 74, scTop = pose === 'Held Up' ? 22 : 30;
+        mBlob(scX - 1, scTop, scX + 1, 76, mRect(scX - 1, scTop, scX + 1, 76), GOLDM);
+        if (lootK === 0) mBlob(scX - 5, scTop - 9, scX + 5, scTop + 1, (X, Y) => (Math.abs(X - scX) <= 5 && Y >= scTop - 3) || (Math.abs(X - scX) >= 2 && Math.abs(X - scX) <= 5 && Y >= scTop - 9), hexw('#c8d0d8'));
+        else if (lootK === 1) mBlob(scX - 5, scTop - 10, scX + 5, scTop + 1, mEll(scX, scTop - 4, 5, 6), hexw('#fff0a0'));
+        else if (lootK === 2) mBlob(scX - 6, scTop - 12, scX + 6, scTop, (X, Y) => { const d = Math.hypot(X - scX, Y - scTop + 6), a = Math.atan2(Y - scTop + 6, X - scX); return d <= (Math.cos(a * 8) > 0 ? 6 : 4.5) && d > 1.5; }, hexw(loot === 'Golden Gear' ? '#f2c84a' : '#b8c0c8'));
+        else mBlob(scX - 5, scTop - 10, scX + 5, scTop + 1, (X, Y) => Math.abs(X - scX) + Math.abs(Y - scTop + 4) <= 5, hexw(loot === 'Rubber Chicken' ? '#f6e05a' : loot === 'Lit Fuse' ? '#34343e' : '#c8321e'));
+        mBlob(scX - 3, 56, scX + 3, 62, mEll(scX, 59, 3, 3), HIDEM);   // his hand on it
+        // the hoard heaped at his feet, in front of his robe, growing with the coins he's given: round coins, each
+        // outlined, lit on top
+        const pk = pileTop();
+        mBlob(14, pk - 2, 86, 86, (X, Y) => Y >= pk + Math.abs(X - 57) * 0.42 && Y <= 86, GOLDM);
+        for (let Y = pk; Y <= 86; Y++) for (let X = 13; X <= 86; X++) { const n = Y * 128 + X; if (MC[n] !== GOLDM) continue; const u = (X + (Y % 6 < 3 ? 0 : 3)) % 6, v = Y % 3; if (u === 0 || (v === 2 && u < 5)) MC[n] = GOLDS; else if (v === 0 && u > 1 && u < 4) MC[n] = GOLDH; }
+        // his head, by its shape, and his ears
+        const hw = shape === 'Long' ? 10 : shape === 'Block' ? 13 : 12, hh = shape === 'Long' ? 14 : 11, hy0 = 38;
+        const earT = ears === 'Floppy' || ears === 'Long Droop' ? 1 : ears === 'Feelers' || ears === 'Satellite' ? 2 : ears === 'Tiny' ? 3 : 0;
+        for (const sd of [-1, 1]) {
+          if (earT === 0) mBlob(57 + sd * 6 - 18, 24, 57 + sd * 6 + 18, 44, mTri(57 + sd * 8, 34, 57 + sd * 26, 26, 57 + sd * 9, 43), HIDEM);
+          else if (earT === 1) mBlob(57 - 30, 30, 57 + 30, 58, mTri(57 + sd * 9, 32, 57 + sd * 22, 52, 57 + sd * 12, 44), HIDEM);
+          else if (earT === 2) { mBlob(57 + sd * 7 - 1, 14, 57 + sd * 7 + 1, 30, mRect(57 + sd * 7 - 1, 14, 57 + sd * 7 + 1, 30), HIDED); mBlob(57 + sd * 7 - 3, 10, 57 + sd * 7 + 3, 16, mEll(57 + sd * 7, 13, 3, 3), HIDED); }
+          else mBlob(57 + sd * 12 - 4, 32, 57 + sd * 12 + 4, 40, mEll(57 + sd * 13, 36, 3, 3), HIDEM);
+        }
+        const headT = shape === 'Wedge' ? (X, Y) => mEll(57, hy0, hw, hh)(X, Y) && Math.abs(X - 57) <= hw * (1.2 - (Y - hy0 + hh) / (2 * hh) * 0.6) : shape === 'Block' ? (X, Y) => Math.abs(X - 57) <= hw && Math.abs(Y - hy0) <= hh && !(Math.abs(X - 57) > hw - 2 && Math.abs(Y - hy0) > hh - 2) : shape === 'Pear' ? (X, Y) => ((X - 57) / (hw * (0.8 + 0.3 * (Y - hy0 + hh) / (2 * hh)))) ** 2 + ((Y - hy0) / hh) ** 2 <= 1 : mEll(57, hy0, hw, hh);
+        mBlob(57 - hw - 2, hy0 - hh - 2, 57 + hw + 2, hy0 + hh + 2, headT, HIDEM);
+        if (marks !== 'None') for (const [u, v] of [[-6, -4], [5, -6], [7, 2], [-8, 3]]) MC[(hy0 + v) * 128 + 57 + u] = marks === 'Freckles' || marks === 'Spots' || marks === 'Warts' ? HIDED : INKM;
+        if (horns !== 'None') for (const sd of horns === 'Single Horn' || horns === 'Light Bulb' || horns === 'Antenna Bolt' ? [0] : [-1, 1]) mBlob(57 + sd * 7 - 3, hy0 - hh - 8, 57 + sd * 7 + 3, hy0 - hh + 2, mTri(57 + sd * 7 - 3, hy0 - hh + 2, 57 + sd * 7 + 3, hy0 - hh + 2, 57 + sd * 8, hy0 - hh - 8), hexw('#efe4c8'));
+        // his eyes, by kind
+        const eyeK = /Goggles|Monocle|Lamp/.test(eyes) ? 2 : /Squint|Sleepy|Slits/.test(eyes) ? 1 : eyes === 'Cyclops' ? 3 : /Glow/.test(eyes) ? 4 : 0;
+        const eyePos = eyeK === 3 ? [[57, hy0 - 3]] : eyes === 'Three Eyes' ? [[52, hy0 - 2], [62, hy0 - 2], [57, hy0 - 8]] : [[52, hy0 - 2], [62, hy0 - 2]];
+        for (const [ex, ey] of eyePos) {
+          if (eyeK === 1) mBlob(ex - 3, ey, ex + 3, ey + 1, mRect(ex - 3, ey, ex + 3, ey + 1), INKM);
+          else { const r = eyeK === 3 ? 4.5 : 3.2; mBlob(ex - r - 1, ey - r - 1, ex + r + 1, ey + r + 1, mEll(ex, ey, r, r), eyeK === 2 ? hexw('#ffb43a') : eyeK === 4 ? hexw(eyes === 'Red Glow' ? '#ff5a3a' : '#a8ff5a') : WHITEM); MC[ey * 128 + ex] = INKM; MC[ey * 128 + ex + 1] = INKM; MC[(ey + 1) * 128 + ex] = INKM; MC[(ey + 1) * 128 + ex + 1] = INKM; }
+        }
+        // his nose and his grin
+        if (nose === 'Hook' || nose === 'Long Pointy') mBlob(55, hy0, 64, hy0 + 6, mTri(56, hy0, 64, hy0 + 5, 56, hy0 + 6), HIDED);
+        else mBlob(54, hy0 + 1, 60, hy0 + 6, mEll(57, hy0 + 3.5, nose === 'Button' ? 2 : 3, 2.5), nose === 'Bulb' ? hexw('#d86a6a') : nose === 'Pig' ? hexw('#e89aa8') : HIDED);
+        mBlob(49, hy0 + 6, 65, hy0 + 10, mEll(57, hy0 + 8, 7.5, 2.4), hexw('#5a1a22'));
+        const tooth = grin === 'Gold Grill' ? GOLDM : WHITEM;
+        if (grin === 'Gap' || grin === 'Buck Teeth') { MC[(hy0 + 7) * 128 + 55] = tooth; MC[(hy0 + 7) * 128 + 56] = tooth; MC[(hy0 + 7) * 128 + 59] = tooth; MC[(hy0 + 7) * 128 + 60] = tooth; }
+        else for (let X = 51; X <= 63; X += 2) MC[(hy0 + 7) * 128 + X] = tooth;
+        // hair tufts beside the crown (unless bald)
+        if (hair !== 'Bald') for (const sd of [-1, 1]) mBlob(57 + sd * 9 - 3, hy0 - hh - 4, 57 + sd * 9 + 3, hy0 - hh + 3, mTri(57 + sd * 6, hy0 - hh + 3, 57 + sd * 12, hy0 - hh + 3, 57 + sd * 11, hy0 - hh - 4), hexw(hair === 'Wild' || hair === 'Mohawk' ? '#2a2420' : HIDES[hide][1]));
+        // the crown: a gold band and points, a jewel for each crowning
+        const cy0 = hy0 - hh - 1;
+        mBlob(45, cy0 - 9, 69, cy0 + 1, (X, Y) => (Y >= cy0 - 3 && Y <= cy0 && X >= 46 && X <= 68) || [47, 52, 57, 62, 67].some(px => mTri(px - 3, cy0 - 3, px + 3, cy0 - 3, px, cy0 - 9)(X, Y)), GOLDM);
+        for (let k = 0; k < Math.min(5, 1 + crowns); k++) MC[(cy0 - 2) * 128 + 49 + k * 4] = [VERM, hexw('#3a7a3c'), LAPIS2, WHITEM, VERM][k];
+        // the margin: a vine with gold leaves, his pet and two little gremlins climbing it
+        for (let Y = 8; Y <= 120; Y++) { const X = Math.round(108 + Math.sin(Y * 0.12) * 6); MC[Y * 128 + X] = GREENM; MC[Y * 128 + X + 1] = GREENM; if (Y % 12 === 0) mBlob(X - 5, Y - 3, X - 1, Y + 1, mEll(X - 3, Y - 1, 2.5, 2), Y % 24 ? GREENL : GOLDM); }
+        const pal2 = [[106, 30], [104, 70], [110, 50]];
+        // (every crowning gilds one of them)
+        pal2.forEach(([gx, gy], q) => { const gc = q < crowns ? GOLDM : HIDEM; mBlob(gx - 5, gy - 4, gx + 5, gy + 5, mEll(gx, gy + 1, 4, 4), gc); mBlob(gx - 8, gy - 6, gx - 2, gy, mTri(gx - 3, gy - 2, gx - 8, gy - 6, gx - 3, gy + 1), gc); mBlob(gx + 2, gy - 6, gx + 8, gy, mTri(gx + 3, gy - 2, gx + 8, gy - 6, gx + 3, gy + 1), gc); if (q < crowns) { MC[(gy - 1) * 128 + gx - 2] = GOLDH; MC[(gy + 2) * 128 + gx + 2] = GOLDH; } MC[gy * 128 + gx - 1] = INKM; MC[gy * 128 + gx + 2] = INKM; });
+        const PETC = { Rat: '#b0acb6', Snail: '#d9733a', 'Bolt Bug': '#b8c0c8', 'Pet Rock': '#9a958a', 'Mini Gremlin': HIDES[hide][0], Moth: '#e8dcc0', 'Dangling Spider': '#2a2420', None: '#d8a820' }[pet];
+        mBlob(104, 98, 120, 110, pet === 'Moth' ? (X, Y) => mTri(112, 104, 104, 98, 106, 110)(X, Y) || mTri(112, 104, 120, 98, 118, 110)(X, Y) : pet === 'Snail' ? mEll(112, 103, 5, 5) : mEll(112, 104, 6, 4), hexw(PETC));
+        if (pet === 'Dangling Spider') for (const sd of [-1, 1]) for (let k = 0; k < 3; k++) { MC[(101 + k * 2) * 128 + 112 + sd * 7] = INKM; MC[(101 + k * 2) * 128 + 112 + sd * 8] = INKM; }
+        if (pet === 'Rat') for (let k = 0; k < 6; k++) MC[(106 + (k >> 1)) * 128 + 105 - k] = INKM;
+        // lines of script below the initial, with a red rubric
+        for (let L2 = 0; L2 < 4; L2++) { const y = 96 + L2 * 7; for (let X = 10; X <= 88; X++) if (Math.sin(X * 0.9 + L2 * 2) > -0.2 && (X + L2 * 5) % 13 !== 0) { MC[y * 128 + X] = L2 === 0 ? VERM : INKM; if ((X * 7 + L2) % 3 === 0) MC[(y - 1) * 128 + X] = L2 === 0 ? VERM : INKM; } }
+        mReady = true;
+      };
+      const manuscript = t => {
+        if (!mReady) paintPage();
+        R32.set(MC);
+        // the coins in flight, landing on the hoard
+        for (let q = mCoins.length - 1; q >= 0; q--) {
+          const cn = mCoins[q], k = (t - cn[2]) / 0.7;
+          if (k >= 1) { mCoins.splice(q, 1); mCoinsN++; mReady = false; if (mCoinsN % 10 === 0) { crowns++; crownAt = t; c.sound.hit('snare', 0.2); [0, 4, 7, 12, 16].forEach((dd, i) => c.sound.note(yelpKey - 5 + dd, { dur: 0.25, vel: 0.12, wave: 'square', cutoff: 2000, at: i * 0.08 })); } else c.sound.note(yelpKey + 12 + (mCoinsN % 5) * 2, { dur: 0.06, vel: 0.08, wave: 'square', cutoff: 3000 }); continue; }
+          // a gold disc spinning as it flies, along an arc with a trail of glints behind it
+          const path = kk => [cn[0] + (57 + cn[3] - cn[0]) * kk, cn[1] + (pileTop() - 4 - cn[1]) * kk - Math.sin(kk * Math.PI) * 40];
+          for (let q2 = 1; q2 <= 6; q2++) { const kk = k - q2 * 0.05; if (kk < 0) break; const [tx, ty] = path(kk); rput(tx, ty, q2 < 3 ? GOLDH : GOLDM); if (q2 < 4) rput(tx + 1, ty, GOLDM); }
+          const [X, Y] = path(k), wdt = Math.abs(Math.cos(k * 16)) * 4.2 + 1;
+          for (let v = -6; v <= 6; v++) for (let u = -6; u <= 6; u++) { const e2 = (u / wdt) ** 2 + (v / 5.5) ** 2; if (e2 <= 1.25) rput(X + u, Y + v, e2 > 0.72 ? INKM : e2 < 0.22 ? GOLDH : GOLDM); }
+        }
+        // a crowning: gold rays burst from the crown
+        if (t - crownAt < 1.6) { const k = (t - crownAt) / 1.6; for (let a = 0; a < 16; a++) { const an = a / 16 * 6.283; for (let r = 6 + k * 30; r < 12 + k * 40; r += 1) rput(57 + Math.cos(an) * r, 22 + Math.sin(an) * r * 0.8, a & 1 ? GOLDH : GOLDM); } }
+        // the little gremlins in the margin blink; the gold catches the light
+        if (Math.floor(t * 0.7) % 4 === 0) { const gc = crowns > 0 ? GOLDM : HIDEM; rput(105, 30, gc); rput(108, 30, gc); }
+        const gl = Math.floor((t * 40) % 220) - 40; for (let Y = 8; Y <= 90; Y++) { const X = gl - Y + 50; if (X >= 8 && X <= 90 && (Y < 12 || Y > 86 || X < 12 || X > 86)) rput(X, Y, GOLDH); }
+      };;
       const show = (t, dt) => {
         dt = Math.min(dt || 0, 0.06);
         const inp = c.input;
-        for (const spook of inp.taps()) {
+        if (legend) toyStep(t, dt, inp);
+        // the clockwork one takes a tap as a short, still release, so winding it never startles it
+        const taps = inp.taps(); if (legend === 'Clockwork') { taps.length = 0; if (clockTap) taps.push(clockTap); clockTap = null; }
+        for (const spook of taps) {
+          if (legend === 'Scrap King') { if (mCoins.length < 12) mCoins.push([spook.x * 128, spook.y * 128, t, (mCoins.length % 5 - 2) * 5]); c.sound.hit('blip', 0.22, { freq: 2600 }); continue; }
           jumpV = 1.6; burst = 1; petRun = 1;
           const pan = (spook.x - 0.5) * 0.5;
           c.sound.hit('snare', 0.18); c.sound.hit('blip', 0.3, { freq: 1700, at: 0.02 });
@@ -1084,7 +1516,9 @@
         burst = Math.max(0, burst - dt * 2.2);
         petRun = Math.max(0, petRun - dt * 0.8);
         const f = Math.floor((t + jitter) * 6) % 4;
-        const ox = nerves > 0.15 ? Math.round(Math.sin(t * 31 + jitter * 3) * Math.min(1, nerves * 1.6)) : 0, oy = -Math.round(jump * 0.09 * N);
+        const ox = (nerves > 0.15 ? Math.round(Math.sin(t * 31 + jitter * 3) * Math.min(1, nerves * 1.6)) : 0) + (legend === 'Phantom' ? Math.round(ghostX) + (litFor > 0.35 ? (Math.floor(t * 20) % 2 ? 1 : -1) : 0) : 0) + (legend === 'Clockwork' && running(t) ? [0, 2, 0, -2][Math.floor(t * 10) % 4] : 0);
+        // the clockwork one jolts with every tick of the clock; the phantom floats
+        const oy = -Math.round(jump * 0.09 * N) + (legend === 'Clockwork' ? ((t % 1) < 0.09 ? 1 : 0) - (running(t) ? [0, 2, 3, 2][Math.floor(t * 10) % 4] : 0) : 0) + (legend === 'Phantom' ? Math.round(Math.sin(t * 1.4) * 1.6) - 1 : 0);
         const hoverX = inp.inside ? inp.x * N : -99, hoverY = inp.inside ? inp.y * N : -99;
 
         // the live layer: eyes, the clockwork key, the crown's glint, the jar's lid and fireflies
@@ -1096,7 +1530,10 @@
           // the key winds itself slowly while idle (faster when nervous); a tap lets it run down fast, then it winds again
           const dk = Math.max(0, Math.min(0.1, t - keyLast)); keyLast = t;
           if (legT === t) keyV = -18;
+          if (running(t)) keyV = -22;
           keyV += (1.4 + nerves * 4 - keyV) * Math.min(1, dk * 1.3); keyPh += keyV * dk;
+          // a porthole in its chest: the mainspring's gear turning behind the glass
+          { const [cx, cy] = chestAt, gp = keyPh * 0.5; for (let y = cy - 5; y <= cy + 5; y++) for (let x = cx - 5; x <= cx + 5; x++) { const dx = x + 0.5 - cx, dy = y + 0.5 - cy, r = Math.hypot(dx, dy); if (r > 5) continue; if (r > 4) setD(x, y, dx + dy < 0 ? BRASS[2] : BRASS[0]); else if (r > 3.2) setD(x, y, BRASS[1]); else { const a = Math.atan2(dy, dx), tooth = Math.cos(8 * (a - gp)) > 0.2; setD(x, y, r < 0.9 ? BRASS[2] : r < (tooth ? 3 : 2.2) ? (dx + dy < -1 ? BRASS[2] : BRASS[1]) : GEARHOLE); } } setD(cx - 2, cy - 3, WHITEP); }
           drawKey(keyAt[0], keyAt[1], keyPh);
           // the cheek gear turns with it
           if (gearAt) {
@@ -1148,20 +1585,30 @@
             if (d < fl && (d < fl * 0.55 || ((x + y) & 1) === 0)) O[y * N + x] = GLOWC;
           }
         }
+        if (legend && legend !== 'Clockwork') legendBack(t);
         const gone = legend === 'Phantom' && t - legT < 0.7;
+        if (legend === 'Phantom') GM.fill(0);
+        if (RD) FIG.fill(0);
         for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-          const sxx = x - ox, syy = y - oy; if (sxx < 0 || syy < 0 || sxx >= N || syy >= N) continue;
+          const sxx = x - ox - (legend === 'Phantom' && y > 40 ? Math.round(Math.sin(t * 2.3 + y * 0.33) * (y - 40) / 9) : 0), syy = y - oy; if (sxx < 0 || syy < 0 || sxx >= N || syy >= N) continue;
           const s = syy * N + sxx;
-          if (E[s] !== 255) { O[y * N + x] = E[s]; continue; }
+          if (E[s] !== 255) {
+            if (legend === 'Phantom') { const ct = t - caughtAt; if (ct < 1.6 || (ct < 2.4 && ((x * 3 + y) % 5) / 5 >= (ct - 1.6) / 0.8)) continue; O[y * N + x] = litFor > 0.35 ? LG.GH[4] : ghostOf(E[s]); GM[y * N + x] = 2; continue; }
+            O[y * N + x] = E[s]; if (RD) FIG[y * N + x] = 2; continue;
+          }
           const v = L[s]; if (v === 255) continue;
           if (legend === 'Phantom') {
             // it thins out toward its tail, under the pointer, and all at once when touched
             if (gone && ((x * 3 + y) % 5) !== 0) continue;
-            const thin = syy > 56 ? ((x + 2 * y) & 3) !== 0 : syy > 49 ? ((x + y) & 1) === 0 : Math.hypot(x - hoverX, y - hoverY) < 8 ? ((x + y) & 1) === 0 : false;
-            if (thin) continue;
+            if (syy > tailY) { const u = (syy - tailY) / (N - tailY), w = tailW * Math.pow(1 - u, 0.9) + 0.6, cxT = hcX + Math.sin(t * 2 + syy * 0.22) * u * 7 + u * u * 6 * Math.sin(t * 0.7); if (Math.abs(sxx + 0.5 - cxT) > w) continue; if (u > 0.7 && ((x + y) & 1)) continue; }
+            const ct = t - caughtAt; if (ct < 1.6 || (ct < 2.4 && ((x * 3 + y) % 5) / 5 >= (ct - 1.6) / 0.8)) continue;
+            GM[y * N + x] = 1;
+            if (litFor > 0.35) { O[y * N + x] = v === LG.GH[0] || v === LG.GH[1] ? LG.GH[2] : LG.GH[4]; continue; }   // frozen: it blanches
           }
+          if (RD) FIG[y * N + x] = 1;
           O[y * N + x] = v;
         }
+        if (legend) legendFront(t);
         // the jar throws a warm dithered light on the hands, face and wall around it
         if (jarGlow) {
           const R = 10 + jarGlow * 6, jx = jarX + ox + 0.5, jy = jarY + oy + 0.5;
@@ -1207,6 +1654,13 @@
           stamp(Math.floor(t * 10) % 2 ? ['ww...ww', 'wdw.wdw', '.wdbdw.', '..wbw..', '...b...'] : ['.......', 'wwwbwww', 'wddbddw', '.ww.ww.', '.......'], mx - 3, my2 - 2, { w: MOTH, d: MOTHD, b: SPIDER });
         }
 
+        if (RD) {
+          // the clockwork one through a thermal camera, the Scrap King in an illuminated initial: each on a 128 grid of its own
+          if (legend === 'Clockwork') thermal(t, ox, oy); else manuscript(t);
+          rctx.putImageData(rimg, 0, 0);
+          ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(rcv, 0, 0, 128, 128, 0, 0, S, S);
+          return;
+        }
         for (let i = 0; i < NN; i++) PX[i] = P32[O[i]];
         cg.putImageData(img, 0, 0);
         ctx.setTransform(1, 0, 0, 1, 0, 0);

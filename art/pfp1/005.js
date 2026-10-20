@@ -209,6 +209,236 @@ Proto.add({
     const HEARTC = hx('#ff4a6a'), TONGUE = hx('#ff6a7a'), RIND = hx('#f0ffe4'), MSTRIPE = hx('#1e6a2a'), FRECK = hx('#8a4a2a');
     // a little painter for top things: rows of letters looked up in a colour map
     const sprite = (rows, x0, y0, map, k) => rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') P(x0 + i, y0 + j, map[r[i]], k === undefined ? 1 : k); });
+    // the face, the things on top, the limbs and the pal: shared by every cubeling and the legendaries
+    function drawEyes(L, R, both, blink, t) {
+        if (eyes === 'Bubbles' || eyes === 'Peeping') {
+          // the aquarium's and the mimic's eyes are drawn with them
+        } else if (eyes === 'Big Single') {
+          for (let s = 0; s < 4; s++) for (let v = 2; v < 8; v++) { const edge = s === 3 || v === 2 || v === 7; both(s, v, blink ? (v === 5 ? INK : (s === 3 ? MAT[1] : MAT[1])) : edge ? INK : WHITE); }
+          if (blink) { for (let s = 0; s < 4; s++) for (let v = 2; v < 8; v++) { L(s, v, v === 5 ? INK : MAT[1]); R(s, v, v === 5 ? INK : MAT[2]); } }
+          else { both(0, 4, INK); both(1, 4, INK); both(0, 5, INK); both(1, 5, INK); L(1, 4, WHITE); }
+        } else if (eyes === 'Visor') {
+          for (let s = 0; s < 12; s++) for (let v = 3; v < 5; v++) both(s, v, v === 3 ? hx('#4a78b8') : hx('#1e2e50'));
+          for (let s = 0; s < 12; s++) { L(s, 2, INK); R(s, 2, INK); L(s, 5, INK); R(s, 5, INK); }
+          L(12, 3, INK); L(12, 4, INK); R(12, 3, INK); R(12, 4, INK);
+          const sweep = Math.floor(t * 4) % 30 - 6;
+          for (let s = 0; s < 12; s++) if (s === sweep || s === sweep + 1) { L(s, 3, hx('#e8f8ff')); R(11 - s, 3, hx('#e8f8ff')); if (s === sweep) { L(s, 4, hx('#8ab8f0')); R(11 - s, 4, hx('#8ab8f0')); } }
+        } else {
+          for (const side of [L, R]) {
+            const sh = side === L ? MAT[1] : MAT[2];
+            if (blink && eyes !== 'Cross') { side(5, 5, INK); side(6, 5, INK); side(7, 5, INK); continue; }
+            if (shy) { side(4, 5, INK); side(5, 4, INK); side(6, 4, INK); side(7, 5, INK); continue; }
+            if (eyes === 'Dots') { side(5, 3, INK); side(5, 4, INK); side(6, 3, INK); side(6, 4, INK); side(5, 5, INK); side(6, 5, INK); }
+            else if (eyes === 'Wide') {
+              for (let s = 4; s < 8; s++) for (let v = 2; v < 7; v++) side(s, v, (s === 4 || s === 7) && (v === 2 || v === 6) ? sh : WHITE);
+              side(5, 4, INK); side(6, 4, INK); side(5, 5, INK); side(6, 5, INK);
+            } else if (eyes === 'Sleepy') { side(4, 4, INK); side(5, 5, INK); side(6, 5, INK); side(7, 4, INK); }
+            else if (eyes === 'Cross') { side(4, 3, INK); side(7, 3, INK); side(5, 4, INK); side(6, 4, INK); side(4, 5, INK); side(7, 5, INK); side(5, 4, INK); }
+            else if (eyes === 'Sparkle') {
+              side(5, 2, INK); side(6, 2, INK); for (let v = 3; v < 6; v++) for (let s = 4; s < 8; s++) side(s, v, INK); side(5, 6, INK); side(6, 6, INK);
+              side(5, 3, WHITE); side(6, 5, WHITE);
+            } else if (eyes === 'Heart') { side(3, 3, HEARTC); side(4, 3, HEARTC); side(6, 3, HEARTC); side(7, 3, HEARTC); for (let s = 3; s < 8; s++) side(s, 4, HEARTC); side(4, 5, HEARTC); side(5, 5, HEARTC); side(6, 5, HEARTC); side(5, 6, HEARTC); }
+            else if (eyes === 'Star') { side(5, 2, INK); side(6, 2, INK); for (let s = 4; s < 8; s++) side(s, 3, INK); side(5, 4, INK); side(6, 4, INK); side(4, 5, INK); side(7, 5, INK); }
+            else if (eyes === 'Happy' || (eyes === 'Wink' && side === R)) { side(4, 5, INK); side(5, 4, INK); side(6, 4, INK); side(7, 5, INK); }
+            else if (eyes === 'Wink') { side(5, 3, INK); side(5, 4, INK); side(6, 3, INK); side(6, 4, INK); side(5, 5, INK); side(6, 5, INK); }
+            else if (eyes === 'Anime Shine') {
+              for (let s = 4; s < 8; s++) for (let v = 2; v < 7; v++) side(s, v, v === 6 ? hx('#4a6ad8') : INK);
+              side(4, 2, sh); side(7, 2, sh); side(5, 3, WHITE); side(4, 3, WHITE); side(6, 5, WHITE);
+            } else if (eyes === 'Glasses') {
+              for (let s = 3; s < 9; s++) for (let v = 1; v < 7; v++) if (s === 3 || s === 8 || v === 1 || v === 6) side(s, v, hx('#3a3040'));
+              side(5, 3, INK); side(6, 3, INK); side(5, 4, INK); side(6, 4, INK);
+            } else if (eyes === 'Swirl') { for (let s = 4; s < 8; s++) side(s, 2, INK); side(7, 3, INK); side(5, 4, INK); side(7, 4, INK); side(5, 5, INK); side(6, 5, INK); side(7, 5, INK); }
+            else if (eyes === 'Content') { side(4, 4, INK); side(7, 4, INK); side(5, 5, INK); side(6, 5, INK); }
+            else if (eyes === 'Looking Up') {
+              for (let s = 4; s < 8; s++) for (let v = 2; v < 7; v++) side(s, v, (s === 4 || s === 7) && (v === 2 || v === 6) ? sh : WHITE);
+              side(5, 2, INK); side(6, 2, INK); side(5, 3, INK); side(6, 3, INK);
+            }
+          }
+        }
+    }
+    function drawMouth(L, R, both, t) {
+        if (mouth === 'Smile') { both(0, 9, INK); both(1, 9, INK); both(2, 8, INK); }
+        else if (mouth === 'Open') { both(0, 8, INK); both(1, 8, INK); both(2, 8, INK); both(0, 9, INK); both(1, 9, hx('#ff6a7a')); both(2, 9, INK); both(0, 10, hx('#ff6a7a')); both(1, 10, INK); }
+        else if (mouth === 'Teeth') { for (let s = 0; s < 4; s++) { both(s, 8, INK); both(s, 9, s % 2 ? INK : WHITE); both(s, 10, INK); } }
+        else if (mouth === 'Wavy') { for (let s = 0; s < 5; s++) both(s, 9 + (s % 2), INK); }
+        else if (mouth === 'Cat') { both(0, 8, INK); both(1, 9, INK); both(2, 9, INK); both(3, 8, INK); }
+        else if (mouth === 'Blep' || mouth === 'Fang' || mouth === 'Drool') {
+          both(0, 9, INK); both(1, 9, INK); both(2, 8, INK);
+          if (mouth === 'Blep') { L(0, 10, TONGUE); L(1, 10, TONGUE); L(0, 11, TONGUE); }
+          if (mouth === 'Fang') L(1, 10, WHITE);
+          if (mouth === 'Drool') R(2, 9 + Math.floor(t * 1.2) % 3, hx('#8ad8ff'));
+        } else if (mouth === 'Oh') { both(0, 8, INK); both(1, 9, INK); both(0, 10, INK); both(0, 9, hx('#6a1a2a')); }
+        else if (mouth === 'Smirk') { L(0, 9, INK); L(1, 9, INK); L(2, 9, INK); R(0, 9, INK); R(1, 8, INK); R(2, 7, INK); }
+    }
+    function drawTop(t, ty) {
+        const cx = 20, cy = ty + 7;
+        const D = (x, y, col) => P(x, y, col, 1);
+        if (top === 'Sprout') {
+          const sway = Math.sin(t * 1.4) > 0.5 ? 1 : 0;
+          for (let y = cy - 4; y < cy; y++) D(cx, y, hx('#3a8a3a'));
+          D(cx - 1 + sway, cy - 5, hx('#5ac85a')); D(cx - 2 + sway, cy - 5, hx('#5ac85a')); D(cx - 2 + sway, cy - 6, hx('#8ae87a')); D(cx - 3 + sway, cy - 6, hx('#5ac85a'));
+          D(cx + 1 + sway, cy - 5, hx('#5ac85a')); D(cx + 2 + sway, cy - 5, hx('#5ac85a')); D(cx + 2 + sway, cy - 6, hx('#8ae87a')); D(cx + 3 + sway, cy - 6, hx('#5ac85a'));
+          D(cx + sway, cy - 5, hx('#3a8a3a'));
+        } else if (top === 'Candle') {
+          for (let y = cy - 6; y < cy; y++) { D(cx - 1, y, hx('#fff4e0')); D(cx, y, hx('#e8d8c0')); }
+          D(cx, cy - 7, INK);
+          const f = Math.floor(t * 7) % 3;
+          D(cx - (f === 1 ? 1 : 0), cy - 8, hx('#ffb030')); D(cx, cy - 8, hx('#ffe070')); D(cx - (f === 2 ? 1 : 0), cy - 9, hx('#ffe070')); D(cx - 1, cy - 10 + (f === 0 ? 1 : 0), hx('#ff8a20'));
+        } else if (top === 'Mushroom') {
+          for (let y = cy - 3; y < cy; y++) { D(cx - 1, y, hx('#f4ecd8')); D(cx, y, hx('#d8ccb0')); }
+          for (let y = cy - 7; y < cy - 3; y++) for (let x = cx - 5; x < cx + 5; x++) {
+            const w = [2, 4, 5, 5][y - (cy - 7)];
+            if (x >= cx - w && x < cx + w) D(x, y, ((x === cx - 3 && y === cy - 5) || (x === cx + 2 && y === cy - 6) || (x === cx && y === cy - 4)) ? WHITE : hx('#e83a3a'));
+          }
+        } else if (top === 'Snow') {
+          for (let x = 6; x < 34; x++) {
+            const k = x < 20 ? 19 - x : x - 20, step = k >> 1;
+            // snow lies only where the cube is (not in a bite or a cut corner)
+            if (shape !== 'Cube' && !(ty + 13 - step >= 0 && kind[(ty + 13 - step) * N + x])) continue;
+            for (let y = ty + step; y < ty + 14 - step; y++) if (shape === 'Cube' || (y >= 0 && kind[y * N + x])) D(x, y, (x + 2 * y) % 11 === 0 ? hx('#dceefa') : WHITE);
+            D(x, ty + step - 1 - topAdd[k] - (topCut[k] ? -topCut[k] : 0), WHITE);
+            D(x, ty + 14 - step, x < 20 ? hx('#eef6fc') : hx('#dceefa'));
+            if (k % 5 === 2 || k % 7 === 5) { D(x, ty + 15 - step, x < 20 ? hx('#eef6fc') : hx('#dceefa')); if (k % 5 === 2) D(x, ty + 16 - step, hx('#dceefa')); }
+          }
+        } else if (top === 'Little Tree') {
+          for (let y = cy - 3; y < cy; y++) { D(cx - 1, y, hx('#6a4020')); D(cx, y, hx('#4a2a10')); }
+          for (let r = 0; r < 4; r++) for (let x = cx - 1 - (r + 1); x <= cx + r; x++) D(x, cy - 4 - (3 - r) * 2, (x < cx ? hx('#4ab05a') : hx('#2e8040'))), D(x, cy - 3 - (3 - r) * 2, (x < cx ? hx('#3a9a4a') : hx('#226a34')));
+          D(cx - 1, cy - 12, hx('#ffe070'));
+        } else if (top === 'Birdie') {
+          const peck = Math.sin(t * 2.2) > 0.6 ? 1 : 0;
+          for (let x = cx - 2; x < cx + 2; x++) for (let y = cy - 4; y < cy - 1; y++) D(x, y, hx('#4a8ae8'));
+          D(cx - 2, cy - 1, hx('#e8a020')); D(cx + 1, cy - 1, hx('#e8a020'));
+          D(cx + 2, cy - 5 + peck, hx('#4a8ae8')); D(cx + 1, cy - 5 + peck, hx('#4a8ae8')); D(cx + 2, cy - 6 + peck, hx('#4a8ae8')); D(cx + 1, cy - 6 + peck, INK);
+          D(cx + 3, cy - 5 + peck, hx('#ffb020'));
+          D(cx - 3, cy - 4, hx('#2a5ab0')); D(cx - 1, cy - 3, hx('#8ab8ff'));
+        } else if (top === 'Party Hat') {
+          for (let y = cy - 8; y < cy; y++) { const w = ((y - (cy - 8)) >> 1) + 1; for (let x = cx - w; x < cx + w; x++) D(x, y, (y + (x > cx ? 1 : 0)) % 3 === 0 ? hx('#ffd84a') : hx('#ff7aa8')); }
+          D(cx - 1, cy - 9, WHITE); D(cx, cy - 9, WHITE); D(cx, cy - 10, WHITE);
+        } else if (top === 'Bow') {
+          sprite(['rr....rr', 'rRr..rRr', 'rRRkkRRr', 'rRr..rRr', 'rr....rr'], cx - 4, cy - 5, { r: hx('#ff4a6a'), R: hx('#ff8aa0'), k: hx('#c82a48') });
+        } else if (top === 'Cherries') {
+          const sw = Math.sin(t * 1.5) > 0.5 ? 1 : 0;
+          for (let k = 0; k < 4; k++) { D(cx - 2 + (k >> 1), cy - 4 - k, hx('#3a8a3a')); D(cx + 1 - (k >> 2), cy - 3 - k, hx('#3a8a3a')); }
+          D(cx, cy - 8, hx('#5ac85a')); D(cx + 1, cy - 8, hx('#5ac85a')); D(cx + 1, cy - 9, hx('#8ae87a'));
+          sprite(['.rr.', 'rRrr', 'rrrr', '.rr.'], cx - 5 + sw, cy - 4, { r: hx('#e8243a'), R: hx('#ff9aa8') });
+          sprite(['.rr.', 'rRrr', 'rrrr', '.rr.'], cx, cy - 3, { r: hx('#d01e34'), R: hx('#ff9aa8') });
+        } else if (top === 'Daisy') {
+          const sway = Math.sin(t * 1.2) > 0.4 ? 1 : 0;
+          for (let y = cy - 5; y < cy; y++) D(cx, y, hx('#3a8a3a'));
+          D(cx + 1, cy - 3, hx('#5ac85a'));
+          sprite(['.w.', 'wyw', '.w.'], cx - 1 + sway, cy - 8, { w: WHITE, y: hx('#ffc830') });
+          D(cx - 2 + sway, cy - 7, WHITE); D(cx + 2 + sway, cy - 7, WHITE);
+        } else if (top === 'Halo') {
+          const hb = Math.sin(t * 1.6) > 0 ? 1 : 0;
+          for (let y = cy - 9; y < cy - 4; y++) for (let x = cx - 6; x < cx + 6; x++) { const d = ((x + 0.5 - cx) / 4.6) ** 2 + ((y + 0.5 - (cy - 7)) / 1.5) ** 2; if (d > 0.5 && d < 1.15) P(x, y - hb, hx('#ffe060'), 0); }
+        } else if (top === 'Antenna') {
+          for (let y = cy - 6; y < cy; y++) D(cx, y, INK);
+          const on = Math.sin(t * 2.2) > 0;
+          sprite(['bb', 'bb'], cx - 1 + 1, cy - 8, { b: on ? hx('#ff4a6a') : hx('#ffc0cc') });
+        } else if (top === 'Propeller') {
+          for (let x = cx - 3; x < cx + 3; x++) { D(x, cy - 1, hx('#4a8ae8')); if (Math.abs(x + 0.5 - cx) < 2) D(x, cy - 2, x % 2 ? hx('#ffd84a') : hx('#e84a4a')); }
+          D(cx, cy - 3, INK);
+          const f = Math.floor(t * 8) % 2;
+          for (let x = cx - (f ? 4 : 1); x < cx + (f ? 5 : 2); x++) D(x, cy - 4, hx('#e84a4a'));
+        } else if (top === 'Baby Cube') {
+          const py0 = cy - 9 - (Math.sin(t * 2 + 2) > 0.85 ? 1 : 0);
+          for (let x = cx - 4; x < cx + 4; x++) {
+            const k = x < cx ? cx - 1 - x : x - cx, st = k >> 1;
+            for (let y = py0 + st; y < py0 + 4 - st; y++) D(x, y, MAT[0]);
+            for (let v = 0; v < 4; v++) D(x, py0 + 4 - st + v, x < cx ? MAT[1] : MAT[2]);
+          }
+          D(cx - 2, py0 + 5, INK); D(cx + 1, py0 + 5, INK);
+        } else if (top === 'Egg Nest') {
+          const wob = Math.sin(t * 3) > 0.7 ? 1 : 0;
+          for (let x = cx - 4; x < cx + 4; x++) { D(x, cy - 1, hx('#8a5a2a')); D(x, cy - 2, (x % 2) ? hx('#b07a3a') : hx('#6a4018')); }
+          sprite(['.ee.', 'eEee', 'eeee', '.ee.'], cx - 2 + wob, cy - 6, { e: hx('#f8f0dc'), E: WHITE });
+        } else if (top === 'Rain Cloud') {
+          sprite(['..cc....', '.cCCc.c.', 'cCCCCCCc', '.cccccc.'], cx - 4, cy - 13, { c: hx('#c8d0e0'), C: hx('#eef2fa') });
+          for (let k = 0; k < 3; k++) { const ry = cy - 9 + ((Math.floor(t * 5) + k * 2) % 6); P(cx - 3 + k * 3, ry, hx('#6aa8f0'), 0); }
+        } else if (top === 'Cactus') {
+          sprite(['..g..', '..gG.', 'g.gG.', 'g.gGG', 'ggGG.', '..gG.', '.ttt.', '.tTt.'], cx - 3, cy - 8, { g: hx('#4ab05a'), G: hx('#2e8040'), t: hx('#d8703a'), T: hx('#b0502a') });
+          D(cx - 1, cy - 9, hx('#ff7ab0'));
+        } else if (top === 'Snail') {
+          const sx = cx - 3 + Math.round(Math.sin(t * 0.3) * 2);
+          sprite(['..ss..', '.sSss.', 'ssSsSs', 'sSSss.', 'bbbbbbb'], sx, cy - 6, { s: hx('#c87a3a'), S: hx('#8a4a1a'), b: hx('#f0dcb0') });
+          D(sx + 7, cy - 3, hx('#f0dcb0')); D(sx + 7, cy - 4, INK);
+        } else if (top === 'Beret') {
+          sprite(['.....k....', '..rrrrrr..', '.rrRRrrrr.', 'rrrrrrrrrr'], cx - 4, cy - 4, { r: hx('#c83a4a'), R: hx('#e86a78'), k: hx('#8a1a2a') });
+        } else if (top === 'Crown') {
+          for (let x = cx - 4; x < cx + 4; x++) { D(x, cy - 1, hx('#d89a10')); D(x, cy - 2, hx('#ffd040')); if ((x - cx + 4) % 3 === 0) { D(x, cy - 3, hx('#ffd040')); D(x, cy - 4, hx('#fff0a0')); } }
+          D(cx - 1, cy - 2, hx('#e8304a'));
+          D(cx, cy - 2, hx('#4ac0ff'));
+        }
+    }
+    function drawLimbs(t, ty, h, hop) {
+      const D = (x, y, col) => P(x, y, col, 1);
+        // stubby limbs, and whatever the little hand is holding
+        if (limbs.endsWith('Feet')) for (const fx of [14, 23]) {
+          const k = fx < 20 ? 19 - fx : fx - 20, fy = ty + 14 - (k >> 1) + h;
+          for (let x = fx; x < fx + 3; x++) { P(x, fy, MAT[2], 1); if (x !== fx + 1 || hop === 0) P(x, fy + 1, MAT[2], 1); }
+        }
+        if (limbs.startsWith('Arms')) {
+          const wave = Math.sin(t * 5) > 0 && ((t + hopAt) % 5) < 1.4, r = ty + 8 + Math.round(h * 0.55), ox = shape === 'Pillow' ? 1 : 0;
+          const held = holding !== 'Nothing', upL = held && wave, upR = !held && wave;
+          // the left arm hangs (or waves when the right hand is busy)
+          if (upL) { P(5 - ox, r, MAT[1], 1); P(4 - ox, r - 1, MAT[1], 1); P(3 - ox, r - 2, MAT[1], 1); for (const [a, b] of [[1, -4], [2, -4], [1, -3], [2, -3]]) P(a - ox, r + b, MAT[1], 1); P(1 - ox, r - 4, MAT[0], 1); }
+          else { P(5 - ox, r, MAT[1], 1); P(4 - ox, r, MAT[1], 1); P(3 - ox, r + 1, MAT[1], 1); for (const [a, b] of [[2, 2], [3, 2], [2, 3], [3, 3]]) P(a - ox, r + b, MAT[1], 1); P(2 - ox, r + 2, MAT[0], 1); }
+          // the right arm: up in front holding its thing, hanging when empty, waving now and then
+          const hx0 = 36 + ox, hy0 = r - 3;
+          if (held) { P(34 + ox, r, MAT[2], 1); P(35 + ox, r, MAT[2], 1); P(35 + ox, r - 1, MAT[2], 1); }
+          else if (upR) { P(34 + ox, r, MAT[2], 1); P(35 + ox, r - 1, MAT[2], 1); P(36 + ox, r - 2, MAT[2], 1); for (const [a, b] of [[37, -4], [38, -4], [37, -3], [38, -3]]) P(a + ox, r + b, MAT[2], 1); }
+          else { P(34 + ox, r, MAT[2], 1); P(35 + ox, r, MAT[2], 1); P(36 + ox, r + 1, MAT[2], 1); for (const [a, b] of [[36, 2], [37, 2], [36, 3], [37, 3]]) P(a + ox, r + b, MAT[2], 1); P(36 + ox, r + 2, MAT[1], 1); }
+          if (held) {
+            const SC = hx('#4a3a44');
+            if (holding === 'Balloon') { for (let y = hy0 - 6; y < hy0; y++) P(hx0 + ((y >> 1) & 1), y, SC, 0); sprite(['.bbb.', 'bBbbb', 'bBbbb', 'bbbbb', '.bbb.', '..b..'], hx0 - 1, hy0 - 12, { b: hx('#ff4a6a'), B: hx('#ffc0cc') }); }
+            else if (holding === 'Flower') { for (let y = hy0 - 4; y < hy0; y++) D(hx0, y, hx('#3a8a3a')); D(hx0 + 1, hy0 - 2, hx('#5ac85a')); sprite(['.pp.', 'pyyp', 'pyyp', '.pp.'], hx0 - 1, hy0 - 8, { p: hx('#ff6ac0'), y: hx('#ffd84a') }); }
+            else if (holding === 'Lollipop') { for (let y = hy0 - 3; y < hy0; y++) D(hx0, y, WHITE); sprite(['.ll.', 'lpLl', 'lLpl', '.ll.'], hx0 - 1, hy0 - 7, { l: hx('#ff4a8a'), p: hx('#ffe0ec'), L: hx('#ff8ab4') }); }
+            else if (holding === 'Tiny Flag') { for (let y = hy0 - 7; y < hy0; y++) D(hx0, y, INK); const fl = Math.floor(t * 3) % 2; sprite(fl ? ['ff..', 'ffff', 'fff.'] : ['fff.', 'ffff', 'ff..'], hx0 + 1, hy0 - 7, { f: hx('#2aa8ff') }); }
+            // the hand closed round it, in front of the stick
+            for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) P(hx0 + a, hy0 + b, MAT[2], 1);
+            P(hx0, hy0, MAT[1], 1);
+          }
+        }
+    }
+    function drawPal(t) {
+        // a tiny pal on the floor: its own little cube with a dot face
+        if (pal === 'Slime Pal' || pal === 'Bunny Pal' || pal === 'Duck Pal' || pal === 'Ghost Pal') {
+          const pc = palLeft ? 2 : 32, bob = Math.sin(t * 2.3 + 1) > 0.8 ? 1 : 0, py = 30 - bob;
+          const PAL = {
+            'Slime Pal': [['..ss..', '.ssSs.', 'sksskS', 'ssssss'], { s: hx('#7ae08a'), S: hx('#c8ffd0'), k: INK }],
+            'Bunny Pal': [['.w..w.', '.w..w.', 'wwwwww', 'wkwwkw', 'wwppww', '.wwww.'], { w: hx('#fff8f4'), k: INK, p: hx('#ffb0c0') }],
+            'Duck Pal': [['.yy...', 'ykyoo.', 'yyyy..', 'yyyyyy', '.yyyy.'], { y: hx('#ffe050'), k: INK, o: hx('#ff9a30') }],
+            'Ghost Pal': [['.www.', 'wwwww', 'wkwkw', 'wwwww', 'w.w.w'], { w: hx('#f4f8ff'), k: INK }],
+          }[pal];
+          sprite(PAL[0], pc, py + 5 - PAL[0].length, PAL[1]);
+        } else if (pal !== 'None') {
+          const PM = pal === 'Golden Pal' ? ['#ffe680', '#f0b830', '#b87c10'].map(hx) : MAT;
+          const pc = palLeft ? 5 : 35, py0 = 29 - (Math.sin(t * 2.3 + 1) > 0.8 ? 1 : 0);
+          for (let x = pc - 5; x < pc + 5; x++) {
+            const k = x < pc ? pc - 1 - x : x - pc, st = k >> 1;
+            for (let y = py0 + st; y < py0 + 5 - st; y++) P(x, y, PM[0], 1);
+            for (let v = 0; v < 5; v++) P(x, py0 + 5 - st + v, x < pc ? PM[1] : PM[2], 1);
+          }
+          const blinkP = ((t + 1.7) % 3.9) < 0.15;
+          P(pc - 2, py0 + 6 + (blinkP ? 1 : 0), INK, 1); P(pc + 1, py0 + 6 + (blinkP ? 1 : 0), INK, 1);
+          if (!blinkP) { P(pc - 2, py0 + 7, INK, 1); P(pc + 1, py0 + 7, INK, 1); }
+          P(pc - 1, py0 + 8, INK, 1); P(pc, py0 + 8, INK, 1);
+          if (pal === 'Golden Pal') { P(pc - 1, py0 + 1, WHITE, 1); P(pc, py0 + 2, WHITE, 1); }
+        }
+    }
+    function drawStuck(L, R, both) {
+        if (cheekStyle === 'Freckles') for (const side of [L, R]) { side(8, 7, FRECK); side(10, 7, FRECK); side(9, 8, FRECK); }
+        else if (cheekStyle === 'Hearts') for (const side of [L, R]) { side(8, 7, HEARTC); side(10, 7, HEARTC); side(9, 8, HEARTC); }
+        else if (cheekStyle === 'Bandage') { for (let s = 8; s < 11; s++) { R(s, 6, hx('#f4dcb8')); R(s, 7, hx('#f4dcb8')); } R(9, 6, hx('#d8b088')); }
+        else if (cheekStyle === 'Sticker') { L(9, 6, hx('#ffd84a')); L(10, 6, hx('#ffd84a')); L(9, 7, hx('#ffd84a')); L(10, 7, hx('#ffd84a')); }
+        if (extra === 'Scarf') {
+          for (let s = 0; s < 14; s++) { const sc = (s % 3 === 2) ? hx('#ffe0d0') : hx('#e8484a'); L(s, 11, sc); R(s, 11, sc); L(s, 12, hx('#c03038')); R(s, 12, hx('#c03038')); }
+          for (let v = 13; v < 17; v++) { L(9, v, hx('#e8484a')); L(10, v, v % 2 ? hx('#ffe0d0') : hx('#c03038')); }
+        } else if (extra === 'Bowtie') { const B1 = hx('#4a8ae8'), B2 = hx('#2a5ab0'); both(0, 12, B2); for (const sd of [L, R]) { sd(1, 11, B1); sd(1, 12, B1); sd(1, 13, B1); sd(2, 11, B1); sd(2, 13, B1); } }
+        else if (extra === 'Necklace') { for (let s = 1; s < 12; s += 2) { L(s, 11, hx('#ffd84a')); R(s, 11, hx('#ffd84a')); } both(0, 12, hx('#4ad8c8')); }
+        else if (extra === 'Star Sticker') { const ST = hx('#ffd84a'); R(9, 8, ST); R(8, 9, ST); R(9, 9, ST); R(10, 9, ST); R(9, 10, ST); }
+        else if (extra === 'Monocle' && eyes !== 'Big Single' && eyes !== 'Visor') { for (let s = 3; s < 9; s++) for (let v = 1; v < 7; v++) if (s === 3 || s === 8 || v === 1 || v === 6) R(s, v, hx('#e8b830')); for (let v = 7; v < 12; v++) R(8 + (v & 1), v, hx('#e8b830')); }
+    }
     function compose(t) {
       const ju = (t - jumpAt) / 0.5;
       const hop = (ju >= 0 && ju < 1 ? Math.round(Math.sin(Math.PI * ju) * 2.4) : ((t + hopAt) % hopEvery) < 0.35 ? 1 : 0) + (beamOn ? 2 : 0);
@@ -387,234 +617,24 @@ Proto.add({
         L(0, gv - 3, GOLDC); R(1, gv + 1, BRASS2); L(1, gv + 1, BRASS2);
       }
       fk = material === 'Hologram' ? 2 : 1;
-      if (eyes === 'Bubbles' || eyes === 'Peeping') {
-        // the aquarium's and the mimic's eyes are drawn with them
-      } else if (eyes === 'Big Single') {
-        for (let s = 0; s < 4; s++) for (let v = 2; v < 8; v++) { const edge = s === 3 || v === 2 || v === 7; both(s, v, blink ? (v === 5 ? INK : (s === 3 ? MAT[1] : MAT[1])) : edge ? INK : WHITE); }
-        if (blink) { for (let s = 0; s < 4; s++) for (let v = 2; v < 8; v++) { L(s, v, v === 5 ? INK : MAT[1]); R(s, v, v === 5 ? INK : MAT[2]); } }
-        else { both(0, 4, INK); both(1, 4, INK); both(0, 5, INK); both(1, 5, INK); L(1, 4, WHITE); }
-      } else if (eyes === 'Visor') {
-        for (let s = 0; s < 12; s++) for (let v = 3; v < 5; v++) both(s, v, v === 3 ? hx('#4a78b8') : hx('#1e2e50'));
-        for (let s = 0; s < 12; s++) { L(s, 2, INK); R(s, 2, INK); L(s, 5, INK); R(s, 5, INK); }
-        L(12, 3, INK); L(12, 4, INK); R(12, 3, INK); R(12, 4, INK);
-        const sweep = Math.floor(t * 4) % 30 - 6;
-        for (let s = 0; s < 12; s++) if (s === sweep || s === sweep + 1) { L(s, 3, hx('#e8f8ff')); R(11 - s, 3, hx('#e8f8ff')); if (s === sweep) { L(s, 4, hx('#8ab8f0')); R(11 - s, 4, hx('#8ab8f0')); } }
-      } else {
-        for (const side of [L, R]) {
-          const sh = side === L ? MAT[1] : MAT[2];
-          if (blink && eyes !== 'Cross') { side(5, 5, INK); side(6, 5, INK); side(7, 5, INK); continue; }
-          if (shy) { side(4, 5, INK); side(5, 4, INK); side(6, 4, INK); side(7, 5, INK); continue; }
-          if (eyes === 'Dots') { side(5, 3, INK); side(5, 4, INK); side(6, 3, INK); side(6, 4, INK); side(5, 5, INK); side(6, 5, INK); }
-          else if (eyes === 'Wide') {
-            for (let s = 4; s < 8; s++) for (let v = 2; v < 7; v++) side(s, v, (s === 4 || s === 7) && (v === 2 || v === 6) ? sh : WHITE);
-            side(5, 4, INK); side(6, 4, INK); side(5, 5, INK); side(6, 5, INK);
-          } else if (eyes === 'Sleepy') { side(4, 4, INK); side(5, 5, INK); side(6, 5, INK); side(7, 4, INK); }
-          else if (eyes === 'Cross') { side(4, 3, INK); side(7, 3, INK); side(5, 4, INK); side(6, 4, INK); side(4, 5, INK); side(7, 5, INK); side(5, 4, INK); }
-          else if (eyes === 'Sparkle') {
-            side(5, 2, INK); side(6, 2, INK); for (let v = 3; v < 6; v++) for (let s = 4; s < 8; s++) side(s, v, INK); side(5, 6, INK); side(6, 6, INK);
-            side(5, 3, WHITE); side(6, 5, WHITE);
-          } else if (eyes === 'Heart') { side(3, 3, HEARTC); side(4, 3, HEARTC); side(6, 3, HEARTC); side(7, 3, HEARTC); for (let s = 3; s < 8; s++) side(s, 4, HEARTC); side(4, 5, HEARTC); side(5, 5, HEARTC); side(6, 5, HEARTC); side(5, 6, HEARTC); }
-          else if (eyes === 'Star') { side(5, 2, INK); side(6, 2, INK); for (let s = 4; s < 8; s++) side(s, 3, INK); side(5, 4, INK); side(6, 4, INK); side(4, 5, INK); side(7, 5, INK); }
-          else if (eyes === 'Happy' || (eyes === 'Wink' && side === R)) { side(4, 5, INK); side(5, 4, INK); side(6, 4, INK); side(7, 5, INK); }
-          else if (eyes === 'Wink') { side(5, 3, INK); side(5, 4, INK); side(6, 3, INK); side(6, 4, INK); side(5, 5, INK); side(6, 5, INK); }
-          else if (eyes === 'Anime Shine') {
-            for (let s = 4; s < 8; s++) for (let v = 2; v < 7; v++) side(s, v, v === 6 ? hx('#4a6ad8') : INK);
-            side(4, 2, sh); side(7, 2, sh); side(5, 3, WHITE); side(4, 3, WHITE); side(6, 5, WHITE);
-          } else if (eyes === 'Glasses') {
-            for (let s = 3; s < 9; s++) for (let v = 1; v < 7; v++) if (s === 3 || s === 8 || v === 1 || v === 6) side(s, v, hx('#3a3040'));
-            side(5, 3, INK); side(6, 3, INK); side(5, 4, INK); side(6, 4, INK);
-          } else if (eyes === 'Swirl') { for (let s = 4; s < 8; s++) side(s, 2, INK); side(7, 3, INK); side(5, 4, INK); side(7, 4, INK); side(5, 5, INK); side(6, 5, INK); side(7, 5, INK); }
-          else if (eyes === 'Content') { side(4, 4, INK); side(7, 4, INK); side(5, 5, INK); side(6, 5, INK); }
-          else if (eyes === 'Looking Up') {
-            for (let s = 4; s < 8; s++) for (let v = 2; v < 7; v++) side(s, v, (s === 4 || s === 7) && (v === 2 || v === 6) ? sh : WHITE);
-            side(5, 2, INK); side(6, 2, INK); side(5, 3, INK); side(6, 3, INK);
-          }
-        }
-      }
+      drawEyes(L, R, both, blink, t);
       fk = 1;
       if (shy && material !== 'Hologram') { L(7, 7, BLUSH); R(7, 7, BLUSH); L(8, 8, BLUSH); R(8, 8, BLUSH); L(10, 7, BLUSH); R(10, 7, BLUSH); }
       if (cheekStyle === 'Rosy' || (shy && legend !== 'Aquarium' && legend !== 'Mimic')) { L(8, 7, BLUSH); L(9, 7, BLUSH); R(8, 7, BLUSH); R(9, 7, BLUSH); }
       fk = material === 'Hologram' ? 2 : 1;
-      if (mouth === 'Smile') { both(0, 9, INK); both(1, 9, INK); both(2, 8, INK); }
-      else if (mouth === 'Open') { both(0, 8, INK); both(1, 8, INK); both(2, 8, INK); both(0, 9, INK); both(1, 9, hx('#ff6a7a')); both(2, 9, INK); both(0, 10, hx('#ff6a7a')); both(1, 10, INK); }
-      else if (mouth === 'Teeth') { for (let s = 0; s < 4; s++) { both(s, 8, INK); both(s, 9, s % 2 ? INK : WHITE); both(s, 10, INK); } }
-      else if (mouth === 'Wavy') { for (let s = 0; s < 5; s++) both(s, 9 + (s % 2), INK); }
-      else if (mouth === 'Cat') { both(0, 8, INK); both(1, 9, INK); both(2, 9, INK); both(3, 8, INK); }
-      else if (mouth === 'Blep' || mouth === 'Fang' || mouth === 'Drool') {
-        both(0, 9, INK); both(1, 9, INK); both(2, 8, INK);
-        if (mouth === 'Blep') { L(0, 10, TONGUE); L(1, 10, TONGUE); L(0, 11, TONGUE); }
-        if (mouth === 'Fang') L(1, 10, WHITE);
-        if (mouth === 'Drool') R(2, 9 + Math.floor(t * 1.2) % 3, hx('#8ad8ff'));
-      } else if (mouth === 'Oh') { both(0, 8, INK); both(1, 9, INK); both(0, 10, INK); both(0, 9, hx('#6a1a2a')); }
-      else if (mouth === 'Smirk') { L(0, 9, INK); L(1, 9, INK); L(2, 9, INK); R(0, 9, INK); R(1, 8, INK); R(2, 7, INK); }
+      drawMouth(L, R, both, t);
       fk = 1;
       // cheeks and things stuck on the faces
-      if (cheekStyle === 'Freckles') for (const side of [L, R]) { side(8, 7, FRECK); side(10, 7, FRECK); side(9, 8, FRECK); }
-      else if (cheekStyle === 'Hearts') for (const side of [L, R]) { side(8, 7, HEARTC); side(10, 7, HEARTC); side(9, 8, HEARTC); }
-      else if (cheekStyle === 'Bandage') { for (let s = 8; s < 11; s++) { R(s, 6, hx('#f4dcb8')); R(s, 7, hx('#f4dcb8')); } R(9, 6, hx('#d8b088')); }
-      else if (cheekStyle === 'Sticker') { L(9, 6, hx('#ffd84a')); L(10, 6, hx('#ffd84a')); L(9, 7, hx('#ffd84a')); L(10, 7, hx('#ffd84a')); }
-      if (extra === 'Scarf') {
-        for (let s = 0; s < 14; s++) { const sc = (s % 3 === 2) ? hx('#ffe0d0') : hx('#e8484a'); L(s, 11, sc); R(s, 11, sc); L(s, 12, hx('#c03038')); R(s, 12, hx('#c03038')); }
-        for (let v = 13; v < 17; v++) { L(9, v, hx('#e8484a')); L(10, v, v % 2 ? hx('#ffe0d0') : hx('#c03038')); }
-      } else if (extra === 'Bowtie') { const B1 = hx('#4a8ae8'), B2 = hx('#2a5ab0'); both(0, 12, B2); for (const sd of [L, R]) { sd(1, 11, B1); sd(1, 12, B1); sd(1, 13, B1); sd(2, 11, B1); sd(2, 13, B1); } }
-      else if (extra === 'Necklace') { for (let s = 1; s < 12; s += 2) { L(s, 11, hx('#ffd84a')); R(s, 11, hx('#ffd84a')); } both(0, 12, hx('#4ad8c8')); }
-      else if (extra === 'Star Sticker') { const ST = hx('#ffd84a'); R(9, 8, ST); R(8, 9, ST); R(9, 9, ST); R(10, 9, ST); R(9, 10, ST); }
-      else if (extra === 'Monocle' && eyes !== 'Big Single' && eyes !== 'Visor') { for (let s = 3; s < 9; s++) for (let v = 1; v < 7; v++) if (s === 3 || s === 8 || v === 1 || v === 6) R(s, v, hx('#e8b830')); for (let v = 7; v < 12; v++) R(8 + (v & 1), v, hx('#e8b830')); }
-      else if (extra === 'Headphones') {
+      drawStuck(L, R, both);
+      if (extra === 'Headphones') {
         for (let x = 5; x < 35; x++) { const u = (x + 0.5 - 20) / 15; if (Math.abs(u) <= 1) P(x, Math.round(ty + 6 - Math.sqrt(1 - u * u) * 9), hx('#3a3a4a'), 1); }
         for (const hx0 of [4, 33]) for (let y = ty + 5; y < ty + 10; y++) { P(hx0, y, hx('#3a3a4a'), 1); P(hx0 + 1, y, hx('#ff6a8a'), 1); P(hx0 + 2, y, hx('#3a3a4a'), 1); }
       }
 
       // what grows on top, standing at the middle of the top face
-      const cx = 20, cy = ty + 7;
-      const D = (x, y, col) => P(x, y, col, 1);
-      if (top === 'Sprout') {
-        const sway = Math.sin(t * 1.4) > 0.5 ? 1 : 0;
-        for (let y = cy - 4; y < cy; y++) D(cx, y, hx('#3a8a3a'));
-        D(cx - 1 + sway, cy - 5, hx('#5ac85a')); D(cx - 2 + sway, cy - 5, hx('#5ac85a')); D(cx - 2 + sway, cy - 6, hx('#8ae87a')); D(cx - 3 + sway, cy - 6, hx('#5ac85a'));
-        D(cx + 1 + sway, cy - 5, hx('#5ac85a')); D(cx + 2 + sway, cy - 5, hx('#5ac85a')); D(cx + 2 + sway, cy - 6, hx('#8ae87a')); D(cx + 3 + sway, cy - 6, hx('#5ac85a'));
-        D(cx + sway, cy - 5, hx('#3a8a3a'));
-      } else if (top === 'Candle') {
-        for (let y = cy - 6; y < cy; y++) { D(cx - 1, y, hx('#fff4e0')); D(cx, y, hx('#e8d8c0')); }
-        D(cx, cy - 7, INK);
-        const f = Math.floor(t * 7) % 3;
-        D(cx - (f === 1 ? 1 : 0), cy - 8, hx('#ffb030')); D(cx, cy - 8, hx('#ffe070')); D(cx - (f === 2 ? 1 : 0), cy - 9, hx('#ffe070')); D(cx - 1, cy - 10 + (f === 0 ? 1 : 0), hx('#ff8a20'));
-      } else if (top === 'Mushroom') {
-        for (let y = cy - 3; y < cy; y++) { D(cx - 1, y, hx('#f4ecd8')); D(cx, y, hx('#d8ccb0')); }
-        for (let y = cy - 7; y < cy - 3; y++) for (let x = cx - 5; x < cx + 5; x++) {
-          const w = [2, 4, 5, 5][y - (cy - 7)];
-          if (x >= cx - w && x < cx + w) D(x, y, ((x === cx - 3 && y === cy - 5) || (x === cx + 2 && y === cy - 6) || (x === cx && y === cy - 4)) ? WHITE : hx('#e83a3a'));
-        }
-      } else if (top === 'Snow') {
-        for (let x = 6; x < 34; x++) {
-          const k = x < 20 ? 19 - x : x - 20, step = k >> 1;
-          // snow lies only where the cube is (not in a bite or a cut corner)
-          if (shape !== 'Cube' && !(ty + 13 - step >= 0 && kind[(ty + 13 - step) * N + x])) continue;
-          for (let y = ty + step; y < ty + 14 - step; y++) if (shape === 'Cube' || (y >= 0 && kind[y * N + x])) D(x, y, (x + 2 * y) % 11 === 0 ? hx('#dceefa') : WHITE);
-          D(x, ty + step - 1 - topAdd[k] - (topCut[k] ? -topCut[k] : 0), WHITE);
-          D(x, ty + 14 - step, x < 20 ? hx('#eef6fc') : hx('#dceefa'));
-          if (k % 5 === 2 || k % 7 === 5) { D(x, ty + 15 - step, x < 20 ? hx('#eef6fc') : hx('#dceefa')); if (k % 5 === 2) D(x, ty + 16 - step, hx('#dceefa')); }
-        }
-      } else if (top === 'Little Tree') {
-        for (let y = cy - 3; y < cy; y++) { D(cx - 1, y, hx('#6a4020')); D(cx, y, hx('#4a2a10')); }
-        for (let r = 0; r < 4; r++) for (let x = cx - 1 - (r + 1); x <= cx + r; x++) D(x, cy - 4 - (3 - r) * 2, (x < cx ? hx('#4ab05a') : hx('#2e8040'))), D(x, cy - 3 - (3 - r) * 2, (x < cx ? hx('#3a9a4a') : hx('#226a34')));
-        D(cx - 1, cy - 12, hx('#ffe070'));
-      } else if (top === 'Birdie') {
-        const peck = Math.sin(t * 2.2) > 0.6 ? 1 : 0;
-        for (let x = cx - 2; x < cx + 2; x++) for (let y = cy - 4; y < cy - 1; y++) D(x, y, hx('#4a8ae8'));
-        D(cx - 2, cy - 1, hx('#e8a020')); D(cx + 1, cy - 1, hx('#e8a020'));
-        D(cx + 2, cy - 5 + peck, hx('#4a8ae8')); D(cx + 1, cy - 5 + peck, hx('#4a8ae8')); D(cx + 2, cy - 6 + peck, hx('#4a8ae8')); D(cx + 1, cy - 6 + peck, INK);
-        D(cx + 3, cy - 5 + peck, hx('#ffb020'));
-        D(cx - 3, cy - 4, hx('#2a5ab0')); D(cx - 1, cy - 3, hx('#8ab8ff'));
-      } else if (top === 'Party Hat') {
-        for (let y = cy - 8; y < cy; y++) { const w = ((y - (cy - 8)) >> 1) + 1; for (let x = cx - w; x < cx + w; x++) D(x, y, (y + (x > cx ? 1 : 0)) % 3 === 0 ? hx('#ffd84a') : hx('#ff7aa8')); }
-        D(cx - 1, cy - 9, WHITE); D(cx, cy - 9, WHITE); D(cx, cy - 10, WHITE);
-      } else if (top === 'Bow') {
-        sprite(['rr....rr', 'rRr..rRr', 'rRRkkRRr', 'rRr..rRr', 'rr....rr'], cx - 4, cy - 5, { r: hx('#ff4a6a'), R: hx('#ff8aa0'), k: hx('#c82a48') });
-      } else if (top === 'Cherries') {
-        const sw = Math.sin(t * 1.5) > 0.5 ? 1 : 0;
-        for (let k = 0; k < 4; k++) { D(cx - 2 + (k >> 1), cy - 4 - k, hx('#3a8a3a')); D(cx + 1 - (k >> 2), cy - 3 - k, hx('#3a8a3a')); }
-        D(cx, cy - 8, hx('#5ac85a')); D(cx + 1, cy - 8, hx('#5ac85a')); D(cx + 1, cy - 9, hx('#8ae87a'));
-        sprite(['.rr.', 'rRrr', 'rrrr', '.rr.'], cx - 5 + sw, cy - 4, { r: hx('#e8243a'), R: hx('#ff9aa8') });
-        sprite(['.rr.', 'rRrr', 'rrrr', '.rr.'], cx, cy - 3, { r: hx('#d01e34'), R: hx('#ff9aa8') });
-      } else if (top === 'Daisy') {
-        const sway = Math.sin(t * 1.2) > 0.4 ? 1 : 0;
-        for (let y = cy - 5; y < cy; y++) D(cx, y, hx('#3a8a3a'));
-        D(cx + 1, cy - 3, hx('#5ac85a'));
-        sprite(['.w.', 'wyw', '.w.'], cx - 1 + sway, cy - 8, { w: WHITE, y: hx('#ffc830') });
-        D(cx - 2 + sway, cy - 7, WHITE); D(cx + 2 + sway, cy - 7, WHITE);
-      } else if (top === 'Halo') {
-        const hb = Math.sin(t * 1.6) > 0 ? 1 : 0;
-        for (let y = cy - 9; y < cy - 4; y++) for (let x = cx - 6; x < cx + 6; x++) { const d = ((x + 0.5 - cx) / 4.6) ** 2 + ((y + 0.5 - (cy - 7)) / 1.5) ** 2; if (d > 0.5 && d < 1.15) P(x, y - hb, hx('#ffe060'), 0); }
-      } else if (top === 'Antenna') {
-        for (let y = cy - 6; y < cy; y++) D(cx, y, INK);
-        const on = Math.sin(t * 2.2) > 0;
-        sprite(['bb', 'bb'], cx - 1 + 1, cy - 8, { b: on ? hx('#ff4a6a') : hx('#ffc0cc') });
-      } else if (top === 'Propeller') {
-        for (let x = cx - 3; x < cx + 3; x++) { D(x, cy - 1, hx('#4a8ae8')); if (Math.abs(x + 0.5 - cx) < 2) D(x, cy - 2, x % 2 ? hx('#ffd84a') : hx('#e84a4a')); }
-        D(cx, cy - 3, INK);
-        const f = Math.floor(t * 8) % 2;
-        for (let x = cx - (f ? 4 : 1); x < cx + (f ? 5 : 2); x++) D(x, cy - 4, hx('#e84a4a'));
-      } else if (top === 'Baby Cube') {
-        const py0 = cy - 9 - (Math.sin(t * 2 + 2) > 0.85 ? 1 : 0);
-        for (let x = cx - 4; x < cx + 4; x++) {
-          const k = x < cx ? cx - 1 - x : x - cx, st = k >> 1;
-          for (let y = py0 + st; y < py0 + 4 - st; y++) D(x, y, MAT[0]);
-          for (let v = 0; v < 4; v++) D(x, py0 + 4 - st + v, x < cx ? MAT[1] : MAT[2]);
-        }
-        D(cx - 2, py0 + 5, INK); D(cx + 1, py0 + 5, INK);
-      } else if (top === 'Egg Nest') {
-        const wob = Math.sin(t * 3) > 0.7 ? 1 : 0;
-        for (let x = cx - 4; x < cx + 4; x++) { D(x, cy - 1, hx('#8a5a2a')); D(x, cy - 2, (x % 2) ? hx('#b07a3a') : hx('#6a4018')); }
-        sprite(['.ee.', 'eEee', 'eeee', '.ee.'], cx - 2 + wob, cy - 6, { e: hx('#f8f0dc'), E: WHITE });
-      } else if (top === 'Rain Cloud') {
-        sprite(['..cc....', '.cCCc.c.', 'cCCCCCCc', '.cccccc.'], cx - 4, cy - 13, { c: hx('#c8d0e0'), C: hx('#eef2fa') });
-        for (let k = 0; k < 3; k++) { const ry = cy - 9 + ((Math.floor(t * 5) + k * 2) % 6); P(cx - 3 + k * 3, ry, hx('#6aa8f0'), 0); }
-      } else if (top === 'Cactus') {
-        sprite(['..g..', '..gG.', 'g.gG.', 'g.gGG', 'ggGG.', '..gG.', '.ttt.', '.tTt.'], cx - 3, cy - 8, { g: hx('#4ab05a'), G: hx('#2e8040'), t: hx('#d8703a'), T: hx('#b0502a') });
-        D(cx - 1, cy - 9, hx('#ff7ab0'));
-      } else if (top === 'Snail') {
-        const sx = cx - 3 + Math.round(Math.sin(t * 0.3) * 2);
-        sprite(['..ss..', '.sSss.', 'ssSsSs', 'sSSss.', 'bbbbbbb'], sx, cy - 6, { s: hx('#c87a3a'), S: hx('#8a4a1a'), b: hx('#f0dcb0') });
-        D(sx + 7, cy - 3, hx('#f0dcb0')); D(sx + 7, cy - 4, INK);
-      } else if (top === 'Beret') {
-        sprite(['.....k....', '..rrrrrr..', '.rrRRrrrr.', 'rrrrrrrrrr'], cx - 4, cy - 4, { r: hx('#c83a4a'), R: hx('#e86a78'), k: hx('#8a1a2a') });
-      } else if (top === 'Crown') {
-        for (let x = cx - 4; x < cx + 4; x++) { D(x, cy - 1, hx('#d89a10')); D(x, cy - 2, hx('#ffd040')); if ((x - cx + 4) % 3 === 0) { D(x, cy - 3, hx('#ffd040')); D(x, cy - 4, hx('#fff0a0')); } }
-        D(cx - 1, cy - 2, hx('#e8304a'));
-        D(cx, cy - 2, hx('#4ac0ff'));
-      }
-      // stubby limbs, and whatever the little hand is holding
-      if (limbs.endsWith('Feet')) for (const fx of [14, 23]) {
-        const k = fx < 20 ? 19 - fx : fx - 20, fy = ty + 14 - (k >> 1) + h;
-        for (let x = fx; x < fx + 3; x++) { P(x, fy, MAT[2], 1); if (x !== fx + 1 || hop === 0) P(x, fy + 1, MAT[2], 1); }
-      }
-      if (limbs.startsWith('Arms')) {
-        const wave = Math.sin(t * 5) > 0 && ((t + hopAt) % 5) < 1.4, r = ty + 8 + Math.round(h * 0.55), ox = shape === 'Pillow' ? 1 : 0;
-        const held = holding !== 'Nothing', upL = held && wave, upR = !held && wave;
-        // the left arm hangs (or waves when the right hand is busy)
-        if (upL) { P(5 - ox, r, MAT[1], 1); P(4 - ox, r - 1, MAT[1], 1); P(3 - ox, r - 2, MAT[1], 1); for (const [a, b] of [[1, -4], [2, -4], [1, -3], [2, -3]]) P(a - ox, r + b, MAT[1], 1); P(1 - ox, r - 4, MAT[0], 1); }
-        else { P(5 - ox, r, MAT[1], 1); P(4 - ox, r, MAT[1], 1); P(3 - ox, r + 1, MAT[1], 1); for (const [a, b] of [[2, 2], [3, 2], [2, 3], [3, 3]]) P(a - ox, r + b, MAT[1], 1); P(2 - ox, r + 2, MAT[0], 1); }
-        // the right arm: up in front holding its thing, hanging when empty, waving now and then
-        const hx0 = 36 + ox, hy0 = r - 3;
-        if (held) { P(34 + ox, r, MAT[2], 1); P(35 + ox, r, MAT[2], 1); P(35 + ox, r - 1, MAT[2], 1); }
-        else if (upR) { P(34 + ox, r, MAT[2], 1); P(35 + ox, r - 1, MAT[2], 1); P(36 + ox, r - 2, MAT[2], 1); for (const [a, b] of [[37, -4], [38, -4], [37, -3], [38, -3]]) P(a + ox, r + b, MAT[2], 1); }
-        else { P(34 + ox, r, MAT[2], 1); P(35 + ox, r, MAT[2], 1); P(36 + ox, r + 1, MAT[2], 1); for (const [a, b] of [[36, 2], [37, 2], [36, 3], [37, 3]]) P(a + ox, r + b, MAT[2], 1); P(36 + ox, r + 2, MAT[1], 1); }
-        if (held) {
-          const SC = hx('#4a3a44');
-          if (holding === 'Balloon') { for (let y = hy0 - 6; y < hy0; y++) P(hx0 + ((y >> 1) & 1), y, SC, 0); sprite(['.bbb.', 'bBbbb', 'bBbbb', 'bbbbb', '.bbb.', '..b..'], hx0 - 1, hy0 - 12, { b: hx('#ff4a6a'), B: hx('#ffc0cc') }); }
-          else if (holding === 'Flower') { for (let y = hy0 - 4; y < hy0; y++) D(hx0, y, hx('#3a8a3a')); D(hx0 + 1, hy0 - 2, hx('#5ac85a')); sprite(['.pp.', 'pyyp', 'pyyp', '.pp.'], hx0 - 1, hy0 - 8, { p: hx('#ff6ac0'), y: hx('#ffd84a') }); }
-          else if (holding === 'Lollipop') { for (let y = hy0 - 3; y < hy0; y++) D(hx0, y, WHITE); sprite(['.ll.', 'lpLl', 'lLpl', '.ll.'], hx0 - 1, hy0 - 7, { l: hx('#ff4a8a'), p: hx('#ffe0ec'), L: hx('#ff8ab4') }); }
-          else if (holding === 'Tiny Flag') { for (let y = hy0 - 7; y < hy0; y++) D(hx0, y, INK); const fl = Math.floor(t * 3) % 2; sprite(fl ? ['ff..', 'ffff', 'fff.'] : ['fff.', 'ffff', 'ff..'], hx0 + 1, hy0 - 7, { f: hx('#2aa8ff') }); }
-          // the hand closed round it, in front of the stick
-          for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) P(hx0 + a, hy0 + b, MAT[2], 1);
-          P(hx0, hy0, MAT[1], 1);
-        }
-      }
-      // a tiny pal on the floor: its own little cube with a dot face
-      if (pal === 'Slime Pal' || pal === 'Bunny Pal' || pal === 'Duck Pal' || pal === 'Ghost Pal') {
-        const pc = palLeft ? 2 : 32, bob = Math.sin(t * 2.3 + 1) > 0.8 ? 1 : 0, py = 30 - bob;
-        const PAL = {
-          'Slime Pal': [['..ss..', '.ssSs.', 'sksskS', 'ssssss'], { s: hx('#7ae08a'), S: hx('#c8ffd0'), k: INK }],
-          'Bunny Pal': [['.w..w.', '.w..w.', 'wwwwww', 'wkwwkw', 'wwppww', '.wwww.'], { w: hx('#fff8f4'), k: INK, p: hx('#ffb0c0') }],
-          'Duck Pal': [['.yy...', 'ykyoo.', 'yyyy..', 'yyyyyy', '.yyyy.'], { y: hx('#ffe050'), k: INK, o: hx('#ff9a30') }],
-          'Ghost Pal': [['.www.', 'wwwww', 'wkwkw', 'wwwww', 'w.w.w'], { w: hx('#f4f8ff'), k: INK }],
-        }[pal];
-        sprite(PAL[0], pc, py + 5 - PAL[0].length, PAL[1]);
-      } else if (pal !== 'None') {
-        const PM = pal === 'Golden Pal' ? ['#ffe680', '#f0b830', '#b87c10'].map(hx) : MAT;
-        const pc = palLeft ? 5 : 35, py0 = 29 - (Math.sin(t * 2.3 + 1) > 0.8 ? 1 : 0);
-        for (let x = pc - 5; x < pc + 5; x++) {
-          const k = x < pc ? pc - 1 - x : x - pc, st = k >> 1;
-          for (let y = py0 + st; y < py0 + 5 - st; y++) P(x, y, PM[0], 1);
-          for (let v = 0; v < 5; v++) P(x, py0 + 5 - st + v, x < pc ? PM[1] : PM[2], 1);
-        }
-        const blinkP = ((t + 1.7) % 3.9) < 0.15;
-        P(pc - 2, py0 + 6 + (blinkP ? 1 : 0), INK, 1); P(pc + 1, py0 + 6 + (blinkP ? 1 : 0), INK, 1);
-        if (!blinkP) { P(pc - 2, py0 + 7, INK, 1); P(pc + 1, py0 + 7, INK, 1); }
-        P(pc - 1, py0 + 8, INK, 1); P(pc, py0 + 8, INK, 1);
-        if (pal === 'Golden Pal') { P(pc - 1, py0 + 1, WHITE, 1); P(pc, py0 + 2, WHITE, 1); }
-      }
+      drawTop(t, ty);
+      drawLimbs(t, ty, h, hop);
+      drawPal(t);
       // outline the creature
       for (let y = 0; y < N; y++) for (let x = N - 1; x >= 0; x--) {
         if (kind[y * N + x]) continue;
@@ -766,6 +786,584 @@ Proto.add({
         voice(climb % 8);
         climb++;
       }
+    }
+    // ---------- the legendaries: three one-of-ones, each a scene of its own on the same 40-cell grid ----------
+    // (every roll and trait above is untouched; they only take over the drawing)
+    if (legend !== 'None') return legendary();
+    function legendary() {
+      const bay = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], dth = (x, y) => (bay[(y & 3) * 4 + (x & 3)] + 0.5) / 16;
+      // a colour ramp read with ordered dither, so light falls off in crisp pixel steps
+      const ramp = (cols, f, x, y) => cols[Math.max(0, Math.min(cols.length - 1, Math.floor(f * (cols.length - 1) + dth(x, y))))];
+      const H = tall ? 19 : slab ? 11 : 14, inp = c.input;
+      const zb = new Float32Array(N * N), fid = new Int16Array(N * N);
+      let cxS = 20, cyS = 0, ty = 7, hop = 0;
+      const pr = (X, Y, Z) => [cxS + X - Y, cyS + (X + Y) / 2 - Z];
+      // fill a parallelogram (three 3D corners: p0, p0 + the u side, p0 + the v side); shade(u, v, x, y) gives a colour
+      // or undefined; with depth on, the nearest surface wins
+      function face(p0, p1, p3, id, shade, depth) {
+        const a = pr(p0[0], p0[1], p0[2]), b = pr(p1[0], p1[1], p1[2]), d = pr(p3[0], p3[1], p3[2]);
+        const ux = b[0] - a[0], uy = b[1] - a[1], vx = d[0] - a[0], vy = d[1] - a[1], det = ux * vy - uy * vx;
+        if (Math.abs(det) < 0.05) return;
+        const xs = [a[0], b[0], d[0], b[0] + vx], ys = [a[1], b[1], d[1], b[1] + vy];
+        const x0 = Math.max(0, Math.floor(Math.min(...xs))), x1 = Math.min(N - 1, Math.ceil(Math.max(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys))), y1 = Math.min(N - 1, Math.ceil(Math.max(...ys)));
+        const z0 = p0[0] + p0[1] + p0[2], zu = p1[0] + p1[1] + p1[2] - z0, zv = p3[0] + p3[1] + p3[2] - z0;
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const px = x + 0.5 - a[0], py = y + 0.5 - a[1], u = (px * vy - py * vx) / det, v = (ux * py - uy * px) / det;
+          if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+          const i = y * N + x, z = z0 + u * zu + v * zv;
+          if (depth && z < zb[i]) continue;
+          const col = shade(u, v, x, y);
+          if (col === undefined) continue;
+          buf[i] = col; fid[i] = id; kind[i] = 1; zb[i] = z;
+        }
+      }
+      // a sprite of letters, and a thick line, in screen cells
+      const spr = (rows, x0, y0, map) => rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (map[r[i]] !== undefined) P(x0 + i, y0 + j, map[r[i]], 1); });
+      const line = (x0, y0, x1, y1, col) => { const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); for (let k = 0; k <= n; k++) P(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), col, 1); };
+      const blink = t => ((t + blinkAt) % blinkEvery) < 0.15;
+      const ease = k => k < 0 ? 0 : k > 1 ? 1 : k * k * (3 - 2 * k);
+
+      // ===== Aquarium: the room's lights are off and the tank is the only light, throwing caustics on the walls =====
+      const NIGHT = ['#050a1c', '#0a1530', '#10244a', '#1a3c68', '#2a6090', '#4596bc', '#86d8ec'].map(v => blendI(hx(v), rooms[0], 0.05));
+      const rampD = (cols, f, x, y, amt) => cols[Math.max(0, Math.min(cols.length - 1, Math.floor(f * (cols.length - 1) + 0.5 + (dth(x, y) - 0.5) * amt)))];
+      const WL = ['#0e4a7e', '#1a6fa8', '#2a96cc', '#4cc0e6', '#8ae0f6'].map(hx), WR = ['#0a3664', '#13558a', '#1f78b0', '#38a2d6', '#6ccaee'].map(hx);
+      const SURFC = ['#2a9ccc', '#5cc8ea', '#c8f6ff'].map(hx), GRAV = ['#f0c070', '#d88850', '#a87a5a', '#f4e8c8', '#e08aa0', '#7a90b0'].map(hx);
+      const FISHS = [['#ff7a1a', '#ffc070', '#ffb040', '#ffe2b8', '#d8520c'], ['#f4f0ec', '#ffffff', '#ff5a3a', '#fff4ee', '#e83a24'], ['#ff8a2a', '#ffd090', '#2a2026', '#fff0d8', '#d85a14']][grain[3] < 0.55 ? 0 : grain[3] < 0.82 ? 1 : 2].map(hx);
+      const caus = (x, y, t) => {
+        const a = Math.sin(x * 0.7 + t * 1.1 + Math.sin(y * 0.55 - t * 0.7) * 1.7), b = Math.sin(y * (y < 30 ? 0.75 : 1.6) - t * 0.9 + Math.sin(x * 0.42 + t * 0.6) * 2.1);
+        const v = Math.abs(a + b);
+        return v < 0.32 ? 1 - v / 0.32 : 0;
+      };
+      let glowK = 1;
+      function bgAq(x, y, t) {
+        // flat dark shades of the room, a soft halo round the tank, and the caustics: crisp bright ripples of light
+        // pouring up the wall above the open top and pooled on the floor in front
+        const pat = roomAt(x, y) !== rooms[0], wall = y < 30;
+        const dx = x + 0.5 - 20, dy = y + 0.5 - (ty + 15), up = ty + 7 - (y + 0.5);
+        const halo = Math.hypot(dx, dy * 1.15) / 21;
+        let lit = 0;
+        if (up > 0 && Math.abs(dx) < 7 + up * 1.1) lit = Math.max(0, 1 - up / 20);
+        if (!wall) { const q = Math.hypot(dx / 17, (y + 0.5 - 36.6) / 3); if (q < 1) lit = Math.max(lit, 1 - q * 0.6); }
+        if (halo < 0.75) lit = Math.max(lit, 0.75 - halo);
+        lit *= glowK;
+        let lv = halo + (dth(x, y) - 0.5) * 0.12 < 0.62 ? 2 : halo < 1.05 ? 1 : 0;
+        if (pat) lv = Math.min(lv + 1, 3);
+        if (!wall && lv > 0) lv--;
+        if (lit > 0.08) { const cs = caus(x, y, t); if (cs > 0.4) lv = Math.max(lv, lit > 0.5 ? 5 : 4); else if (cs > 0.05 && lit > 0.3) lv = Math.max(lv, 3); }
+        return NIGHT[lv];
+      }
+      let fishU = -2, fishDir = 1, fishV = 0, lookX = 0, lookY = 0, dartAt = -9, flipAt = -9, eaten = 0, fleeUntil = -9, fleeTo = 0, finger = null;
+      const food = [], hearts = [];
+      const tankBub = [];
+      function aquarium(t) {
+        hop = 0; ty = tall ? 3 : 7; cyS = ty + 7 + H;
+        const h = H;
+        kind.fill(0);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) buf[y * N + x] = bgAq(x, y, t);
+        // its feet, if it has any: little dark glass ones
+        if (limbs === 'Feet') for (const fx of [14, 23]) { const k = fx < 20 ? 19 - fx : fx - 20, fy = ty + 14 - (k >> 1) + h; for (let x = fx; x < fx + 3; x++) { P(x, fy, hx('#1a5a80'), 1); P(x, fy + 1, hx('#123e5c'), 1); } P(fx, fy, hx('#4ab0d8'), 1); }
+        const T = (u, bv, col) => { const k = u < 0 ? -u - 1 : u; if (k < 14 && bv >= 0 && bv < h) P(20 + u, ty + 14 - (k >> 1) + bv, col, 1); };
+        const tick = Math.floor(t * 8);
+        for (let x = 6; x < 34; x++) {
+          const k = x < 20 ? 19 - x : x - 20, step = k >> 1, left = x < 20;
+          // the open surface, from above: thin ripple lines drifting across it, glints
+          for (let y = ty + step; y < ty + 14 - step; y++) {
+            const yy = y - ty, w = Math.sin((x + 2 * yy) * 0.55 + t * 2) + Math.sin((x - 2 * yy) * 0.45 - t * 1.7);
+            P(x, y, w > 1.7 ? SURFC[2] : w > 1.05 ? SURFC[1] : SURFC[0], 1);
+          }
+          // the glass sides: water lit from inside, shafts of light sliding down through it, gravel, the tank's dark base
+          for (let v = 0; v < h; v++) {
+            const y = ty + 14 - step + v;
+            const shaft = Math.sin(k * 0.7 - v * 0.5 + t * 1.2 + (left ? 0 : 2)) > 0.78 ? 0.22 : 0;
+            let col = rampD(left ? WL : WR, 0.88 - 0.98 * v / h + shaft, x, y, 0.7);
+            if (v === 0) col = left ? hx('#d8f8ff') : hx('#a8e8fa');
+            else if (v === 1) col = (k + Math.floor(t * 3)) % 6 === 0 ? WHITE : left ? WL[4] : WR[4];
+            if (v >= h - 3 && v < h - 1) col = GRAV[(k * 7 + v * 3 + (left ? 0 : 2) + (grain[k % 40] > 0.6 ? 1 : 0)) % 6];
+            if (v === h - 1) col = left ? hx('#16263a') : hx('#0c1826');
+            P(x, y, col, 1);
+          }
+        }
+        // swaying grass at both ends, and a little sunken castle on the right
+        const blades = [[-12, 8, 0], [-10, 6, 1], [-8, 4, 0], [9, 5, 1], [11, 8, 0], [12, 6, 1]];
+        for (const [u, len, tone] of blades) for (let j = 0; j < len; j++) {
+          const bv = h - 4 - j, sw = Math.round(Math.sin(t * 1.3 + u * 0.7 + j * 0.35) * j / len * 1.6);
+          T(u + sw, bv, j === len - 1 ? hx('#9af08a') : tone ? hx('#2e9a50') : hx('#45c066'));
+        }
+        const CAS = { c: hx('#d8c8a8'), C: hx('#a89a80'), d: hx('#2a1c2a'), f: hx('#ff5a6a') };
+        ['..f..', '..c..', 'c.c.c', 'ccccc', 'cCdCc', 'cCdCc'].forEach((r, j) => { for (let i = 0; i < 5; i++) if (r[i] !== '.') T(3 + i, h - 9 + j, CAS[r[i]]); });
+        // the air stone and its stream of bubbles
+        T(-5, h - 4, hx('#5a6070')); T(-4, h - 4, hx('#7a8090'));
+        for (let i = 0; i < 5; i++) { const ph = (t * 0.55 + i / 5) % 1, bv = Math.round(h - 5 - ph * (h - 5)); if (bv > 1) T(-5 + (Math.sin(t * 3 + i * 2) > 0 ? 1 : 0), bv, i % 2 ? WHITE : hx('#bff2ff')); }
+        for (let i = tankBub.length - 1; i >= 0; i--) { const b = tankBub[i], bv = Math.round(b.v - (t - b.t0) * 7); if (t < b.t0) continue; if (bv < 2) { tankBub.splice(i, 1); continue; } T(b.u + (bv % 3 === 0 ? 1 : 0), bv, WHITE); }
+        // the goldfish: a fancy fantail, its double tail flowing, swimming laps round the tank
+        const fl = Math.floor(t * (t - dartAt < 0.8 ? 12 : 5)) % 2, fu = Math.round(fishU), fb = h - 10 + Math.round(fishV) - (t - flipAt < 0.9 ? Math.round(Math.sin(Math.PI * (t - flipAt) / 0.9) * 3) : 0);
+        const BODY = ['..ddd.....', 'oooooo....', 'ohhoooowo.', 'oooooooko.', 'ooooooooom', 'bbbbbbbb..', '.f....f...'];
+        const TAIL = fl ? ['...', '...', '.tt', 'ttt', '.tt', '...', '...'] : ['...', 't..', 'tt.', 'ttt', 'tt.', 't..', '...'];
+        const FROWS = BODY.map((r, j) => TAIL[j] + r);
+        // (after every fifth flake it eats it turns a happy golden somersault)
+        const flip = t - flipAt < 0.9, FS = flip ? [hx('#ffd23a'), hx('#fff6b0'), hx('#ffb020'), hx('#fff0c0'), hx('#c88a10')] : FISHS;
+        const fd = flip ? (Math.floor((t - flipAt) * 7) % 2 ? -fishDir : fishDir) : fishDir;
+        const FMAP = { o: FS[0], h: FS[1], d: FS[2], t: FS[2], b: FS[3], f: FS[2], m: FS[4], w: WHITE, k: INK };
+        FROWS.forEach((r, j) => { for (let i = 0; i < 13; i++) if (r[i] !== '.' && r[i] !== ' ') T(fu + (fd > 0 ? i - 6 : 6 - i), fb + j, FMAP[r[i]]); });
+        // the food you dropped, sinking (it rests on the gravel until the fish finds it)
+        for (const f of food) { if (t < f.t0) continue; const bv = Math.round(Math.min(h - 4, 1 + (t - f.t0) * 1.7)), u = f.u + (bv < h - 4 && Math.sin(t * 3 + f.t0 * 7) > 0.5 ? 1 : 0); if (t - f.t0 < 0.25) T(f.u, 0, WHITE); T(u, bv, f.c ? hx('#f0a050') : hx('#c8603a')); }
+        for (let i = hearts.length - 1; i >= 0; i--) { const k = t - hearts[i].t0; if (k > 1.6) { hearts.splice(i, 1); continue; } const bv = Math.round(hearts[i].bv - k * 6); if (bv >= 1) { T(hearts[i].u, bv, hx('#ff5a8a')); T(hearts[i].u + 1, bv, hx('#ff5a8a')); T(hearts[i].u, bv + 1, hx('#ff8ab0')); } }
+        if (grain[3] >= 0.82) for (const [i, j] of [[5, 2], [8, 4], [6, 4]]) T(fu + (fishDir > 0 ? i - 6 : 6 - i), fb + j, hx('#2a2026'));
+        // the glass: a bright edge down the front corner
+        for (let bv = 3; bv < h - 2; bv++) if (bv % 5 !== 4) T(-1, bv, hx('#e8fbff'));
+        // its eyes: two bubbles stuck on the glass, looking at you
+        const lx = lookX > 0.3 ? 1 : lookX < -0.3 ? -1 : 0, ly = lookY > 0.3 ? 1 : 0, bl = blink(t);
+        for (const sg of [-1, 1]) {
+          const c0 = sg < 0 ? -7 : 6, top = 2;
+          for (let i = -2; i <= 2; i++) for (let j = 0; j < 5; j++) {
+            if (Math.abs(i) === 2 && (j === 0 || j === 4)) continue;
+            const ring = Math.abs(i) === 2 || j === 0 || j === 4, kk = c0 + i < 0 ? -c0 - i - 1 : c0 + i, yy = ty + 14 - (kk >> 1) + top + j;
+            if (ring) T(c0 + i, top + j, (i < 0 && j < 2) || (j === 0 && i < 1) ? WHITE : hx('#bff0ff')); else if (bl && j === 2) T(c0 + i, top + j, INK); else if (yy >= 0 && yy < N) T(c0 + i, top + j, blendI(buf[yy * N + 20 + c0 + i], hx('#e8fbff'), 0.3));
+          }
+          if (bl) continue;
+          const p0 = c0 + (lx < 0 ? -1 : lx > 0 ? 0 : sg < 0 ? 0 : -1), q0 = top + 1 + ly;
+          T(p0, q0, INK); T(p0 + 1, q0, INK); T(p0, q0 + 1, INK); T(p0 + 1, q0 + 1, INK); T(p0, q0, WHITE);
+        }
+        // two kelp fronds grown up out of the water and over the rim, and bubbles escaping the surface
+        for (const [bx, by, len, ph] of [[15, ty + 5, 9, 0], [25, ty + 6, 7, 2]]) for (let j = 0; j < len; j++) {
+          const x = bx + Math.round(Math.sin(t * 1.1 + ph + j * 0.45) * j / len * 2.2), y = by - j;
+          P(x, y, j === len - 1 ? hx('#b8ff9a') : j % 2 ? hx('#3aae5a') : hx('#2a8a48'), 1);
+          if (j > 1 && j < len - 1) P(x + (j % 2 ? 1 : -1), y, j % 4 < 2 ? hx('#5ad078') : hx('#3aae5a'), 1);
+        }
+        for (let i = 0; i < 3; i++) { const ph = (t * 0.5 + i / 3) % 1, y = Math.round(ty + 9 - ph * 14), x = 15 + (Math.sin(t * 3 + i * 2) > 0 ? 1 : 0); if (ph < 0.92 && y >= 0) P(x, y, ph > 0.8 ? hx('#9ae8f8') : WHITE, 1); }
+        // light glinting along the top front edges
+        for (let k = 0; k < 14; k++) { const y = ty + 13 - (k >> 1); if ((k + tick) % 7 !== 0) { P(19 - k, y, hx('#bff4ff'), 1); P(20 + k, y, hx('#9ae8fa'), 1); } else { P(19 - k, y, WHITE, 1); P(20 + k, y, WHITE, 1); } }
+        // a pal waits by the tank, in its light
+        if (pal !== 'None') { const was = buf.slice(); drawPal(t); for (let i = 0; i < N * N; i++) if (buf[i] !== was[i]) { const x = i % N; buf[i] = blendI(blendI(buf[i], NIGHT[1], 0.3), hx('#4cc0e0'), 0.22); } }
+        // the tank's dark frame, and the light spilling past it
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const i = y * N + x;
+          if (kind[i]) continue;
+          if ((x > 0 && kind[i - 1]) || (x < N - 1 && kind[i + 1]) || (y > 0 && kind[i - N]) || (y < N - 1 && kind[i + N])) buf[i] = y < ty + 14 - Math.abs(x + 0.5 - 20) / 2 + 1 ? hx('#9ae6f6') : hx('#071426');
+        }
+      }
+
+      // ===== Mimic: deep in a torchlit dungeon, the chest yawns open on its teeth and its tongue; gold everywhere =====
+      const WOOD = [['#e0a060', '#b87838', '#8a5422', '#5a3210'], ['#c87a50', '#9c5430', '#6e3418', '#401c08'], ['#d8a870', '#ac7e46', '#7c5428', '#4a3014']][grain[5] < 0.5 ? 0 : grain[5] < 0.8 ? 1 : 2].map(hx);
+      const STONE = ['#120e18', '#1c1724', '#251f2f', '#2f283b', '#3a3248', '#4a3f58', '#5e4c62', '#7a5a5a', '#a07050', '#d09050'].map(hx);
+      const IRN = [hx('#2a2830'), hx('#4a4652'), hx('#7a7684')], BR = [hx('#7a5410'), hx('#c8901c'), hx('#f0c24a'), hx('#fff0a0')];
+      const GOLD = [hx('#8a5a08'), hx('#d89a18'), hx('#ffd040'), hx('#fff6b0')], MAW = [hx('#0c0204'), hx('#1e0408'), hx('#3a0a12'), hx('#5a1420')];
+      const TONG = [hx('#a02a40'), hx('#e0506a'), hx('#ff8aa0')], TEETH = [hx('#fffaf0'), hx('#d8ccb8')];
+      // coins spilled on the floor round the chest (where they lie varies by hash)
+      const COINS = [];
+      for (let i = 0; i < 14; i++) { const a = grain[(i * 3) % 40] * 6.28, r = 12 + grain[(i * 7 + 1) % 40] * 7; COINS.push([Math.round(20 + Math.cos(a) * r), Math.round(34 + Math.sin(a) * r * 0.3), i]); }
+      let lid = 0.7, chompAt = -9, lastYawn = 0, wasOver = false, lean = 0, linger = 0, caught = false, mood = '', moodUntil = -9, eatAt = -9;
+      const coins = [], mouthM = new Uint8Array(N * N);
+      const torchAt = t => 0.85 + 0.1 * Math.sin(t * 11) + 0.05 * Math.sin(t * 23 + 1);
+      function bgMim(x, y, t) {
+        const fl = torchAt(t);
+        let L = 0;
+        for (const [tx, tyy] of [[3.5, 11], [36.5, 11]]) L += Math.max(0, 1 - Math.hypot(x + 0.5 - tx, (y + 0.5 - tyy) * 1.1) / 15) * fl;
+        L += Math.max(0, 1 - Math.hypot((x + 0.5 - 20) / 16, (y + 0.5 - 30) / 9)) * 0.45;
+        let base = 0.3, f;
+        if (y < 28) {
+          // big rough stone blocks, a row of four or five, each row offset
+          const row = Math.floor((y + 40) / 5), yy = (y + 40) % 5, w = 7 + (row % 3), xx = ((x + 40 + row * 3) % w + w) % w;
+          if (yy === 4 || xx === 0) base = 0.02;
+          else if (yy === 0 || xx === 1) base = 0.42;
+          else base = 0.28 + ((row * 7 + Math.floor((x + 40 + row * 3) / w) * 13) % 5) * 0.03;
+          if (y === 27) base = 0.05;
+        } else {
+          // flagstones, in the cube's own 2:1 diamonds
+          const a = (x + 2 * y + 400) % 12, b = (x - 2 * y + 400) % 12;
+          base = a === 0 || b === 0 ? 0.04 : 0.2 + ((Math.floor((x + 2 * y + 400) / 12) + Math.floor((x - 2 * y + 400) / 12)) % 3) * 0.04;
+        }
+        f = base * (0.45 + 0.9 * L) + L * 0.18;
+        return ramp(STONE, Math.min(1, f), x, y);
+      }
+      function mimic(t) {
+        // the lid: breathing a little open, a big yawn now and then, snapping shut when it bites
+        const ch = t - chompAt;
+        hop = ch >= 0 && ch < 0.45 ? Math.round(Math.sin(Math.PI * ch / 0.45) * 2) : 0;
+        ty = (tall ? 5 : 9) - hop; cyS = ty + 7 + H; cxS = 20 + Math.round(lean) + (caught ? (Math.floor(t * 20) % 2 ? 1 : -1) : 0);
+        const hl = tall ? 6 : 5, hb = H - hl;
+        kind.fill(0); fid.fill(0); zb.fill(-1e9);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) buf[y * N + x] = bgMim(x, y, t);
+        // cobwebs high in the corners, a skull and bones by the wall
+        for (let k = 0; k < 6; k++) { P(k, 5 - k, STONE[6]); P(k, 0, k % 2 ? STONE[5] : STONE[6]); P(0, k, STONE[5]); if (k < 4) P(k + 1, 2 - (k >> 1) + 1, STONE[5]); }
+        const BONE = { w: hx('#e8dcc8'), s: hx('#b8a890'), k: hx('#1a1218') };
+        spr(['.www.', 'wwwww', 'wkwkw', 'wwwww', '.w.w.'], palLeft ? 32 : 3, 29, BONE); spr(['w...w', '.sss.', 'w...w'], palLeft ? 33 : 2, 35, BONE);
+        // the torches on the wall, flames licking
+        const ft = Math.floor(t * 9);
+        for (const tx of [3, 35]) {
+          spr(['.ii.', 'iIIi', '.ii.', '.ii.', '..i.'], tx, 12, { i: IRN[0], I: IRN[1] });
+          const FL = [['.y..', '.yo.', 'yYoo', 'oYYo', '.oo.'], ['..y.', '.oy.', 'ooYy', 'oYYo', '.oo.'], ['.y.y', '.yo.', 'oYyo', 'oYYo', '.oo.']][(ft + tx) % 3];
+          spr(FL, tx, 7, { y: hx('#ffd040'), Y: hx('#fff4b0'), o: hx('#ff7a1a') });
+        }
+        // spilled gold on the floor
+        for (const [x, y, i] of COINS) { const gl = (Math.floor(t * 3) + i * 5) % 17 === 0; P(x, y, gl ? GOLD[3] : GOLD[2]); P(x + 1, y, GOLD[1]); if (i % 3 === 0) P(x, y - 1, GOLD[2]); }
+        // the chest's shadow
+        for (let y = 34; y < 40; y++) for (let x = 5; x < 35; x++) if (((x + 0.5 - 20) / 15) ** 2 + ((y + 0.5 - 37.6) / 2.4) ** 2 < 1) buf[y * N + x] = STONE[0];
+        // the lid's angle: lid 0 shut .. 1 wide open (about 75 degrees)
+        const th = lid * 1.3, cs = Math.cos(th), sn = Math.sin(th);
+        const LW = (xl, y, zl) => [-7 + xl * cs - zl * sn, y, hb + xl * sn + zl * cs];
+        const lit = (col, k) => blendI(col, hx('#ffb060'), k);
+        // the hollow inside first (a dark maw: back walls, the floor heaped with gold), then the outside
+        const mawCol = (v, gx, gy) => MAW[Math.max(0, Math.min(3, Math.floor(v * 3.2 + dth(gx, gy))))];
+        face([-6, 6, hb], [-6, -6, hb], [-6, 6, 1], 20, (u, v, gx, gy) => mawCol(0.9 - v * 0.6, gx, gy), true);
+        face([6, -6, hb], [-6, -6, hb], [6, -6, 1], 21, (u, v, gx, gy) => mawCol(0.8 - v * 0.6, gx, gy), true);
+        face([-6, -6, 1.5], [6, -6, 1.5], [-6, 6, 1.5], 22, (u, v, gx, gy) => (gx * 3 + gy * 5 + Math.floor(t * 4)) % 11 === 0 ? GOLD[3] : (gx + gy) % 3 ? GOLD[1] : GOLD[2], true);
+        // the walls' rim, and the outside: planks, iron bands, brass corners
+        const plank = (u, v, sideK, front) => {
+          const yv = v * hb;
+          let col = (Math.floor(yv) % 3 === 2) ? WOOD[2 + sideK] : WOOD[sideK];
+          if (Math.abs(u - 0.27) < 0.045 || Math.abs(u - 0.73) < 0.045) col = Math.abs(u - 0.27) < 0.02 || Math.abs(u - 0.73) < 0.02 ? IRN[2] : IRN[1];
+          if ((u < 0.08 || u > 0.92) && (yv < 2 || yv > hb - 2)) col = BR[2 - sideK];
+          if (yv >= hb - 1) col = IRN[sideK];
+          if (front && Math.abs(u - 0.5) < 0.09 && yv < 3.5) col = yv > 1 && yv < 2.6 && Math.abs(u - 0.5) < 0.03 ? MAW[0] : BR[2 - sideK];
+          return col;
+        };
+        face([7, 7, hb], [-7, 7, hb], [7, 7, 0], 1, (u, v) => plank(u, v, 0, false), true);
+        face([7, 7, hb], [7, -7, hb], [7, 7, 0], 2, (u, v) => plank(u, v, 1, true), true);
+        face([-7, -7, hb], [7, -7, hb], [-7, 7, hb], 3, (u, v) => { const X = -7 + u * 14, Y = -7 + v * 14; if (X > -6 && X < 6 && Y > -6 && Y < 6) return undefined; return WOOD[0]; }, true);
+        // the lid: its outside, and (once it gapes) its dark red roof lined with teeth
+        face(LW(14, 7, hl), LW(0, 7, hl), LW(14, -7, hl), 4, (u, v) => { const yy = v * 14; return Math.abs(yy - 3.5) < 0.8 || Math.abs(yy - 10.5) < 0.8 ? IRN[1] : (Math.floor(u * 14) % 3 === 0 ? WOOD[2] : WOOD[1]); }, true);
+        face(LW(14, 7, 0), LW(0, 7, 0), LW(14, 7, hl), 5, (u, v) => { const zl = v * hl, xl = (1 - u) * 14; return Math.abs(xl - 3.5) < 0.8 || Math.abs(xl - 10.5) < 0.8 ? IRN[1] : zl < 1 ? IRN[0] : Math.floor(zl) % 3 === 1 ? WOOD[2] : WOOD[1]; }, true);
+        face(LW(14, 7, 0), LW(14, -7, 0), LW(14, 7, hl), 6, (u, v) => { const yy = u * 14, zl = v * hl; if (Math.abs(yy - 7) < 1.2) return zl < 1.5 ? BR[1] : BR[2]; return Math.abs(yy - 3.5) < 0.8 || Math.abs(yy - 10.5) < 0.8 ? IRN[2] : zl < 1 ? IRN[1] : WOOD[1]; }, true);
+        face(LW(14, -7, 0), LW(14, 7, 0), LW(0, -7, 0), 7, (u, v) => { const xl = (1 - v) * 14; return xl > 12.8 ? MAW[3] : MAW[(Math.floor(xl / 2.5) + Math.floor(u * 7)) % 2 + 1]; }, true);
+        const lidF = new Set([4, 5, 6]), maw = (x, y) => { if (x < 0 || y < 0 || x >= N || y >= N) return false; const f = fid[y * N + x]; return f === 7 || f >= 20; };
+        const PM = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < N && y < N && !lidF.has(fid[y * N + x])) P(x, y, col, 1); };
+        // teeth: a lower row standing on the front rims, an upper row hanging from the lid's edge
+        if (lid > 0.1) {
+          for (let s = -5; s <= 5; s += 2) for (const [X, Y] of [[6.5, s], [s, 6.5]]) { const [ax, ay] = pr(X, Y, hb); PM(Math.floor(ax), Math.floor(ay) - 1, TEETH[1]); if (lid > 0.25) PM(Math.floor(ax), Math.floor(ay) - 2, TEETH[0]); }
+          if (sn > 0.3) for (let s = -6; s <= 6; s += 2) { const [ex, ey] = pr(...LW(13.6, s, 0)), [fx2, fy2] = pr(...LW(13.6, s, -1.7)); line(ex, ey, fx2, fy2, TEETH[0]); }
+        }
+        // its eyes, glowing in the dark at the back of the mouth, following you
+        if (lid > 0.12) {
+          const [qx, qy] = pr(-3, -3, hb - 0.8), bl = blink(t);
+          const lk = held ? Math.sign(Math.round(held.x - 20)) : inp.inside ? Math.max(-1, Math.min(1, Math.round((inp.x - 0.5) * 4))) : Math.round(Math.sin(t * 0.7));
+          for (const s of [-1, 1]) {
+            const ex = Math.round(qx + s * 3.5) - 1, ey = Math.round(qy) - 1, ok = (x, y) => maw(x, y);
+            const happy = mood === 'happy' && t < moodUntil, sulk = mood === 'miss' && t < moodUntil;
+            const EY = happy ? ['e.e.', 'eee.', '.e..'] : sulk ? ['....', 'eeee', '.ee.'] : bl ? ['....', 'eeee', '....'] : ['.ee.', 'eEEe', '.ee.'];
+            EY.forEach((r, j) => { for (let i = 0; i < 4; i++) if (r[i] !== '.' && ok(ex + i, ey + j)) P(ex + i, ey + j, happy ? hx('#ff5a8a') : r[i] === 'E' ? hx('#fff4a0') : hx('#ff9a2a'), 1); });
+            if (!bl && !happy && ok(ex + 1 + (lk > 0 ? 1 : 0), ey + 1)) P(ex + 1 + (lk > 0 ? 1 : 0), ey + 1, hx('#1a0804'), 1);
+          }
+          // the tongue: out over the front corner, lolling down the planks, wagging
+          const [rx, ry] = pr(6.6, 6.6, hb), [mx, my] = pr(-1.5, -1.5, 2.5), wag = Math.round(Math.sin(t * (inp.inside ? 7 : 3)) * (lid > 0.5 ? 1 : 0.6));
+          const tipY = Math.round(ry) + 3 + Math.round(lid * 4), X0 = Math.round(rx);
+          const TC = i => i === -2 || i === 1 ? TONG[0] : i === -1 ? TONG[2] : TONG[1];
+          for (let k = 0; k <= 8; k++) { const f = k / 8, x = Math.round(mx + (rx - mx) * f), y = Math.round(my + (ry - 1 - my) * f); for (let i = -2; i <= 1; i++) PM(x + i, y, TC(i)); }
+          for (let y = Math.round(ry - 1); y <= tipY; y++) { const x = X0 + (y > ry + 2 ? wag : 0); for (let i = -2; i <= 1; i++) PM(x + i, y, y > ry + 1 && i === 0 ? TONG[0] : TC(i)); }
+          PM(X0 + wag - 1, tipY + 1, TONG[0]); PM(X0 + wag, tipY + 1, TONG[0]);
+          if ((t * 0.6) % 1 < 0.5) PM(X0 + wag, tipY + 2 + Math.floor((t * 1.2) % 1 * 3), hx('#c8f0ff'));
+        }
+        // its feet
+        if (limbs === 'Feet') for (const fx of [14, 23]) { const k = fx < 20 ? 19 - fx : fx - 20, fy = ty + 14 - (k >> 1) + H; for (let x = fx; x < fx + 3; x++) { P(x, fy, WOOD[3], 1); if (x !== fx + 1 || hop === 0) P(x, fy + 1, WOOD[3], 1); } }
+        if (pal !== 'None') { const was = buf.slice(); drawPal(t); for (let i = 0; i < N * N; i++) if (buf[i] !== was[i]) buf[i] = blendI(buf[i], hx('#4a2a1a'), 0.35); }
+        // where its mouth is this frame (the maw, and the air just over the rim)
+        mouthM.fill(0);
+        if (lid > 0.25) for (let i = 0; i < N * N; i++) if (fid[i] === 7 || fid[i] >= 20) { mouthM[i] = 1; for (let k = 1; k < 4; k++) if (i - k * N >= 0) mouthM[i - k * N] = 1; }
+        // a dark outline round the chest (and the gold it spits)
+        const sk = kind.slice();
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const i = y * N + x;
+          if (sk[i]) continue;
+          if ((x > 0 && sk[i - 1]) || (x < N - 1 && sk[i + 1]) || (y > 0 && sk[i - N]) || (y < N - 1 && sk[i + N])) buf[i] = hx('#0a0608');
+        }
+        for (let i = loot.length - 1; i >= 0; i--) {
+          const c0 = loot[i], u = t - c0.t0;
+          if (u < 0) continue;
+          if (u > 1.4) { loot.splice(i, 1); continue; }
+          const x = Math.round(c0.x + c0.vx * u), y = Math.round(c0.y - 14 * u + 20 * u * u);
+          P(x, y, Math.floor(u * 9) % 2 ? GOLD[2] : GOLD[3]); P(x + 1, y, GOLD[1]);
+        }
+        // the coins it spat, wherever you flicked them
+        for (const k of coins) {
+          const x = Math.round(k.x), y = Math.round(k.y), sp = k.rest ? 0 : Math.floor(t * 10 + k.x) % 4;
+          const R = sp === 1 ? ['.a.', '.b.', '.a.'] : sp === 3 ? ['.a.', 'aba', '.a.'] : ['aaa', 'aba', 'aaa'];
+          R.forEach((r, j) => { for (let i = 0; i < 3; i++) if (r[i] !== '.') P(x - 1 + i, y - 1 + j, r[i] === 'b' ? GOLD[3] : j === 2 ? GOLD[1] : GOLD[2], 1); });
+          if (k === held || ((Math.floor(t * 3) + Math.round(k.x)) % 7 === 0)) P(x + 1, y - 2, hx('#fffbe0'), 1);
+        }
+      }
+
+      // ===== Hologram: a projection of the cubeling, turning slowly on its projector before a striped sunset =====
+      const HCS = [['#062a3a', '#0e5a78', '#1a8ab0', '#3ac4e4', '#8af0ff', '#e8ffff'], ['#06301a', '#0e6a34', '#1aa04c', '#3ae070', '#9affb4', '#eaffef'], ['#3a1a04', '#7a3a08', '#c06a10', '#f0a030', '#ffd890', '#fff6e0'], ['#3a0630', '#7a0e6a', '#b02aa0', '#e05ad8', '#ffa8f4', '#fff0fc']].map(a => a.map(hx));
+      let HC = HCS[0], hcI = 0;
+      const MAG = hx('#ff4ad8');
+      let spinAt = 2.2, glitchy = false, rebuildAt = -9, spinPhi = 0, omega = 0, touchedAt = -99, grabX = null, overloadAt = -9;
+      const texA = new Int32Array(14 * 24), texB = new Int32Array(14 * 24), featM = new Uint8Array(N * N);
+      const vOff = (tall ? 2 : 0) - (slab ? 1 : 0);
+      const SUN = ['#ffe866', '#ffc23e', '#ff9440', '#ff6450', '#ff3a7a', '#e02a9e'].map(hx), SKY = ['#07031a', '#0d0526', '#150834', '#210c44', '#341052'].map(hx), GRID = ['#4a0e5e', '#8a1c9a', '#d43ac8', '#ff86ea'].map(hx);
+      function bgHolo(x, y, t) {
+        const hz = 25;
+        if (y < hz) {
+          // a retro sun going down behind it, its lower half cut by bands that slide down
+          const d = Math.hypot(x + 0.5 - 20, y + 0.5 - hz + 3);
+          if (d < 17) {
+            const k = (y + 0.5 - (hz - 20)) / 20, gap = k > 0.45 && (y + Math.floor(t * 1.5)) % 3 === 0;
+            if (!gap) return SUN[Math.min(5, Math.floor(k * 6))];
+          }
+          const n = (((x + 57) * 73856093) ^ ((y + 31) * 19349663)) >>> 0;
+          if (n % 41 === 0 && Math.sin(t * 2 + n) > -0.3) return n % 3 ? hx('#c8b8ff') : WHITE;
+          return d < 19 ? SKY[4] : SKY[Math.min(4, Math.floor(y / hz * 4.6))];
+        }
+        // the grid floor, rushing toward us
+        const dd = y + 0.5 - hz + 0.5, z0 = 8 / dd + t * 0.9, z1 = 8 / (dd + 1) + t * 0.9;
+        const vx = (x + 0.5 - 20) / (dd * 0.6), vl = Math.abs(vx - Math.round(vx)) * dd * 0.6 < 0.5;
+        if (Math.floor(z0) !== Math.floor(z1) || vl) return GRID[dd > 9 ? 3 : dd > 5 ? 2 : dd > 2 ? 1 : 0];
+        return y === hz ? hx('#3a0c4a') : hx('#0c0320');
+      }
+      function hologram(t) {
+        // a slow sway, a whole turn every so often (or when tapped), bobbing over its projector
+        const bob = Math.sin(t * 1.5) > 0.3 ? 1 : 0;
+        let phi;
+        if (t - touchedAt < 6) phi = spinPhi;
+        else {
+          const sp = ease((t - spinAt) / 1.6);
+          if (t - spinAt > 1.6 && t - spinAt > 7) spinAt = t + 0.1;
+          phi = sp * Math.PI * 2 + Math.sin(t * 0.8) * 0.16;
+        }
+        ty = (tall ? 2 : slab ? 9 : 5) - bob; cyS = ty + 7 + H;
+        kind.fill(0); fid.fill(0);
+        const bg = new Int32Array(N * N);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) bg[y * N + x] = bgHolo(x, y, t);
+        buf.fill(0);
+        // the face, painted into two textures either side of the front corner
+        texA.fill(0); texB.fill(0);
+        const bl = blink(t);
+        const Lt = (s, v, col) => { v += vOff; if (s >= 0 && s < 14 && v >= 0 && v < 24) texA[v * 14 + s] = col; }, Rt = (s, v, col) => { v += vOff; if (s >= 0 && s < 14 && v >= 0 && v < 24) texB[v * 14 + s] = col; };
+        const bt = (s, v, col) => { Lt(s, v, col); Rt(s, v, col); };
+        drawEyes(Lt, Rt, bt, bl, t);
+        if (cheekStyle === 'Rosy') { Lt(8, 7, BLUSH); Lt(9, 7, BLUSH); Rt(8, 7, BLUSH); Rt(9, 7, BLUSH); }
+        drawMouth(Lt, Rt, bt, t);
+        drawStuck(Lt, Rt, bt);
+        const cs = Math.cos(phi), sn = Math.sin(phi), rot = (X, Y, Z) => [X * cs - Y * sn, X * sn + Y * cs, Z];
+        // four sides and the top: corners in the cube's own frame (the face sits across the corner at +7, +7)
+        // (each side: the corner its u runs from, the corner it runs to, its texture, its outward normal)
+        const SIDES = [[[7, 7], [-7, 7], texA, [0, 1]], [[7, 7], [7, -7], texB, [1, 0]], [[-7, -7], [7, -7], null, [0, -1]], [[-7, -7], [-7, 7], null, [-1, 0]]];
+        featM.fill(0);
+        const shadeSide = (tex, nx, ny) => (u, v, x, y) => {
+          const s = Math.min(13, Math.floor(u * 14)), r = Math.min(23, Math.floor(v * H));
+          const fc = tex ? tex[r * 14 + s] : 0;
+          featM[y * N + x] = fc ? 1 : 0;
+          if (fc) return lumI(fc) < 110 ? HC[0] : fc === BLUSH ? hx('#ff8ad8') : WHITE;
+          const lv = 0.5 + 0.5 * (nx * -0.25 + ny * 0.97), band = Math.floor(t * 9) % 30 - 4;
+          return HC[(lv > 0.7 ? 3 : lv > 0.35 ? 2 : 1) + (r === band || r === band + 1 ? 1 : 0)];
+        };
+        // back faces first (just their edges, faintly), then the front ones
+        const order = SIDES.map(([a, b, tex, n0], i) => { const n = rot(n0[0], n0[1], 0); return { i, a, b, tex, front: n[0] + n[1] > 0.02, n }; });
+        for (const back of [true, false]) for (const sd of order) {
+          if (sd.front === back) continue;
+          const p0 = rot(sd.a[0], sd.a[1], H), p1 = rot(sd.b[0], sd.b[1], H), p3 = rot(sd.a[0], sd.a[1], 0);
+          face(p0, p1, p3, 1 + sd.i + (back ? 10 : 0), back ? (u, v, x, y) => (u < 0.08 || u > 0.92 || v < 0.06 || v > 0.94 ? HC[2] : undefined) : shadeSide(sd.tex, sd.n[0], sd.n[1]), false);
+        }
+        face(rot(-7, -7, H), rot(7, -7, H), rot(-7, 7, H), 5, (u, v, x, y) => { featM[y * N + x] = 0; return top === 'Snow' ? HC[5] : HC[4]; }, false);
+        // whatever it wears on top, its limbs and its pal, all projected too
+        const faces = buf.slice();
+        if (top !== 'Snow') drawTop(t, ty);
+        drawLimbs(t, ty, H, bob); if (pal !== 'None') drawPal(t);
+        for (let i = 0; i < N * N; i++) if (buf[i] !== faces[i]) { fid[i] = 0; featM[i] = 0; }
+        // compose: translucent cyan over the sunset, bright edges, rolling scanlines, a magenta fringe, and the light cone
+        const tick = Math.floor(t * 6), tear = glitchy || (t % 4.3) < 0.2 || Math.abs(omega) > 8 || t - overloadAt < 0.6 ? (Math.floor(t * 9) * 7) % 30 + 4 : -9;
+        const built = Math.min(1, (t - rebuildAt) / 0.7), edge = built < 1 ? Math.round(N - built * N) : -1;
+        const out2 = new Int32Array(N * N);
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const i = y * N + x, sx = Math.max(0, Math.min(N - 1, x - (y === tear || y === tear + 1 ? 2 : y === tear + 2 ? -1 : 0))), j = y * N + sx;
+          let o = bg[i];
+          // the light cone from the projector up to the cube
+          if (y > ty + 12 && y < 37 && Math.abs(x + 0.5 - 20) < 3 + (37 - y) * 0.55 && (x + y + tick) % 2 === 0 && !buf[j]) o = blendI(o, HC[4], 0.3);
+          const v = buf[j];
+          if (v && !(edge >= 0 && y < edge)) {
+            const scan = (y + tick) % 3 === 0;
+            const lq = lumI(v) / 255, col0 = fid[j] ? v : HC[lq > 0.8 ? 4 : lq > 0.55 ? 3 : lq > 0.3 ? 2 : 1];
+            let col = col0;
+            if (featM[j]) o = v;
+            else {
+              o = blendI(o, HC[0], 0.55);
+              if (fid[j] && fid[j] < 10) {
+                let ed = false;
+                for (const q of [j - 1, j + 1, j - N, j + N]) if (q < 0 || q >= N * N || (fid[q] !== fid[j] && !featM[q])) ed = true;
+                if (ed) col = HC[5];
+              }
+              o = blendI(o, col, col === HC[5] ? 1 : fid[j] >= 10 ? 0.4 : (y + tick) % 2 ? 0.28 : 0.72);
+            }
+          } else if (sx > 0 && buf[j - 1] && !buf[j]) o = blendI(o, MAG, glitchy ? 0.8 : 0.45);
+          if (y === edge) o = HC[5];
+          out2[i] = o;
+        }
+        // the projector itself
+        for (let y = 35; y < 40; y++) for (let x = 10; x < 30; x++) { const d = ((x + 0.5 - 20) / 8) ** 2 + ((y + 0.5 - 37.5) / 2) ** 2; if (d <= 1) out2[y * N + x] = d > 0.62 ? hx('#3a3a52') : d > 0.4 ? ((x + tick) % 4 ? HC[3] : HC[5]) : hx('#14142a'); }
+        buf.set(out2);
+      }
+
+      // ---------- the pointer, and painting ----------
+      let lastTap = -9, pdown = false, pT = 0, pgx = 0, pgy = 0, held = null, pressAt = -9, pressX = 0, pressY = 0, moved = 0;
+      const tapSound = () => { if (lastTap < 0 || true) { voice(climb % 8); climb++; } };
+      function feelL(t) {
+        const dt = Math.min(0.1, Math.max(0.001, t - pT)); pT = t;
+        const gx = (inp.x * S - off) / cell, gy = (inp.y * S - off) / cell, ix = Math.floor(gx), iy = Math.floor(gy);
+        const down = inp.inside && inp.down, pressed = down && !pdown, released = !down && pdown;
+        const vx = (gx - pgx) / dt, vy = (gy - pgy) / dt;
+        if (pressed) { pressAt = t; pressX = gx; pressY = gy; moved = 0; }
+        if (down) moved = Math.max(moved, Math.hypot(gx - pressX, gy - pressY));
+        const taps = inp.taps().map(p => [(p.x * S - off) / cell, (p.y * S - off) / cell]);
+        const over = inp.inside && ix >= 0 && iy >= 0 && ix < N && iy < N && kind[iy * N + ix] > 0;
+        if (legend === 'Aquarium') feelAq(t, dt, gx, gy, down, taps, over, released);
+        if (legend === 'Mimic') feelMim(t, dt, gx, gy, down, pressed, released, taps, vx, vy);
+        if (legend === 'Hologram') feelHolo(t, dt, gx, gy, down, pressed, released, over);
+        pdown = down; pgx = gx; pgy = gy;
+      }
+      // ---- Aquarium: tap the water to drop food and the goldfish comes to eat it (every fifth flake, a golden
+      // somersault); knock on the glass and it darts away; press and drag on the glass and it follows your finger
+      function feelAq(t, dt, gx, gy, down, taps, over, released) {
+        const h = H, colTop = x => ty + 14 - (Math.abs(Math.floor(x) + 0.5 - 20) - 0.5 >> 1);
+        // (a knock is a quick tap on the glass, so a press that drags is a finger, not a knock)
+        // (a tap is a short, still press: the gallery reports every press as a tap, drags included)
+        const quick = released && t - pressAt < 0.3 && moved < 1 ? [[pressX, pressY, true]] : [];
+        for (const [tx, tyy, isKnock] of quick) {
+          const x = Math.floor(tx), y = Math.floor(tyy);
+          if (x < 6 || x > 33 || y < 0 || y >= N) continue;
+          const u = Math.max(-12, Math.min(12, x - 20));
+          if (y < colTop(x)) {
+            // food: three flakes scattered where you tapped
+            for (let k = 0; k < 3; k++) food.push({ u: Math.max(-13, Math.min(12, u + k - 1)), t0: t + k * 0.12, c: k % 2 });
+            while (food.length > 9) food.shift();
+            c.sound.note(scale(7) + 12, { dur: 0.08, vel: 0.08, wave: 'sine' }); c.sound.note(scale(9) + 12, { dur: 0.08, vel: 0.06, wave: 'sine', at: 0.12 });
+          } else if (isKnock && y < colTop(x) + h) {
+            // a knock on the glass: it darts off to the far side
+            fleeUntil = t + 1.1; fleeTo = u > fishU ? -11 : 11; dartAt = t;
+            if (tankBub.length < 12) for (let k = 0; k < 3; k++) tankBub.push({ u: u + (k % 2), v: y - colTop(x) + 1, t0: t + k * 0.08 });
+            c.sound.hit('click', 0.35); c.sound.note(scale(2) - 12, { dur: 0.1, vel: 0.12, wave: 'triangle', cutoff: 900 });
+          }
+        }
+        finger = null;
+        if (down && gx >= 6 && gx < 34) { const ct = colTop(gx); if (gy >= ct && gy < ct + h) finger = { u: Math.floor(gx) - 20, bv: gy - ct }; }
+        // where it wants to be: away from a knock, at your finger, at the nearest food, or idling
+        const live = food.filter(f => t >= f.t0);
+        let goalU = Math.sin(t * 0.33) * 9, goalV = Math.sin(t * 1.1) * 1.2, fast = false;
+        if (t < fleeUntil) { goalU = fleeTo; fast = true; }
+        else if (finger) { goalU = finger.u - 6 * Math.sign(finger.u - fishU || 1); goalV = finger.bv - (h - 10) - 4; fast = true; }
+        else if (live.length) {
+          let best = live[0], bd = 1e9;
+          for (const f of live) { const d = Math.abs(f.u - fishU); if (d < bd) { bd = d; best = f; } }
+          const fbv = Math.min(h - 4, 1 + (t - best.t0) * 1.7);
+          goalU = best.u - 6 * Math.sign(best.u - fishU || 1); goalV = fbv - (h - 10) - 4; fast = true;
+        }
+        const stp = Math.max(-0.45, Math.min(0.45, (goalU - fishU) * (fast ? 0.16 : 0.07)));
+        if (Math.abs(stp) > 0.02) fishDir = stp > 0 ? 1 : -1;
+        fishU = Math.max(-12, Math.min(12, fishU + stp));
+        fishV = Math.max(-2.5, Math.min(2, fishV + Math.max(-0.25, Math.min(0.25, (goalV - fishV) * 0.12))));
+        // a gulp when its mouth reaches a flake
+        const mu = fishU + 6 * fishDir, mv = h - 10 + fishV + 4;
+        for (let i = food.length - 1; i >= 0; i--) {
+          const f = food[i]; if (t < f.t0) continue;
+          const fbv = Math.min(h - 4, 1 + (t - f.t0) * 1.7);
+          if (Math.abs(mu - f.u) <= 1.6 && Math.abs(mv - fbv) <= 1.6) {
+            food.splice(i, 1); eaten++;
+            if (tankBub.length < 12) tankBub.push({ u: Math.round(mu), v: Math.round(mv), t0: t });
+            c.sound.hit('blip', 0.12, { freq: 620 });
+            if (eaten % 5 === 0) { flipAt = t; hearts.push({ u: Math.round(fishU), bv: h - 10 + Math.round(fishV), t0: t + 0.4 }); [0, 2, 4, 7, 9, 12].forEach((k, j) => c.sound.note(scale(k) + 12, { dur: 0.12, vel: 0.08, wave: 'sine', at: j * 0.07 })); }
+          }
+        }
+        lookX = finger ? (finger.u) / 6 : live.length ? (live[0].u) / 6 : inp.inside ? (gx - 20) / 6 : Math.sin(t * 0.5) * 0.5 + Math.sin(t * 0.21) * 0.6;
+        lookY = finger ? 1 : live.length ? 1 : inp.inside ? (gy - 18) / 6 : Math.sin(t * 0.37) * 0.8;
+        glowK = 0.92 + 0.08 * Math.sin(t * 0.9) + (over ? 0.1 : 0) + (t - flipAt < 1 ? 0.15 : 0);
+      }
+      // ---- Mimic: it snaps at a finger left over its mouth (keep holding and it chews, let go and it spits a coin);
+      // tap its planks and it coughs up a coin; grab a coin and flick it, and a coin thrown back into its mouth is
+      // caught, to its delight
+      function feelMim(t, dt, gx, gy, down, pressed, released, taps, vx, vy) {
+        const ix = Math.floor(gx), iy = Math.floor(gy), inMouth = inp.inside && ix >= 0 && iy >= 0 && ix < N && iy < N && mouthM[iy * N + ix];
+        const onChest = inp.inside && ix >= 0 && iy >= 0 && ix < N && iy < N && kind[iy * N + ix] && !inMouth;
+        const spit = (vx0, vy0) => { const [mx, my] = pr(0, 0, H - 4); coins.push({ x: mx, y: my - 2, vx: vx0, vy: vy0, rest: false, flicked: false }); while (coins.length > 10) coins.shift(); c.sound.note(scale(9) + 12, { dur: 0.15, vel: 0.08, wave: 'triangle' }); c.sound.note(scale(11) + 12, { dur: 0.2, vel: 0.06, wave: 'triangle', at: 0.08 }); };
+        // grab a coin
+        if (pressed && !held) { let best = null, bd = 2.2; for (const k of coins) { const d = Math.hypot(k.x + 0.5 - gx, k.y + 0.5 - gy); if (d < bd) { bd = d; best = k; } } if (best) { held = best; best.rest = false; c.sound.hit('click', 0.15); } }
+        if (held) {
+          if (down) { held.x = gx - 0.5; held.y = gy - 0.5; held.vx = vx; held.vy = vy; }
+          else { held.vx = Math.max(-60, Math.min(60, held.vx)); held.vy = Math.max(-60, Math.min(60, held.vy)); held.flicked = true; held = null; c.sound.note(scale(4) + 12, { dur: 0.06, vel: 0.06, wave: 'sine' }); }
+        }
+        // a finger lingering over its mouth gets bitten
+        if (inMouth && !held && t - chompAt > 1.5) linger += dt; else if (!caught) linger = Math.max(0, linger - dt * 2);
+        if (linger > 0.45 && !caught) {
+          chompAt = t; linger = 0; c.sound.hit('kick', 0.22); c.sound.hit('click', 0.3, { at: 0.02 });
+          if (down) { caught = true; c.sound.note(scale(0) - 24, { dur: 0.4, vel: 0.1, wave: 'triangle', cutoff: 500, at: 0.1 }); }
+        }
+        if (caught && !down) { caught = false; chompAt = t - 0.5; spit((coins.length % 2 ? -1 : 1) * (10 + Math.abs(Math.sin(t * 7)) * 5), -22); }
+        if (!caught && t - chompAt > 0.12 && t - chompAt < 0.2 && !inMouth && inp.inside && mood !== 'happy') { mood = 'miss'; moodUntil = t + 1; }
+        // tap its planks: it coughs up a coin
+        const quick = released && t - pressAt < 0.3 && moved < 1 && !caught ? [[pressX, pressY]] : [];
+        for (const [tx, tyy] of quick) { const x = Math.floor(tx), y = Math.floor(tyy); if (x >= 0 && y >= 0 && x < N && y < N && kind[y * N + x] && !mouthM[y * N + x] && !held && t - chompAt > 0.6) { chompAt = t - 0.35; spit((x < 20 ? -1 : 1) * (9 + Math.abs(Math.sin(t * 13)) * 6), -22); } }
+        // coins fly, bounce and settle on the flagstones; one that lands in its open mouth is eaten
+        for (let i = coins.length - 1; i >= 0; i--) {
+          const k = coins[i]; if (k === held || k.rest) continue;
+          k.vy += 46 * dt; k.x += k.vx * dt; k.y += k.vy * dt;
+          if (k.x < 0) { k.x = 0; k.vx = -k.vx * 0.5; } if (k.x > N - 2) { k.x = N - 2; k.vx = -k.vx * 0.5; }
+          if (k.y > 37) { k.y = 37; if (Math.abs(k.vy) > 6) { k.vy = -k.vy * 0.45; k.vx *= 0.7; c.sound.note(scale(12) + 12, { dur: 0.05, vel: 0.05, wave: 'triangle' }); } else { k.vy = 0; k.vx = 0; k.rest = true; } }
+          const cx2 = Math.floor(k.x + 0.5), cy2 = Math.floor(k.y + 0.5);
+          if (k.flicked && k.vy > 0 && cx2 >= 0 && cy2 >= 0 && cx2 < N && cy2 < N && mouthM[cy2 * N + cx2]) { coins.splice(i, 1); chompAt = t; mood = 'happy'; moodUntil = t + 1.4; eatAt = t; c.sound.hit('kick', 0.2); [4, 7, 9, 12].forEach((n, j) => c.sound.note(scale(n) + 12, { dur: 0.15, vel: 0.08, wave: 'triangle', at: 0.15 + j * 0.08 })); }
+        }
+        // lean toward a finger; the lid: shut on a bite, chewing a caught finger, gaping at one close by, else breathing
+        lean += ((inp.inside && !held ? Math.max(-1.5, Math.min(1.5, (gx - 20) / 8)) : 0) - lean) * 0.15;
+        const ch = t - chompAt, near = inp.inside && Math.hypot(gx - 20, gy - (ty + 12)) < 14;
+        let want;
+        if (caught) want = 0.05 + 0.08 * Math.abs(Math.sin(t * 9));
+        else if (ch >= 0 && ch < 0.12) want = 0;
+        else if (ch >= 0 && ch < 0.6) want = 0.1;
+        else if (near || held) want = 0.95;
+        else {
+          // left alone, it yawns now and then and bites down on nothing, spitting a little gold
+          if (t >= lastYawn + 2.6 && t - chompAt > 1) { lastYawn = t + 4; for (let k = 0; k < 4; k++) loot.push({ x: 18 + (k % 3), y: ty + 12, vx: (k - 1.5) * 6, t0: t + 0.18 + k * 0.05 }); want = 0.02; chompAt = t; }
+          else want = t > lastYawn + 1.6 ? 0.88 : 0.68 + 0.06 * Math.sin(t * 1.3);
+        }
+        if (near && !wasOver) { c.sound.note(scale(0) - 24, { dur: 0.5, vel: 0.08, wave: 'triangle', cutoff: 400, attack: 0.1 }); }
+        wasOver = near;
+        lid += (want - lid) * (want < lid - 0.3 ? 0.6 : 0.2);
+      }
+      // ---- Hologram: grab it and drag sideways to spin it; let go and it keeps spinning, then turns back to face you;
+      // spin it hard enough and the projection overloads and rebuilds itself; a tap changes the colour it's projected in
+      function feelHolo(t, dt, gx, gy, down, pressed, released, over) {
+        const was = glitchy;
+        glitchy = over && !down;
+        if (glitchy && !was) c.sound.note(scale(9) + 12, { dur: 0.05, vel: 0.06, wave: 'square', cutoff: 3000 });
+        if (pressed && inp.inside) { if (t - touchedAt >= 6) spinPhi = 0; grabX = gx; touchedAt = t; }
+        if (down && grabX !== null) {
+          const d = (gx - grabX) * 0.16; spinPhi += d; omega = omega * 0.5 + (d / dt) * 0.5; grabX = gx; touchedAt = t;
+          if (Math.abs(d) > 0.3 && Math.floor(spinPhi / (Math.PI / 2)) !== Math.floor((spinPhi - d) / (Math.PI / 2))) c.sound.note(scale(5) + 12, { dur: 0.04, vel: 0.05, wave: 'square', cutoff: 2600 });
+        } else {
+          if (released) {
+            touchedAt = t;
+            if (t - pressAt < 0.3 && moved < 1) { hcI = (hcI + 1) % HCS.length; HC = HCS[hcI]; rebuildAt = t; [0, 4, 7, 12].forEach((k, i) => c.sound.note(scale(k + hcI) + 12, { dur: 0.07, vel: 0.07, wave: 'square', cutoff: 2600, at: i * 0.06 })); omega = 0; }
+          }
+          grabX = null;
+          if (t - touchedAt < 6) {
+            spinPhi += omega * dt; omega *= Math.pow(0.35, dt);
+            if (Math.abs(omega) > 16 && t - overloadAt > 1.2) { overloadAt = t; rebuildAt = t + 0.3; omega *= 0.3; [12, 9, 7, 4, 0].forEach((k, i) => c.sound.note(scale(k) + 12, { dur: 0.06, vel: 0.08, wave: 'sawtooth', cutoff: 2000, at: i * 0.05 })); }
+            if (Math.abs(omega) < 0.6) { const home = Math.round(spinPhi / (Math.PI * 2)) * Math.PI * 2; spinPhi += (home - spinPhi) * 0.08; omega = 0; }
+          }
+        }
+      }
+      let sigL = -1;
+      const outside = (gx, gy, t) => legend === 'Aquarium' ? bgAq(gx, gy, t) : legend === 'Mimic' ? bgMim(gx, gy, t) : bgHolo(gx, gy, t);
+      function renderL(t) {
+        feelL(t);
+        if (legend === 'Aquarium') aquarium(t); else if (legend === 'Mimic') mimic(t); else hologram(t);
+        let sig = 0;
+        for (let i = 0; i < buf.length; i++) sig = (Math.imul(sig, 31) + buf[i]) | 0;
+        if (sig === sigL) return;
+        sigL = sig;
+        // paint a cell band's first pixel row, then copy it down the band
+        const g0 = Math.floor(-off / cell), g1 = Math.floor((S - 1 - off) / cell);
+        for (let gy = g0; gy <= g1; gy++) {
+          const p0 = Math.max(0, off + gy * cell), p1 = Math.min(S, off + (gy + 1) * cell);
+          if (p0 >= p1) continue;
+          const row = p0 * S, inY = gy >= 0 && gy < N;
+          for (let gx = g0; gx <= g1; gx++) {
+            const col = inY && gx >= 0 && gx < N ? buf[gy * N + gx] : outside(gx, gy, t);
+            out.fill(col, row + Math.max(0, off + gx * cell), row + Math.min(S, off + (gx + 1) * cell));
+          }
+          for (let py = p0 + 1; py < p1; py++) out.copyWithin(py * S, row, row + S);
+        }
+        c.ctx.putImageData(img, 0, 0);
+      }
+      renderL(0);
+      return t => renderL(t);
     }
     let lastSig = -1;
     function render(t) {

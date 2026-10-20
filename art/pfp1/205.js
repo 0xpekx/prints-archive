@@ -10,7 +10,7 @@ Proto.add({
   seed: 1308,
   interactive: 'Tap the tusk to ring it. Tap anywhere else to make it spout and sing.',
   music: true,
-  recipe: 'A narwhal, head and shoulders, in careful hand-antialiased pixel art 48 dots across: shapes shaded in five-step ramps with a coloured outline only on the shadow side, curves softened with in-between colours from the ramps, and motion done in fractions of a dot. A blunt melon of a head over a narrow, low face with the eyes set wide, a short snout, and the tusk leaving the upper lip and rising clear of both eyes; flippers at the chest, the tail flukes raised behind one shoulder, and a pale belly under a darker back. Hide, build, tusk and the side it grows from, markings, eyes, mouth, headwear, neckwear, a little companion, a frame and the scene (ice floes to pink dawns, kelp forests and sandy shallows) vary; pearl hides, rainbow tusks, glowing lures and halos are rare; about 1 in 400 is a legendary (an Ice Sculpture cut into glinting facets with a bright rim and solid crystal tusks, or The Unicorn, a white old bull with one spiral horn twice the length, a ring of barnacles and a ship\'s figurehead crown), and about 1 in 200 wears the coveted gold ring on its tusk. It bobs, blinks and sways its tusk.',
+  recipe: 'A narwhal, head and shoulders, in careful hand-antialiased pixel art 48 dots across: shapes shaded in five-step ramps with a coloured outline only on the shadow side, curves softened with in-between colours from the ramps, and motion done in fractions of a dot. A blunt melon of a head over a narrow, low face with the eyes set wide, a short snout, and the tusk leaving the upper lip and rising clear of both eyes; flippers at the chest, the tail flukes raised behind one shoulder, and a pale belly under a darker back. Hide, build, tusk and the side it grows from, markings, eyes, mouth, headwear, neckwear, a little companion, a frame and the scene (ice floes to pink dawns, kelp forests and sandy shallows) vary; pearl hides, rainbow tusks, glowing lures and halos are rare; about 1 in 400 is a legendary, a picture of its own (an Ice Sculpture: an isometric diorama in a cold palette, a narwhal carved in faceted ice leaping from a hole in a floating slab of sea ice; or The Unicorn: a page of an old bestiary, the crowned white old bull rising out of curling waves under a gilt arch, its great spiral horn up to the corner), and about 1 in 200 wears the coveted gold ring on its tusk. It bobs, blinks and sways its tusk.',
   make(c) {
     const S = c.size, g = c.ctx;
     // an LCG (Numerical Recipes constants) mixed with the hash on every draw
@@ -674,8 +674,479 @@ Proto.add({
       for (let y = 0; y < 12; y++) for (let x = 0; x < N; x++) for (const [sx, sy] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75]]) { bgHit = false; sample0(x + sx, y + sy); if (!bgHit) near[y * N + x] = 1; }
       for (let y = 0; y < 12; y++) for (let x = 0; x < N; x++) if (near[y * N + x]) for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const xx = x + i, yy = y + j; if (i * i + j * j <= 10 && xx >= 0 && xx < N && yy >= 0 && yy < N) AURM[yy * N + xx] = 1; }
     }
+    // ================= the legendaries: each one a picture of its own =================
+    // (only a legendary print ever comes here; everything above draws the collection's narwhals.) Both are drawn on
+    // the same 48-dot grid with the same hand-antialiasing: sixteen samples a dot, resolved through the ramps. Most
+    // samples are worked out once (a still layer); a frame redoes only what light and motion change, and a dot is
+    // resolved again only when one of its samples changed. A tusk on the left mirrors the picture; the Frame trait
+    // still frames it.
+    const legendFrame = LEG ? (() => {
+      const SSN = N * SS, NS = SSN * SSN, MIRX = tuskSide < 0;
+      const reg = rr => { for (const col of rr) { if (!RAMPOF.has(col)) RAMPOF.set(col, rr); cid(col); } return rr; };
+      const H = a => reg(ramp(a));
+      const FRM = new Int32Array(NS).fill(-1);
+      for (let sy = 0; sy < SSN; sy++) for (let sx = 0; sx < SSN; sx++) { const f = frameAt((sx + 0.5) / SS, (sy + 0.5) / SS); if (f) FRM[sy * SSN + sx] = cid(f); }
+      const prev = new Int32Array(NS).fill(-1), dotc = new Array(NN).fill(null);
+      const sstep = (a, b, v) => { const u = Math.max(0, Math.min(1, (v - a) / (b - a))); return u * u * (3 - 2 * u); };
+      // paint every dot: kOf(si, X, py) gives a sample's colour id (X already mirrored)
+      const paint = kOf => {
+        const d = img.data;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          let same = true;
+          for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) {
+            const s = sy * SS + sx, si = (y * SS + sy) * SSN + x * SS + sx, px = x + (sx + 0.5) / SS;
+            const k = FRM[si] >= 0 ? FRM[si] : kOf(si, MIRX ? N - px : px, y + (sy + 0.5) / SS);
+            ids[s] = k; if (prev[si] !== k) { prev[si] = k; same = false; }
+          }
+          const at = y * N + x;
+          if (!same || !dotc[at]) dotc[at] = resolve();
+          const p = dotc[at], i = at * 4;
+          d[i] = p[0]; d[i + 1] = p[1]; d[i + 2] = p[2]; d[i + 3] = 255;
+        }
+        oc.putImageData(img, 0, 0);
+        g.imageSmoothingEnabled = false;
+        g.drawImage(off, 0, 0, S, S);
+      };
+      // a cubic spine and its tube: nearest point, its parameter and the radius there
+      const spineOf = (P, rOf, n) => {
+        const pts = [];
+        for (let i = 0; i <= n; i++) { const s = i / n, u = 1 - s; pts.push([u * u * u * P[0][0] + 3 * u * u * s * P[1][0] + 3 * u * s * s * P[2][0] + s * s * s * P[3][0], u * u * u * P[0][1] + 3 * u * u * s * P[1][1] + 3 * u * s * s * P[2][1] + s * s * s * P[3][1], rOf(s), s]); }
+        return pts;
+      };
+      const tube = (pts, x, y) => {
+        let best = 1e9, bs = 0, bx = 0, by = 0, br = 1;
+        for (let i = 0; i < pts.length - 1; i++) {
+          const a = pts[i], b = pts[i + 1], vx = b[0] - a[0], vy = b[1] - a[1], l2 = vx * vx + vy * vy;
+          const u = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / l2)), cx = a[0] + vx * u, cy = a[1] + vy * u, r = a[2] + (b[2] - a[2]) * u;
+          const dd = Math.hypot(x - cx, y - cy) - r;
+          if (dd < best) { best = dd; bs = a[3] + (b[3] - a[3]) * u; bx = cx; by = cy; br = r; }
+        }
+        return [best, bs, bx, by, br];
+      };
+      const atS = (pts, s) => { const f = s * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), u = f - i, a = pts[i], b = pts[i + 1]; return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, b[0] - a[0], b[1] - a[1]]; };
+      let legAt2 = -9, wasIn2 = false;
+      const hoverAt = () => c.input.inside ? [MIRX ? N - c.input.x * N : c.input.x * N, c.input.y * N] : null;
+
+      // a short, still release is a tap (so a hold or a drag never also fires the tap's action)
+      const PRS = { at: -9, x: 0, y: 0, moved: 0, was: false };
+      const shortTap = (inp, t) => {
+        inp.taps();
+        let up = false;
+        if (inp.down && !PRS.was) { PRS.at = t; PRS.x = inp.x * N; PRS.y = inp.y * N; PRS.moved = 0; }
+        if (inp.down) PRS.moved = Math.max(PRS.moved, Math.hypot(inp.x * N - PRS.x, inp.y * N - PRS.y));
+        if (!inp.down && PRS.was) up = t - PRS.at < 0.3 && PRS.moved < 1.5;
+        PRS.was = inp.down;
+        return up;
+      };
+      if (LEG === 'Ice Sculpture') {
+        // ---- Ice Sculpture: an isometric diorama in a cold palette. A slab of sea ice floats in the polar dark, its
+        // top laid in iso tiles, its sides banded with the strata of old ice and hung with icicles; out of a hole in it
+        // leaps the narwhal, carved from clear ice in flat cut facets with a crystal tusk, the dark water in the hole
+        // rippling. Your pointer is a lamp: the facets turn to it, the beam crosses the dark and its shadow falls on the
+        // ice; hold to warm it (it drips into the hole, the tusk melts back), let go and it freezes with a crackle of
+        // frost; a quick tap sends a prism through it. Drawn on its own grid, 96 dots across, in nine shades of ice.
+        // Its traits, in the diorama's way: the sky round it (Scene), its eyes, mouth, flippers, headwear, neckwear and
+        // build carved in the ice, its tusk(s) and the side they point (Tusk, Tusk Side), the companion on the ice
+        // (Companion), the frame round the scene (Frame).
+        const G = 96, cv = document.createElement('canvas'); cv.width = cv.height = G;
+        const cx2 = cv.getContext('2d'), im = cx2.createImageData(G, G), px = new Uint8Array(G * G);
+        // 0 void .. 8 white; 9-13 prism; 14 water dark, 15 water; 16 accent red, 17 accent gold, 18 aurora green, 19 sun
+        const PAL = ['#03060f', '#081430', '#0e2450', '#183a74', '#245a9c', '#3f86c4', '#78b8e4', '#bfe4f8', '#ffffff',
+          '#ff6a8a', '#ffc85a', '#8af08a', '#5ac8ff', '#b08aff', '#02101e', '#0a3050', '#e0405a', '#f0c050', '#3ae0a0', '#ffb0a0'].map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+        const MX = tuskSide < 0;                      // the tusk to the left: the whole diorama mirrored
+        const BK = build === 'Chubby' ? 1.18 : build === 'Slim' ? 0.84 : 1;
+        // the slab: an iso diamond, top at (48, 66), 36 across, 18 high, 11 thick
+        const SX0 = 48, SY0 = 68, HW = 36, HH = 18, TH = 11;
+        const onTop = (x, y) => Math.abs(x - SX0) / HW + Math.abs(y - SY0) / HH <= 1;
+        const HOLE = [44, 68, 9, 4.5];               // the hole the narwhal leaps from
+        // the narwhal's spine: a curve from its tail in the hole up and over to its head, the tusk beyond
+        const P0 = [40, 70], P1 = [38, 24], P2 = [70, 24];
+        const spine = [];
+        for (let k = 0; k <= 60; k++) { const s = k / 60, a = (1 - s) ** 2, b = 2 * s * (1 - s), cc = s * s; spine.push([P0[0] * a + P1[0] * b + P2[0] * cc, P0[1] * a + P1[1] * b + P2[1] * cc, s]); }
+        const rad = s => (1.4 + 9.2 * Math.sin(Math.min(1, s * 1.25) * Math.PI * 0.55) - (s > 0.85 ? (s - 0.85) * 18 : 0)) * BK;
+        const HEAD = spine[60], hdir = Math.atan2(spine[60][1] - spine[55][1], spine[60][0] - spine[55][0]);
+        const TB = [HEAD[0] + Math.cos(hdir) * 5.5, HEAD[1] + Math.sin(hdir) * 5.5 + 1], TE = [92, 4], TE2 = [86, 2];
+        // per dot of the body: the spine param, the signed offset across it (-1 top .. 1 belly), its facet
+        const BODY = new Int8Array(G * G).fill(-1), BS = new Float32Array(G * G), BV = new Float32Array(G * G), BF = new Uint8Array(G * G), TUSKM = new Float32Array(G * G).fill(-1);
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+          let best = 1e9, bs = 0, bv = 0;
+          for (let k = 0; k <= 60; k += 1) { const [sx, sy, s] = spine[k], d = Math.hypot(x + 0.5 - sx, y + 0.5 - sy) / rad(s); if (d < best) { best = d; bs = s; const k2 = Math.min(60, k + 1), k1 = Math.max(0, k - 1), tx = spine[k2][0] - spine[k1][0], ty = spine[k2][1] - spine[k1][1], nl = Math.hypot(tx, ty) || 1; bv = ((x + 0.5 - sx) * ty / nl - (y + 0.5 - sy) * tx / nl) / rad(s) * -1; } }
+          // the flukes, spread at the tail (low in the hole: only their tips show above the water)
+          const fk = Math.min(Math.hypot((x - 36) / 6, (y - 66) / 2.2), Math.hypot((x - 48) / 6, (y - 66.5) / 2.2));
+          if (best <= 1) { const i = y * G + x; BODY[i] = 1; BS[i] = bs; BV[i] = bv; BF[i] = (Math.floor(bs * 6 + (bv > 0 ? 0.5 : 0)) * 5 + (bv > 0.1 ? 1 : 0) * 3) % 11; }
+          else if (fk <= 1 && y < 67) { const i = y * G + x; BODY[i] = 2; BS[i] = 0; BV[i] = -0.5; BF[i] = 3; }
+          // the tusk(s): a crystal spiral to the corner (two, a little apart, if it has twin tusks)
+          for (const E of tusk === 'Twin' ? [TE, TE2] : [TE]) {
+            const B = E === TE2 ? [TB[0] - 1, TB[1] - 2] : TB, vx = E[0] - B[0], vy = E[1] - B[1], l2 = vx * vx + vy * vy, u = Math.max(0, Math.min(1, ((x - B[0]) * vx + (y - B[1]) * vy) / l2)), d = Math.hypot(x - B[0] - vx * u, y - B[1] - vy * u);
+            if (d < 1.9 * (1 - u) + 0.4 && TUSKM[y * G + x] < 0) TUSKM[y * G + x] = u;
+          }
+        }
+        // the flippers (Flippers): resting, waving, both up, tucked, paddling
+        const FL = { Resting: [[0.62, 0.9, 0.6]], Waving: [[0.62, 0.9, -0.9]], 'Both Up': [[0.6, 0.9, -0.7], [0.55, -0.9, -0.8]], Tucked: [[0.62, 0.7, 0.2]], Paddling: [[0.62, 0.95, 0.9], [0.5, 0.95, 0.4]] }[flips] || [];
+        for (const [s0, side, ang] of FL) {
+          const [sx, sy] = spine[Math.round(s0 * 60)], r = rad(s0), n0 = Math.atan2(spine[Math.round(s0 * 60) + 1][1] - sy, spine[Math.round(s0 * 60) + 1][0] - sx) + Math.PI / 2 * side;
+          const bx = sx + Math.cos(n0) * r * 0.8, by = sy + Math.sin(n0) * r * 0.8, a = n0 + ang;
+          for (let y = Math.floor(by - 7); y <= by + 7; y++) for (let x = Math.floor(bx - 7); x <= bx + 7; x++) {
+            if (x < 0 || y < 0 || x >= G || y >= G) continue;
+            const dx = x - bx, dy = y - by, u = dx * Math.cos(a) + dy * Math.sin(a), v = -dx * Math.sin(a) + dy * Math.cos(a);
+            if (u > 0 && u < 7 && Math.abs(v) < 2.2 * (1 - u / 8)) { const i = y * G + x; if (BODY[i] < 0) { BODY[i] = 3; BS[i] = s0; BV[i] = v / 2.5; BF[i] = 7; } }
+          }
+        }
+        const lt0 = { x: 20, y: -6 };
+        let warm = 0, melt = 0, pool = 0, frzAt = -9, prismAt = -9, wasD = false, dAt = -9, dX = 0, dY = 0, dMv = 0, lmx = 20, lmy = -6, lastT = 0;
+        const rnd = (x, y, s) => { let h = Math.imul(x * 73856093 ^ y * 19349663 ^ s * 83492791, 0x9e3779b1) >>> 0; h ^= h >>> 15; return (h >>> 0) % 1000 / 1000; };
+        const snow = Array.from({ length: 40 }, (_, k) => [rnd(k, 1, 7) * G, rnd(k, 2, 7) * G, 0.4 + rnd(k, 3, 7) * 0.8]);
+        const stars = Array.from({ length: 30 }, (_, k) => [Math.floor(rnd(k, 4, 9) * G), Math.floor(rnd(k, 5, 9) * 50)]);
+        // frost in a corner (24 by 24): fern-like crystals growing out along three branches, twigs off them
+        const FROST = new Uint8Array(24 * 24);
+        for (const [a, len] of [[0.25, 20], [0.785, 22], [1.32, 20]]) for (let r = 0; r < len; r++) {
+          const x = Math.round(Math.cos(a) * r), y = Math.round(Math.sin(a) * r); if (x < 24 && y < 24) FROST[y * 24 + x] = r < 8 ? 8 : 7;
+          if (r % 3 === 1 && r < len - 2) for (const s of [-1, 1]) for (let k = 1; k <= Math.max(1, 4 - r / 6); k++) { const tx = Math.round(Math.cos(a) * r + Math.cos(a + s * 0.8) * k), ty = Math.round(Math.sin(a) * r + Math.sin(a + s * 0.8) * k); if (tx >= 0 && ty >= 0 && tx < 24 && ty < 24) FROST[ty * 24 + tx] = 7; }
+        }
+        for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) FROST[y * 24 + x] = 8;
+        return t => {
+          const inp = c.input, dt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
+          tt = t;
+          if (inp.inside && !wasIn2) c.sound.note(96, { dur: 0.5, vel: 0.05, wave: 'sine' });
+          wasIn2 = inp.inside;
+          inp.taps();
+          // the lamp: the pointer (the diorama's own x, mirrored with it), or a slow drift in the dark above
+          const ix = inp.inside ? (MX ? 1 - inp.x : inp.x) * G : 20 + Math.sin(t * 0.3) * 14, iy = inp.inside ? inp.y * G : 4 + Math.sin(t * 0.43) * 4;
+          lmx += (ix - lmx) * 0.35; lmy += (iy - lmy) * 0.35;
+          // a press: a quick still one is a tap (the prism); held, it warms the ice
+          if (inp.down && !wasD) { dAt = t; dX = inp.x; dY = inp.y; dMv = 0; }
+          if (inp.down) dMv = Math.max(dMv, Math.hypot(inp.x - dX, inp.y - dY) * G);
+          if (!inp.down && wasD) {
+            if (t - dAt < 0.3 && dMv < 2) { prismAt = t; [84, 88, 91, 95, 98].forEach((m, i) => c.sound.note(m, { dur: 1.1 - i * 0.12, vel: 0.08, wave: 'sine', at: i * 0.06 })); }
+            else if (warm > 0.2) { frzAt = t; for (let k = 0; k < 7; k++) c.sound.hit('noise', 0.05 + (k % 3) * 0.02, { cutoff: 5000 + k * 600, dur: 0.03, at: k * 0.07 }); [91, 96, 103].forEach((m, i) => c.sound.note(m, { dur: 0.5, vel: 0.04, wave: 'sine', at: 0.3 + i * 0.1 })); }
+          }
+          wasD = inp.down;
+          const hold = inp.down && t - dAt > 0.3;
+          warm = Math.max(0, Math.min(1, warm + dt * (hold ? 0.9 : -0.6)));
+          melt = Math.max(0, Math.min(1, melt + dt * (hold ? 0.7 * warm : -0.04)));
+          pool = Math.max(0, Math.min(7, pool + dt * (hold ? warm * 1.6 : -0.15)));
+          if (warm > 0.2 && Math.floor(t * 4) !== Math.floor((t - dt) * 4)) c.sound.note(98 - Math.floor(t * 4) % 5, { dur: 0.08, vel: 0.04, wave: 'sine' });
+          const frz = t - frzAt < 1.4 ? 1 - (t - frzAt) / 1.4 : 0, pt = t - prismAt;
+          // ---- the sky (Scene)
+          for (let y = 0; y < G; y++) { const band = y < 20 ? 1 : y < 44 ? (y % 2 && y > 40 ? 2 : 1) : 2; for (let x = 0; x < G; x++) px[y * G + x] = scene === 'Midnight Sun' || scene === 'Dawn Pink' ? (y < 30 ? 2 : 3) : band === 1 && y < 10 ? 0 : band; }
+          if (scene === 'Polar Night' || scene === 'Starry Sea' || scene === 'Aurora' || scene === 'Deep Glow') for (const [sx, sy] of stars) px[sy * G + sx] = ((t * 2 + sx) % 5) < 0.6 ? 8 : 6;
+          if (scene === 'Aurora') for (let x = 0; x < G; x++) { const top = 8 + Math.sin(x * 0.11 + t * 0.6) * 4 + Math.sin(x * 0.05 - t * 0.3) * 3; for (let y = Math.floor(top); y < top + 14; y++) if ((x + y + Math.floor(t * 6)) % 3 === 0 || y - top < 3) px[y * G + x] = y - top < 3 ? 18 : 11; }
+          if (scene === 'Midnight Sun' || scene === 'Dawn Pink') for (let y = 18; y < 42; y++) for (let x = 0; x < G; x++) { const r = Math.hypot(x - 22, y - 40); if (r < 14) px[y * G + x] = r < 12 ? 19 : 17; else if (r < 18 && (x + y) % 2) px[y * G + x] = 4; }
+          if (scene === 'Iceberg') for (let x = 0; x < G; x++) { const h = 50 - Math.max(0, 12 - Math.abs(x - 78) * 0.9) - Math.max(0, 7 - Math.abs(x - 14) * 0.8); for (let y = Math.round(h); y < 52; y++) px[y * G + x] = x < 78 && x > 64 ? 4 : 3; }
+          if (scene === 'Under Ice') for (let x = 0; x < G; x++) { const d = 4 + (x * 7) % 5 + ((x % 9) === 0 ? 6 : 0); for (let y = 0; y < d; y++) px[y * G + x] = y === d - 1 ? 7 : 5; }
+          if (scene === 'Kelp Forest') for (const kx of [8, 16, 80, 88]) for (let y = 30; y < 62; y++) { const x = Math.round(kx + Math.sin(y * 0.3 + t + kx) * 1.5); px[y * G + x] = 4; if (y % 5 === 0) px[y * G + x + 1] = 5; }
+          if (scene === 'Sandy Shallows') for (let y = 52; y < 62; y++) for (let x = 0; x < G; x++) if ((x + y * 3) % 7 === 0) px[y * G + x] = 3;
+          if (scene === 'Deep Glow') for (let k = 0; k < 6; k++) { const gx = 10 + k * 15, gy = 40 + Math.sin(t + k) * 6; px[Math.round(gy) * G + gx] = 12; }
+          // the lamp's beam across the dark, toward the sculpture
+          let ax = 52 - lmx, ay = 40 - lmy; const al = Math.hypot(ax, ay) || 1; ax /= al; ay /= al;
+          const beam = (x, y) => { const vx = x - lmx, vy = y - lmy, along = vx * ax + vy * ay; if (along < 0) return 0; const perp = Math.abs(vx * ay - vy * ax), w = 1 + along * 0.3; return perp < w * 0.5 ? 2 : perp < w ? 1 : 0; };
+          for (let y = 0; y < 62; y++) for (let x = 0; x < G; x++) { const b = beam(x, y); if (b && px[y * G + x] < 4) px[y * G + x] = Math.min(4, px[y * G + x] + b); }   // (flat steps of light, no dither)
+          // ---- the slab: its two sides (strata, icicles), its tiled top, the hole with the dark water
+          for (let y = 40; y < G; y++) for (let x = 0; x < G; x++) {
+            const i = y * G + x, dx = x - SX0;
+            if (onTop(x, y)) {
+              const u = (dx / HW + (y - SY0) / HH), v = (-dx / HW + (y - SY0) / HH);   // iso tile coordinates
+              // two flat tones (the far half catching more light), a crisp bright edge along the near sides
+              const edgeN = Math.abs(dx) / HW + Math.abs(y - SY0) / HH > 0.93 && y > SY0 - 2, edgeF = Math.abs(dx) / HW + Math.abs(y - SY0) / HH > 0.93;
+              px[i] = edgeN || edgeF ? 8 : y < SY0 - Math.abs(dx) * 0.1 ? 7 : 6;
+              // the melt water pooling round the hole
+              if (pool > 0.5 && ((x - HOLE[0]) / (HOLE[2] + pool * 1.6)) ** 2 + ((y - HOLE[1]) / (HOLE[3] + pool * 0.8)) ** 2 <= 1) px[i] = 5;
+              if (((x - HOLE[0]) / HOLE[2]) ** 2 + ((y - HOLE[1]) / HOLE[3]) ** 2 <= 1) { const r = ((x - HOLE[0]) / HOLE[2]) ** 2 + ((y - HOLE[1]) / HOLE[3]) ** 2; px[i] = r > 0.75 ? 5 : ((x + Math.floor(t * 3)) % 7 === 0 && r > 0.3) ? 15 : 14; }
+              continue;
+            }
+            // the sides below the top's front edges
+            const edgeY = SY0 + HH - Math.abs(dx) * HH / HW;
+            if (Math.abs(dx) <= HW && y > edgeY && y <= edgeY + TH) {
+              const depth = y - edgeY, strata = (Math.floor(depth + Math.sin(x * 0.4) * 0.8) % 3 === 0);
+              px[i] = dx < 0 ? (strata ? 5 : 4) : (strata ? 4 : 3);
+              if (Math.abs(dx) < 0.6) px[i] = 6;
+            }
+            // icicles under the sides
+            if (Math.abs(dx) <= HW - 2 && y > edgeY + TH && y < edgeY + TH + 1 + ((x * 7) % 5) * ((x % 3) ? 1 : 0)) px[i] = dx < 0 ? 5 : 4;
+          }
+          // the lamp's shadow of the narwhal on the ice
+          const shx = -ax * 8, shy = -ay * 4;
+          for (let y = 50; y < 86; y++) for (let x = 0; x < G; x++) { if (!onTop(x, y)) continue; const sx = Math.round(x - shx * 0.3 - (40 - y) * ax * 0.6), sy = Math.round(y - 30 + (y - 50) * -0.2); if (sx >= 0 && sy >= 0 && sx < G && sy < G && BODY[sy * G + sx] > 0 && px[y * G + x] === 7) px[y * G + x] = 6; }
+          // ---- the narwhal: flat facets, each turned its own way, lit as they face the lamp; a dark ice edge, a white rim
+          const Lx = (lmx - 52) / 60, Ly = (lmy - 40) / 60, Ll = Math.hypot(Lx, Ly, 0.7);
+          const tcut = 1 - melt * 0.75;
+          for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+            const i = y * G + x, b = BODY[i];
+            if (b < 0) {
+              const tu = TUSKM[i];
+              if (tu >= 0 && tu <= tcut) px[i] = pt < 1.2 && Math.abs(tu - pt) < 0.08 ? 8 : tu > tcut - 0.05 ? 8 : (Math.floor(tu * 24 + (x + y) * 0.25) % 3 === 0 ? 6 : 7);
+              continue;
+            }
+            const v = BV[i], s = BS[i], f = BF[i];
+            // the edge of the ice: dark on the shadow side, a white rim where the lamp reaches
+            const edge = BODY[i - 1] < 0 || BODY[i + 1] < 0 || BODY[i - G] < 0 || BODY[i + G] < 0;
+            const nx = Math.sin(f * 2.1) * 0.45 + (b === 1 ? 0 : 0), ny = -v * 0.8 + Math.cos(f * 1.7) * 0.3;
+            const lam = (nx * Lx + ny * Ly + 0.7 * 0.7) / Ll;
+            if (edge) { px[i] = frz || (ny * Ly + nx * Lx) > 0.05 ? 8 : 2; continue; }
+            let k = Math.round(2.4 + lam * 4.6 + warm * 0.6);
+            if (beam(x, y) === 2) k++;
+            if (frz && rnd(x, y, Math.floor(t * 14)) < 0.08) k = 8;
+            // a slow shine crossing the carving now and then
+            if (Math.abs(x * 0.7 - y * 0.7 - (((t * 18) % 160) - 60)) < 1.2) k += 2;
+            px[i] = Math.max(3, Math.min(8, k));
+            // its facets' cut lines
+            const fr2 = BF[i + 1], fd = BF[i + G];
+            if ((BODY[i + 1] > 0 && fr2 !== f) || (BODY[i + G] > 0 && fd !== f)) px[i] = k >= 6 ? 5 : 7;
+          }
+          // its face and what it wears: eye (Eyes), mouth (Mouth), headwear, neckwear
+          const ex = Math.round(HEAD[0] + 1), ey = Math.round(HEAD[1] - 1);
+          const P = (x, y, k) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < G && y < G) px[y * G + x] = k; };
+          const EY = {
+            Wide: () => { P(ex, ey, 1); P(ex + 1, ey, 1); P(ex, ey + 1, 1); P(ex + 1, ey + 1, 1); P(ex, ey, 8); },
+            Shades: () => { for (let x = -2; x <= 3; x++) P(ex + x, ey, 1); P(ex - 3, ey - 1, 1); },
+            Monocle: () => { for (let a = 0; a < 10; a++) P(ex + Math.cos(a * 0.63) * 2, ey + Math.sin(a * 0.63) * 2, 17); P(ex, ey, 1); },
+            Teary: () => { P(ex, ey, 1); P(ex + 1, ey, 1); P(ex, ey + 2, 12); P(ex, ey + 3, 12); },
+            Hearts: () => { P(ex - 1, ey, 16); P(ex + 1, ey, 16); P(ex, ey + 1, 16); P(ex, ey, 16); },
+            Starry: () => { P(ex, ey, 17); P(ex - 1, ey, 17); P(ex + 1, ey, 17); P(ex, ey - 1, 17); P(ex, ey + 1, 17); },
+            Sparkle: () => { P(ex, ey, 1); P(ex + 1, ey, 1); P(ex, ey + 1, 1); P(ex + 1, ey + 1, 1); P(ex + 1, ey, 8); P(ex + 3, ey - 2, 8); },
+          }[eyes] || (() => { P(ex, ey, 1); P(ex + 1, ey, 1); P(ex, ey + 1, 1); P(ex + 1, ey + 1, 1); });
+          EY();
+          const mx = ex + 3, my = ey + 4;
+          if (mouth === 'Ooh' || mouth === 'Whistle') { P(mx, my, 1); P(mx + 1, my, 1); if (mouth === 'Whistle') { P(mx + 3, my - 2, 7); P(mx + 4, my - 3, 7); } }
+          else for (let k = -2; k <= 1; k++) P(mx + k, my + (mouth === 'Smile' || mouth === 'Grin' || mouth === 'Toothy' ? (Math.abs(k + 0.5) > 1 ? -1 : 0) : mouth === 'Smirk' ? (k > 0 ? -1 : 0) : 0), 2);
+          if (mouth === 'Toothy' || mouth === 'Grin') P(mx, my + 1, 8);
+          const hx = Math.round(HEAD[0] - 3), hy = Math.round(HEAD[1] - rad(0.93) + 1);
+          const HT = {
+            'Bobble Hat': () => { for (let y = 0; y < 4; y++) for (let x = -3; x <= 3; x++) P(hx + x, hy - y, y === 0 ? 8 : 16); P(hx, hy - 5, 8); P(hx, hy - 4, 8); },
+            Earmuffs: () => { for (let a = 0; a < 8; a++) P(hx + Math.cos(a * 0.45 + 3.3) * 4, hy + Math.sin(a * 0.45 + 3.3) * 4 + 2, 6); P(hx - 4, hy + 3, 16); P(hx + 4, hy + 3, 16); },
+            Bow: () => { P(hx - 2, hy, 16); P(hx - 3, hy - 1, 16); P(hx - 3, hy + 1, 16); P(hx + 2, hy, 16); P(hx + 3, hy - 1, 16); P(hx + 3, hy + 1, 16); P(hx, hy, 16); },
+            Captain: () => { for (let x = -3; x <= 3; x++) { P(hx + x, hy, 1); P(hx + x, hy - 1, 8); P(hx + x, hy - 2, 8); } P(hx, hy - 1, 17); },
+            Crown: () => { for (let x = -3; x <= 3; x++) P(hx + x, hy, 17); for (const x of [-3, 0, 3]) { P(hx + x, hy - 1, 17); P(hx + x, hy - 2, 17); } },
+            'Ice Crown': () => { for (let x = -3; x <= 3; x++) P(hx + x, hy, 7); for (const x of [-3, -1, 1, 3]) for (let k = 1; k < 4 - Math.abs(x) % 2 * 1; k++) P(hx + x, hy - k, 8); },
+            'Party Hat': () => { for (let y = 0; y < 6; y++) for (let x = -2 + Math.floor(y / 2); x <= 2 - Math.floor(y / 2); x++) P(hx + x, hy - y, y % 2 ? 17 : 16); P(hx, hy - 6, 8); },
+            Flower: () => { for (const [a, b] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) P(hx + a, hy - 1 + b, 9); P(hx, hy - 1, 17); },
+            'Snow Cap': () => { for (let x = -3; x <= 3; x++) { P(hx + x, hy, 8); if (Math.abs(x) < 3) P(hx + x, hy - 1, 8); } },
+            Lure: () => { for (let k = 0; k < 6; k++) P(hx + 1 + k * 0.5, hy - k, 2); P(hx + 4, hy - 6, ((t * 2) % 1) < 0.5 ? 17 : 8); },
+            Halo: () => { for (let a = 0; a < 16; a++) P(hx + Math.cos(a / 16 * 6.283) * 4, hy - 3 + Math.sin(a / 16 * 6.283) * 1.2, 17); },
+          }[hat];
+          if (HT) HT();
+          const [nx0, ny0] = spine[46], nr = rad(0.77);
+          const NK = {
+            'Striped Scarf': () => { for (let k = -3; k <= 3; k++) for (let w = 0; w < 2; w++) P(nx0 + k * 0.6 + w, ny0 - nr + 1 + k, (k + w) % 2 ? 16 : 8); },
+            'Bow Tie': () => { const bx = nx0 + nr * 0.6, by = ny0 + nr * 0.4; P(bx, by, 1); P(bx - 1, by - 1, 1); P(bx - 1, by + 1, 1); P(bx + 1, by - 1, 1); P(bx + 1, by + 1, 1); },
+            'Life Ring': () => { for (let a = 0; a < 20; a++) P(nx0 + Math.cos(a * 0.314) * (nr + 1), ny0 + Math.sin(a * 0.314) * (nr * 0.4 + 1), a % 5 < 2 ? 16 : 8); },
+            Pearls: () => { for (let k = -3; k <= 3; k++) P(nx0 + k * 1.2, ny0 + nr * 0.6 + Math.abs(k) * -0.3, 8); },
+            Medal: () => { P(nx0 + 2, ny0 + nr * 0.7, 17); P(nx0 + 2, ny0 + nr * 0.7 + 1, 17); P(nx0 + 1, ny0 + nr * 0.4, 16); },
+            Kelp: () => { for (let k = -4; k <= 4; k++) P(nx0 + k, ny0 + nr * 0.5 + Math.sin(k) * 0.8, 18); },
+            Bell: () => { P(nx0 + 1, ny0 + nr * 0.7, 17); P(nx0, ny0 + nr * 0.7 + 1, 17); P(nx0 + 2, ny0 + nr * 0.7 + 1, 17); P(nx0 + 1, ny0 + nr * 0.7 + 1, 17); },
+            'Shell Necklace': () => { for (let k = -3; k <= 3; k++) P(nx0 + k * 1.2, ny0 + nr * 0.6, k % 2 ? 19 : 8); },
+          }[neck];
+          if (NK) NK();
+          // the companion on the ice (Companion)
+          if (pal2 === 'Puffin') { const qx = 66, qy = 70; for (const [a, b, k] of [[0, 0, 1], [0, -1, 1], [1, -1, 8], [0, -2, 1], [1, -2, 8], [2, -2, 16], [0, -3, 1], [1, -3, 1], [1, 1, 16], [-1, 0, 1]]) P(qx + a, qy + b, k); }
+          if (pal2 === 'Fish School') for (let k = 0; k < 4; k++) { const u = (t * 0.6 + k * 0.25) % 1, fx = 8 + k * 6 + u * 10, fy = 52 - Math.sin(u * Math.PI) * 10; P(fx, fy, 6); P(fx + 1, fy, 6); P(fx - 1, fy - 1, 6); P(fx - 1, fy + 1, 6); }
+          if (pal2 === 'Jellyfish') { const jx = 80, jy = 30 + Math.sin(t * 1.2) * 3; for (let x = -2; x <= 2; x++) P(jx + x, jy, 13); for (const x of [-2, 0, 2]) for (let k = 1; k < 4; k++) P(jx + x + Math.sin(t * 3 + k + x) * 0.5, jy + k, 13); }
+          if (pal2 === 'Bubbles') for (let k = 0; k < 5; k++) { const u = (t * 0.3 + k * 0.2) % 1; P(HOLE[0] + (k - 2) * 3 + Math.sin(t * 2 + k) * 1.5, HOLE[1] - u * 30, u < 0.8 ? 7 : 6); }
+          // drops of melt water, falling into the hole
+          if (warm > 0.1) for (let k = 0; k < 3; k++) { const per = 1.6 - warm, u = ((t + k * 0.5) % per) / per, src = k === 0 ? [36, 56] : k === 1 ? [HEAD[0] + 2, HEAD[1] + 6] : [TB[0] + (TE[0] - TB[0]) * tcut, TB[1] + (TE[1] - TB[1]) * tcut]; P(src[0], src[1] + u * (HOLE[1] - src[1]), 7); P(src[0], src[1] + u * (HOLE[1] - src[1]) + 1, 6); }
+          // snow falling, always; in a Snowfall scene, more of it
+          for (const [sx, sy, sp] of scene === 'Snowfall' || scene === 'Floes' ? snow : snow.slice(0, 16)) { const y = (sy + t * sp * 8) % G, x = (sx + Math.sin(t + sy) * 2 + G) % G; P(x, y, 7); }
+          // the prism's rainbow, through the carving and out across the dark
+          if (pt < 2.5) for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) { const q = Math.floor(x / 2) * 2 * 0.8 - Math.floor(y / 2) * 2 * 0.6 - (-20 + pt * 60); if (q > -4.5 && q < 4.5 && (BODY[y * G + x] > 0 || (y < 60 && x > 50))) px[y * G + x] = [9, 10, 12][Math.min(2, Math.floor((q + 4.5) / 3))]; }   // (a stepped band of three colours)
+          // the lamp itself
+          if (inp.inside) { P(lmx, lmy, 8); P(lmx - 1, lmy, 7); P(lmx + 1, lmy, 7); P(lmx, lmy - 1, 7); P(lmx, lmy + 1, 7); }
+          // the frame (Frame)
+          for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+            const i = y * G + x, d = Math.min(x, y, G - 1 - x, G - 1 - y);
+            if (frameKind === 'Porthole') { const r = Math.hypot(x - 47.5, y - 47.5); if (r > 46) px[i] = 1; else if (r > 44) px[i] = r > 45 ? 3 : 6; }
+            else if (frameKind === 'Frosted Corners') { if (FROST[Math.min(y, G - 1 - y) * 24 + Math.min(x, G - 1 - x)] && Math.min(x, G - 1 - x) < 24 && Math.min(y, G - 1 - y) < 24) px[i] = FROST[Math.min(y, G - 1 - y) * 24 + Math.min(x, G - 1 - x)]; }
+            else if (frameKind === 'Rope') { if (d < 3) px[i] = ((x + y + (d === 1 ? 2 : 0)) % 4 < 2) ? 17 : 2; }
+            else if (frameKind === 'Snapshot') { if (d < 3 || y > G - 10) px[i] = d === 0 ? 6 : 8; }
+            else if (frameKind === 'Gilt Frame') { if (d < 4) px[i] = d === 0 || d === 3 ? 2 : (x + y) % 3 ? 17 : 10; }
+          }
+          const d = im.data;
+          for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) { const p = PAL[px[y * G + (MX ? G - 1 - x : x)]], j = (y * G + x) * 4; d[j] = p[0]; d[j + 1] = p[1]; d[j + 2] = p[2]; d[j + 3] = 255; }
+          cx2.putImageData(im, 0, 0);
+          g.imageSmoothingEnabled = false;
+          g.drawImage(cv, 0, 0, S, S);
+        };
+      }
+      // ---- The Unicorn: a page of an old bestiary. Under a pointed gilt arch on lapis diapered with gold, the white
+      // old bull rises side on out of curling medieval waves, its great spiral horn running up past the arch to the
+      // corner, a figurehead crown on its head, barnacles on its neck and the scars of a long life on its back. The
+      // waves roll, it rides them, a sheen runs up the horn and the gold glints; a tap and it sings, a ring of light
+      // climbs the horn and the crown flashes.
+      const IV = H(['#3a332c', '#7a7266', '#b8b0a0', '#e2dccc', '#fffcf2']), LAPIS = H(['#0a1236', '#14215e', '#22378a']);
+      const VERM = H(['#4a0c0c', '#8a1a14', '#c43a22']), SEA2 = H(['#06263a', '#0e4a62', '#1c7088', '#cfeef0']), GOLD = RING, HORN = H(['#5a4a30', '#a89870', '#e6dec6', '#f8f4e8', '#ffffff']);
+      const INKI = cid(INK), WH = cid(WHITE), G = GOLD.map(cid), L = LAPIS.map(cid), V = VERM.map(cid), SE = SEA2.map(cid), IVI = IV.map(cid), HI = HORN.map(cid), BA = BARN.map(cid), PE = cid(PEARLC[1]), RB = cid(RIBBON), TE = cid(TEAR);
+      // the page: a pointed arch springing at y 22 from x 5 to 43, its gold band, red spandrels with gold dots, the lapis
+      // field with its diaper of gold lines and dots
+      const BGP = new Int32Array(NS), BGM = new Uint8Array(NS);
+      for (let sy = 0; sy < SSN; sy++) for (let sx = 0; sx < SSN; sx++) {
+        const si = sy * SSN + sx, px = (sx + 0.5) / SS, X = MIRX ? N - px : px, py = (sy + 0.5) / SS;
+        const inA = X > 5 && X < 43 && (py >= 22 || (Math.hypot(X - 25, py - 22) < 20 && Math.hypot(X - 23, py - 22) < 20));
+        const inB = X > 3.6 && X < 44.4 && (py >= 22 || (Math.hypot(X - 25, py - 22) < 21.4 && Math.hypot(X - 23, py - 22) < 21.4));
+        let k;
+        if (inA) {
+          const u = ((X + py) % 8 + 8) % 8, v = ((X - py) % 8 + 8) % 8;
+          k = u < 0.3 || v < 0.3 ? G[0] : L[py < 10 ? 0 : 1];
+          // and a few gold stars in the field, that twinkle
+          for (const [qx, qy] of [[9, 12], [15, 6], [36, 8], [40, 15], [31, 4], [8, 20], [37, 21]]) { const ax = Math.abs(X - qx), ay = Math.abs(py - qy); if (ax + ay < 0.8 || (ax < 0.28 && ay < 1.5) || (ay < 0.28 && ax < 1.5)) { k = G[ax + ay < 0.8 ? 4 : 3]; BGM[si] = 1 + (qx % 3); } }
+        } else if (inB) k = (Math.abs(X - 3.6) < 0.45 || Math.abs(X - 44.4) < 0.45 || (!inA && py < 22 && !(Math.hypot(X - 25, py - 22) < 21) && !(Math.hypot(X - 23, py - 22) < 21))) ? G[0] : G[py < 22 ? 4 : 3];
+        else {
+          k = V[1];
+          const u = ((X * 0.5 + py * 0.5) % 3 + 3) % 3, v = ((X * 0.5 - py * 0.5) % 3 + 3) % 3;
+          if ((u - 1.5) ** 2 + (v - 1.5) ** 2 < 0.22) k = G[3]; else if (u < 0.2 || v < 0.2) k = V[0];
+        }
+        BGP[si] = k;
+      }
+      // the old bull: a tube along a curve rising out of the sea, its blunt head to the right
+      const P = [[-5, 46], [3, 35], [10, 27.5], [21.5, 24.5]];
+      const pts = spineOf(P, s => 5.6 + 1.6 * sstep(0, 0.4, s) - 0.5 * sstep(0.85, 1, s), 40);
+      const HB = [28, 24.3], HE = [46.6, 1.2], HL = Math.hypot(HE[0] - HB[0], HE[1] - HB[1]);
+      const LX = -0.5, LY = -0.75, LZ = 0.45;
+      const scars = [[6, 27, 9.5, 29.5], [2.5, 32, 6, 33.5], [12, 21, 15, 22.4]];
+      const barn = [[9.6, 24.6, 1.3], [12.3, 23.4, 1.1], [11.2, 26.4, 0.9], [7.4, 26.6, 0.9], [14.2, 25.6, 0.7]];
+      const GILD = new Float32Array(NS).fill(-99);
+      let gLast = null;
+      const layers = new Map();
+      const layerOf = oyq => {
+        let lay = layers.get(oyq);
+        if (lay) return lay;
+        lay = { k: new Int32Array(NS).fill(-1), m: new Uint8Array(NS), u: new Float32Array(NS) };
+        for (let sy = 0; sy < SSN; sy++) for (let sx = 0; sx < SSN; sx++) {
+          const si = sy * SSN + sx, px = (sx + 0.5) / SS, X = MIRX ? N - px : px, py = (sy + 0.5) / SS - oyq;
+          // the horn: twisted ivory and gold with deep grooves
+          const [dh, uh] = seg(X, py, HB[0], HB[1], HE[0], HE[1], 2, 0.3);
+          if (dh < 0) {
+            const across = ((X - HB[0]) * (HE[1] - HB[1]) - (py - HB[1]) * (HE[0] - HB[0])) / HL, tw = ((uh * HL * 1.05 + across * 0.7) % 1.7 + 1.7) % 1.7;
+            lay.k[si] = dh > -0.38 ? HI[0] : tw < 0.42 ? HI[1] : across > 0.3 ? HI[2] : tw < 0.7 ? HI[3] : HI[4];
+            lay.m[si] = 2; lay.u[si] = uh; continue;
+          }
+          // the crown: a band with five points tipped with pearls, a red jewel and two blue ones
+          const cdx = X - 21, cy = py - 1;
+          if (Math.abs(cdx) < 7.4 && cy > 12.2 && cy < 20.4) {
+            for (let k = -2; k <= 2; k++) { const r2 = (X - 21 - k * 3.4) ** 2 + (cy - 13.7 + Math.abs(k) * 0.5) ** 2; if (r2 < 1.1) { lay.k[si] = r2 < 0.3 ? WH : IVI[3]; lay.m[si] = 3; break; } }
+            if (lay.k[si] >= 0) continue;
+            const sp = ((cdx + 8.5) % 3.4 + 3.4) % 3.4, tip = 13.4 + Math.abs(sp - 1.7) * 2.6 + Math.abs(cdx) * 0.12;
+            if (cy > tip || cy > 17.2) {
+              const band = cy > 17.2;
+              let k = band ? (cy < 17.8 ? G[4] : cy > 19.7 ? G[0] : G[2]) : (sp < 1.7 ? G[4] : G[3]);
+              if (Math.abs(cdx) > 6.8 || (!band && cy - tip < 0.45)) k = G[0];
+              if (band && cy > 17.9 && cy < 19.6) { if (cdx * cdx + (cy - 18.7) ** 2 < 1) k = RB; else if ((Math.abs(cdx) - 3.6) ** 2 + (cy - 18.7) ** 2 < 0.6) k = TE; }
+              lay.k[si] = k; lay.m[si] = 3; continue;
+            }
+          }
+          let [dd, s, cx0, cy0, r] = tube(pts, X, py);
+          // the flipper, low by the water
+          const fq = flipAt(X, py, 15.5, 33.5, 4.2, 1.6, 0.75);
+          let nx = (X - cx0) / r, ny = (py - cy0) / r;
+          if (fq[0] < dd) { dd = fq[0]; nx = fq[1] * 0.7; ny = fq[2] * 0.7; }
+          if (dd >= 0) continue;
+          const nz = Math.sqrt(Math.max(0.04, 1 - Math.min(1, nx * nx + ny * ny))), lam = (nx * LX + ny * LY + nz * LZ) / Math.hypot(nx, ny, nz);
+          let k = Math.max(1, Math.min(4, Math.floor((lam + 0.35) * 3.4)));
+          if (py > 31 && X < 30) k = Math.max(1, k - 1);
+          if (dd > -0.55) k = lam < 0.3 ? 0 : 1;                     // a dark edge all round, darkest on the shadow side
+          let kk = IVI[k];
+          for (const [ax, ay, bx2, by2] of scars) if (seg(X, py, ax, ay, bx2, by2, 0.22, 0.22)[0] < 0) kk = IVI[Math.max(1, k - 2)];
+          for (const [bx2, by2, br] of barn) { const e = Math.hypot(X - bx2, py - by2); if (e < br) kk = e < br * 0.38 ? BA[0] : (X - bx2) + (py - by2) < -0.3 ? BA[3] : BA[2]; else if (e < br + 0.3) kk = BA[0]; }
+          // the old eye under a heavy lid, and the long mouth
+          const ex = X - 23.6, ey = py - 23.4;
+          if (ex * ex / 1.2 + ey * ey / 0.8 < 1) { kk = ey < -0.15 ? IVI[1] : ex > 0.3 && ey > 0.1 ? IVI[3] : INKI; lay.m[si] = 4; }
+          else if (Math.abs(ey + 1.15 - ex * 0.15) < 0.3 && Math.abs(ex) < 1.6) kk = IVI[1];
+          const mq = X - 24.6, my = py - (27.6 + mq * mq * 0.05);
+          if (mq > -4.5 && mq < 3.2 && Math.abs(my) < 0.3) kk = IVI[0];
+          lay.k[si] = kk; if (!lay.m[si]) lay.m[si] = 1;
+        }
+        layers.set(oyq, lay);
+        return lay;
+      };
+      // every height it bobs to, laid out now rather than on the first frame that reaches it
+      for (let q = -2; q <= 2; q++) layerOf(q / 4);
+      // the page's own gilding (the arch's band, its gold lines and dots, the stars, the crown): the only places your
+      // gold leaf will take; and the illuminated initial in the free corner, its frame filling in as you gild
+      const GOLDS = new Set(G), GOK = new Uint8Array(NS);
+      let GOKN = 0;
+      for (let si = 0; si < NS; si++) {
+        if (!GOLDS.has(BGP[si])) continue;
+        // (not the fine diaper lines on the lapis: those stay quiet)
+        const px = (si % SSN + 0.5) / SS, X = MIRX ? N - px : px, py = ((si / SSN | 0) + 0.5) / SS;
+        const inA = X > 5 && X < 43 && (py >= 22 || (Math.hypot(X - 25, py - 22) < 20 && Math.hypot(X - 23, py - 22) < 20));
+        if (inA && BGP[si] === G[0]) continue;
+        GOK[si] = 1; GOKN++;
+      }
+      const lay0 = layerOf(0);
+      for (let si = 0; si < NS; si++) if (lay0.m[si] === 3 && GOLDS.has(lay0.k[si]) && !GOK[si]) { GOK[si] = 2; GOKN++; }
+      const IB = [1.2, 1.2, 9.4, 9.4];   // the initial's box
+      const inIB = (X, py) => X > IB[0] && X < IB[2] && py > IB[1] && py < IB[3];
+      const PERIM = (X, py) => { const w = IB[2] - IB[0], h = IB[3] - IB[1], x = X - IB[0], y = py - IB[1]; return y < 0.7 ? x / (2 * (w + h)) : x > w - 0.7 ? (w + y) / (2 * (w + h)) : y > h - 0.7 ? (w + h + (w - x)) / (2 * (w + h)) : (2 * w + h + (h - y)) / (2 * (w + h)); };
+      const letterU = (X, py) => { const x = X - IB[0], y = py - IB[1]; return y > 1.6 && y < 6.8 && ((x > 1.8 && x < 3.1) || (x > 5.1 && x < 6.4)) || (y > 5.6 && y < 6.8 && x > 1.8 && x < 6.4); };
+      const SINGM = [45, 52, 57, 52, 50];
+      let gilded = 0, doneAt = -9;
+      return t => {
+        const inp = c.input;
+        tt = t;
+        if (inp.inside && !wasIn2) [50, 57, 62].forEach((m, i) => c.sound.note(m, { dur: 1.8, vel: 0.06, wave: 'sine', attack: 0.5, at: i * 0.12 }));
+        wasIn2 = inp.inside;
+        if (shortTap(inp, t) && t - legAt2 > 1.8) { legAt2 = t; SINGM.forEach((m, i) => c.sound.note(m, { dur: 0.9, vel: 0.14, wave: 'sine', attack: 0.25, at: i * 0.32 })); c.sound.note(88, { dur: 1.4, vel: 0.04, wave: 'sine', at: 0.2 }); }
+        const lt = t - legAt2, hv = inp.inside;
+        const oyq = Math.round(Math.sin(t * 0.9 + swayOff) * 2) / 4, lay = layerOf(oyq);
+        const sheen = ((t * (hv ? 0.9 : 0.3)) % 1.4), ring = lt < 1.1 ? lt / 1.0 : -1, blinkOn = ((t + blinkOff) % 5.2) < 0.18;
+        const glintC = lt < 0.9 || (t * 0.5) % 3 < 0.25, wv = t * 0.8;
+        // singing: each note a neume rising from its mouth, the waves lifting and the stars flashing with it
+        let lift = 0, note = false;
+        const neumes = [];
+        if (lt < 3.4) SINGM.forEach((m, i) => { const u = lt - i * 0.32; if (u < 0) return; if (u < 0.35) { lift = Math.max(lift, (1 - u / 0.35) * 1.1); note = note || u < 0.18; } if (u < 1.9) neumes.push([30 + i * 2.2 + Math.sin(u * 4 + i) * 0.8, 26.5 - u * 6 - (m - 45) * 0.15, u]); });
+        // gilding: press and drag over the page's gold to lay leaf on it, burnished bright; the rest of the page won't take it
+        if (inp.down && inp.inside) {
+          const gx = inp.x * SSN, gy = inp.y * SSN, a = gLast || [gx, gy], n = Math.ceil(Math.hypot(gx - a[0], gy - a[1]) / 2) + 1;
+          let took = 0;
+          for (let k = 0; k <= n; k++) { const cx2 = a[0] + (gx - a[0]) * k / n, cy2 = a[1] + (gy - a[1]) * k / n; for (let y = Math.floor(cy2 - 7); y <= cy2 + 7; y++) for (let x = Math.floor(cx2 - 7); x <= cx2 + 7; x++) { if (x < 0 || y < 0 || x >= SSN || y >= SSN || (x - cx2) ** 2 + (y - cy2) ** 2 >= 46) continue; const j = y * SSN + x; if (GOK[j] && GILD[j] < 0) { GILD[j] = t; gilded++; took++; } } }
+          if (took && (!gLast || Math.hypot(gx - a[0], gy - a[1]) > 10)) c.sound.note(84 + ((gx / 12) | 0) % 7, { dur: 0.3, vel: 0.035, wave: 'sine' });
+          gLast = [gx, gy];
+        } else gLast = null;
+        const prog = Math.min(1, gilded / (GOKN * 0.5));
+        if (prog >= 1 && doneAt < 0) { doneAt = t; [62, 66, 69, 74, 78].forEach((m, i) => c.sound.note(m, { dur: 2.2, vel: 0.05, wave: 'sine', attack: 0.1, at: i * 0.09 })); }
+        const done = doneAt > 0, dsw = done && t - doneAt < 1.2 ? (t - doneAt) / 1.2 * 110 - 20 : -99;   // the flash of light across the finished page
+        paint((si, X, py) => {
+          if (dsw > -99 && Math.abs(X + py - dsw) < 1.4) return WH;
+          // the illuminated initial: its frame filling in with gold as you gild; finished, a gold U on lapis
+          if (inIB(X, py)) {
+            const x = X - IB[0], y = py - IB[1], edge = x < 0.7 || y < 0.7 || x > IB[2] - IB[0] - 0.7 || y > IB[3] - IB[1] - 0.7;
+            if (edge) return PERIM(X, py) < prog ? (((si * 2654435761) >>> 0) % 13 === 0 || Math.abs(PERIM(X, py) - prog) < 0.02 ? WH : G[4]) : G[0];
+            if (letterU(X, py)) return done ? (x < 2.3 || (y > 5.6 && y < 6.1) ? WH : G[4]) : IVI[1];
+            if (done) { const vine = Math.abs(Math.sin(x * 1.6) * 1.1 + 4 - y) < 0.35 && (x < 1.6 || x > 6.6); return vine ? G[3] : L[2]; }
+            return V[0];
+          }
+          for (const [nx, ny, u] of neumes) { const dx = X - nx, dy = py - ny; if (Math.abs(dx) + Math.abs(dy) * 1.2 < 1.2) return u < 1.3 ? (dx + dy < -0.5 ? WH : G[4]) : G[2]; if (Math.abs(dx - 0.9) < 0.25 && dy > 0 && dy < 2.6) return G[3]; }
+          const ga = GILD[si] > 0 ? t - GILD[si] : -1;
+          // the sea, in front: rows of curling waves, each row rolling its own way (lifting with each sung note)
+          const sp = 34.6 - lift;
+          if (py > sp) {
+            const row = Math.floor((py - sp) / 3.3), ry = py - sp - row * 3.3, xo = X + (row % 2) * 3.3 + (row % 2 ? wv : -wv);
+            const cxw = ((xo % 6.6) + 6.6) % 6.6 - 3.3, arc = 3.3 - Math.sqrt(Math.max(0, 10.9 - cxw * cxw));
+            if (Math.abs(ry - arc) < 0.45) return row % 2 ? SE[2] : SE[3];
+            if (ry > arc) return SE[1];
+            if (row > 0) return SE[0];
+          }
+          const burnish = col => {
+            // laid leaf: a step brighter, a shine sweeping over it now and then, a glint here and there
+            if (((X + py * 0.6 - t * 14) % 40 + 40) % 40 < 1.1 || (((si * 2654435761) >>> 0) + Math.floor(t * 6)) % 61 === 0) return WH;
+            return col === G[0] ? G[2] : col === G[1] ? G[3] : G[4];
+          };
+          const k = lay.k[si];
+          if (k >= 0) {
+            const m = lay.m[si];
+            if (m === 2) { const u = lay.u[si]; if (ring >= 0 && Math.abs(u - ring) < 0.05) return WH; if (Math.abs(u - sheen) < 0.035) return WH; }
+            if (m === 3 && glintC) { const gx = Math.abs(X - 24.4), gy = Math.abs(py - oyq - 13.9); if (gx + gy < 0.9 || (gx < 0.35 && gy < 2.4) || (gy < 0.35 && gx < 2.4)) return WH; }
+            if (m === 3 && ga >= 0 && GOLDS.has(k)) return burnish(k);
+            if (m === 4 && blinkOn) return IVI[1];
+            return k;
+          }
+          if (BGM[si] && (note || ((t * 0.7 + BGM[si] * 0.37) % 1) < 0.18)) return BGM[si] === 2 || note ? WH : G[4];
+          if (ga >= 0 && GOK[si] === 1) return burnish(BGP[si]);
+          return BGP[si];
+        });
+      };
+    })() : null;
     let spoutAt = -9, wasIn = false;
     function frame(t) {
+      if (legendFrame) return legendFrame(t);
       tt = t;
       const inp = c.input;
       hov = LEG && inp.inside ? [inp.x * N, inp.y * N] : null;

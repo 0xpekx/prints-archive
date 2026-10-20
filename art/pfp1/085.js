@@ -163,6 +163,11 @@ Proto.add({
       g.save(); g.translate(J() * 2, J() * 2); g.globalAlpha = 0.3; g.lineWidth = base * 0.5; smooth(g, pts); g.stroke(); g.restore();
     };
 
+    // the legendaries are paintings of their own (legendPainting, at the end); a type set to false here falls back
+    // to its earlier look, the template dumpling further down
+    const NEW_LEGEND = { 'Koi Bun': true, 'Steam Spirit': true };
+    if (legend && NEW_LEGEND[legend]) return legendPainting();
+
     // ---------- the dumpling's silhouette ----------
     const BX = 500, BY = 700, y0 = BY - 10;
     const ring = fn => { const o = []; for (let i = 0; i < 48; i++) { const a = Math.PI + i / 48 * Math.PI * 2; o.push(fn(Math.cos(a), Math.sin(a), i)); } return o; };
@@ -629,8 +634,12 @@ Proto.add({
     // (where it sits, its spacing and tilt were settled above; it is clipped to the dough so a face set off to one side wraps round)
     const faceT = g => { g.translate(fx, fy); g.rotate(tilt); g.scale(FS, FS); g.translate(-fx, -fy); };
     d.save(); smooth(d, outline); d.clip(); faceT(d);
-    const blush = cheeks === 'Peachy' ? [250, 150, 90] : [240, 110, 120];
     const lookSide = chop || garnish.n === 'Soy Dish' ? 1 : garnish.n === 'Little Sibling' ? -1 : prop !== 'None' ? propSide : sj[11] < 0.5 ? -1 : 1;
+    faceMarks(d, fx, fy, gap, lookSide, shadeCol);
+    d.restore();
+    // the cheeks, the mouth and a whole-face expression, painted at (fx, fy) (a function so the legendaries can paint them too)
+    function faceMarks(d, fx, fy, gap, lookSide, shadeCol) {
+    const blush = cheeks === 'Peachy' ? [250, 150, 90] : [240, 110, 120];
     if (cheeks === 'Rosy' || cheeks === 'Peachy' || cheeks === 'Freckled' || cheeks === 'Steamy Flush') {
       const big = cheeks === 'Steamy Flush' ? 1.3 : 1, al = cheeks === 'Steamy Flush' ? 0.3 : cheeks === 'Freckled' ? 0.15 : cheeks === 'Peachy' ? 0.26 : 0.22;
       for (const sd of [-1, 1]) washOf(d, ellipsePts(fx + sd * (gap + 52), fy + 40, 40 * big, 24 * big, 16), blush, al, 4, 4);
@@ -684,7 +693,7 @@ Proto.add({
       const hw = gap + 44;
       washOf(d, [[fx - hw, fy + 6], [fx - hw * 0.5, fy - 18], [fx, fy - 24], [fx + hw * 0.5, fy - 18], [fx + hw, fy + 6], [fx + hw * 0.6, fy + 24], [fx, fy + 30], [fx - hw * 0.6, fy + 24]], coal ? [20, 18, 24] : shadeCol.map(v => v * 0.6 | 0), coal ? 0.4 : 0.2, 2, 4);
     }
-    d.restore();
+    }
 
     // the koi's barbels and side fins, and its tail on a canvas of its own so it can swish
     let tailCv = null;
@@ -805,7 +814,9 @@ Proto.add({
     gx.putImageData(img, 0, 0);
 
     const ctx = c.ctx;
-    const eye1 = (sd, ex, ey, open, t) => {
+    const eye1 = (sd, ex, ey, open, t) => eyeOne(ctx, lookSide, sd, ex, ey, open, t);
+    // one eye of the trait's kind (a function so the legendaries can draw them too)
+    function eyeOne(ctx, lookSide, sd, ex, ey, open, t) {
       if (E === 'Peeping') {   // big round eyes looking out from under the fold, each with a glint
         if (open < 0.3) { ctx.beginPath(); ctx.moveTo(ex - 18, ey + 4); ctx.lineTo(ex + 18, ey + 4); ctx.stroke(); return; }
         ctx.beginPath(); ctx.ellipse(ex + lookSide * 3, ey + 4, 16, 19, 0, 0, 7); ctx.fill();
@@ -849,7 +860,7 @@ Proto.add({
           ctx.fillStyle = 'rgba(255,255,250,' + (0.7 + 0.3 * Math.sin(t * 1.7 + sd)).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(ex + 7, ey - 9, 6, 0, 7); ctx.fill(); ctx.fillStyle = FPEN;
         }
       }
-    };
+    }
     // the whole-face expressions' eyes
     const faceEye = (sd, ex, ey, open, t) => {
       if (face === 'Asleep') {
@@ -1104,6 +1115,457 @@ Proto.add({
     puffs.length = rings.length = drops.length = 0; fluster = 0; cookieAt = -9; spiritPuff = -9; kickAt = -9;
     draw(0);
     return t => { knead(t); draw(t); };
+
+    // ---------- the legendaries: each one a painting of its own (2026-10-19) ----------
+    // Not the dumpling on its dish with a filter over it: a whole sheet painted for the one bun, the wash stopping
+    // short of the paper's edge, signed with the painter's seal. It keeps the face its traits name (eyes, mouth and
+    // cheeks) and draws its own variety from a stream of its own, so nothing an ordinary dumpling rolls moves.
+    function legendPainting() {
+      const ctx = c.ctx, koi = legend === 'Koi Bun';
+      let ls = (h ^ 0x51ed270b) >>> 0;
+      const L = () => { ls = (ls + 0x6d2b79f5) >>> 0; let z = ls; z = Math.imul(z ^ (z >>> 15), z | 1); z ^= z + Math.imul(z ^ (z >>> 7), z | 61); return ((z ^ (z >>> 14)) >>> 0) / 4294967296; };
+      const paperCol = { 'Cotton White': '#fbf6ec', 'Cream': '#f6ecd6', 'Rice Paper': '#f8f3e6', 'Kraft': '#e3cfab', 'Gold Flecked': '#f7f0e0' }[paper];
+      const mix = (a, b, u) => a.map((v, i) => v + (b[i] - v) * u | 0);
+      const path = pts => { const p = new Path2D(), n = pts.length, l = pts[n - 1]; p.moveTo((l[0] + pts[0][0]) / 2, (l[1] + pts[0][1]) / 2); for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; p.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); } p.closePath(); return p; };
+      // a canvas for just part of the sheet (x0..x1, y0..y1 in the 1000 frame), so a frame only moves the pixels it needs
+      const part = (x0, y0, x1, y1) => { const px0 = Math.floor(x0 * k), py0 = Math.floor(y0 * k), pw = Math.ceil(x1 * k) - px0, ph = Math.ceil(y1 * k) - py0, cv = document.createElement('canvas'); cv.width = pw; cv.height = ph; const g = cv.getContext('2d'); g.setTransform(k, 0, 0, k, -px0, -py0); g.lineCap = 'round'; g.lineJoin = 'round'; return [cv, g, [px0 / k, py0 / k, pw / k, ph / k]]; };
+      const put = (cv, r, dx = 0, dy = 0) => ctx.drawImage(cv, r[0] + dx, r[1] + dy, r[2], r[3]);
+      const strokePts = (g, pts) => { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length - 1; i++) g.quadraticCurveTo(pts[i][0], pts[i][1], (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2); g.lineTo(pts[pts.length - 1][0], pts[pts.length - 1][1]); };
+      // the painted sheet: the wash stops about 46 in from the paper's edge, along a line that wobbles as a brush does
+      const sheet = [];
+      const side = (x0, y0, x1, y1) => { for (let i = 0; i < 14; i++) { const u = i / 14; sheet.push([x0 + (x1 - x0) * u + (L() - 0.5) * 9, y0 + (y1 - y0) * u + (L() - 0.5) * 9]); } };
+      side(46, 46, 954, 46); side(954, 46, 954, 954); side(954, 954, 46, 954); side(46, 954, 46, 46);
+      // the frame over everything: bare paper round the sheet, its dried edge, and the painter's signature and seal
+      const [mc, m] = canvas();
+      m.fillStyle = paperCol; m.fillRect(0, 0, 1000, 1000);
+      m.globalCompositeOperation = 'destination-out'; smooth(m, sheet); m.fill(); m.globalCompositeOperation = 'source-over';
+      const sealAt = koi ? [104, 236] : [884, 600];
+      const sign = (g, x, y) => {
+        // three quick strokes of a signature, then the seal pressed under it (paper showing through where the stone is cut)
+        g.strokeStyle = koi ? 'rgba(236,214,160,0.8)' : 'rgba(226,212,236,0.75)'; g.lineCap = 'round';
+        for (let i = 0; i < 3; i++) { const yy = y - 150 + i * 36; g.lineWidth = 4 + L() * 3; g.beginPath(); g.moveTo(x - 10 + L() * 6, yy); g.quadraticCurveTo(x + 8, yy + 8 + L() * 6, x - 4 + L() * 8, yy + 22); g.stroke(); if (i !== 1) { g.lineWidth = 3; g.beginPath(); g.moveTo(x - 14, yy + 10); g.lineTo(x + 12, yy + 8 + L() * 5); g.stroke(); } }
+        const s = 30, sq = [[x - s, y - s], [x + s, y - s], [x + s, y + s], [x - s, y + s]].map(([a, b]) => [a + (L() - 0.5) * 4, b + (L() - 0.5) * 4]);
+        g.fillStyle = 'rgba(206,46,40,0.92)'; g.beginPath(); sq.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fill();
+        g.strokeStyle = paperCol; g.lineWidth = 4.5; g.lineCap = 'square'; g.lineJoin = 'miter';
+        g.strokeRect(x - s + 7, y - s + 7, 2 * s - 14, 2 * s - 14);
+        g.beginPath();
+        if (koi) { g.ellipse(x - 2, y, 12, 7, 0, 0, 7); g.moveTo(x + 10, y); g.lineTo(x + 17, y - 7); g.moveTo(x + 10, y); g.lineTo(x + 17, y + 7); }
+        else { g.moveTo(x - 15, y - 12); g.lineTo(x - 11, y - 8); g.moveTo(x - 15, y); g.lineTo(x - 11, y + 2); g.moveTo(x - 15, y + 12); g.lineTo(x - 11, y + 10); for (let q = 0; q < 14; q++) { const a = q * 0.62, r = 2 + q * 0.75; g.lineTo(x + 5 + Math.cos(a) * r, y + Math.sin(a) * r); } }
+        g.stroke(); g.lineJoin = 'round'; g.lineCap = 'round';
+        g.fillStyle = 'rgba(206,46,40,0.9)'; for (let i = 0; i < 9; i++) { g.beginPath(); g.arc(x + (L() - 0.5) * 50, y + (L() - 0.5) * 50, 0.8 + L() * 1.4, 0, 7); g.fill(); }
+      };
+      // paper grain over everything (as the ordinary prints have)
+      const grain = document.createElement('canvas'); grain.width = grain.height = N;
+      { const gx = grain.getContext('2d'), img = gx.createImageData(N, N), px = img.data; let s = h | 1; const tooth = paper === 'Kraft' ? 1.6 : 1;
+        for (let i = 0; i < px.length; i += 4) { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; const v = (s >>> 24); px[i] = px[i + 1] = px[i + 2] = 120; px[i + 3] = (v < 50 ? 26 : v < 120 ? 10 : 0) * tooth; }
+        gx.putImageData(img, 0, 0); }
+      const blinkAt = t => (t + blinkPh) % 4.4 < 0.14 ? 0 : 1;
+      const eyesAt = (open, t, gap, es) => {
+        ctx.strokeStyle = FPEN; ctx.fillStyle = FPEN; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 7;
+        for (const sd of [-1, 1]) { ctx.save(); ctx.translate(sd * gap, 0); ctx.scale(es, es); eyeOne(ctx, sd, sd, 0, 0, open, t); ctx.restore(); }
+      };
+      const sq = [0, 2, 4, 7, 9].map(v => v + 74 + Math.floor(L() * 5));
+      // a tap acts on a short, still release, so a press that turns into a hold or a drag never fires it too
+      // (onDown, if given, hears every press as it lands)
+      let tpDown = null;
+      const shortTaps = (t, inp, onDown) => {
+        const out = [];
+        for (const tp of inp.taps()) { const q = [tp.x * 1000, tp.y * 1000]; if (onDown) onDown(q); if (!inp.down) out.push(q); else tpDown = [q[0], q[1], t, 0]; }
+        if (tpDown) {
+          if (inp.down) tpDown[3] = Math.max(tpDown[3], Math.hypot(inp.x * 1000 - tpDown[0], inp.y * 1000 - tpDown[1]));
+          else { if (t - tpDown[2] < 0.25 && tpDown[3] < 30) out.push([tpDown[0], tpDown[1]]); tpDown = null; }
+        }
+        return out;
+      };
+      return koi ? koiPainting() : spiritPainting();
+
+      // ===== Koi Bun (redesign 2, 2026-10-20): Ming blue-and-white porcelain. A glazed white bowl seen from above, painted in
+      // cobalt: a border of rolling waves inside its rim, waterweed and a lotus pad in the well, and the koi bun painted
+      // swimming round it (a koi's head, tapering body and forked tail, the bao's pleated knot on its back, the print's face
+      // on its head). Its Dish is the rim's border, its Paper the table, its Garnish and Side Treat sit on the table, and
+      // its Laid As marks the bowl. Tap the well to drop a pellet and it swims over and gulps it; tap the koi to startle
+      // it; drag through the water to leave rings. =====
+      function koiPainting() {
+        const G = 64, pc = document.createElement('canvas'); pc.width = pc.height = G;
+        const pg = pc.getContext('2d'), im = pg.createImageData(G, G), px32 = new Uint32Array(im.data.buffer);
+        const PALS = [], PI = {};
+        const pal = (name, rgb) => { PI[name] = PALS.length; PALS.push(rgb); return PI[name]; };
+        // the glaze and four cobalts, deepest to palest wash
+        pal('glaze', [242, 245, 248]); pal('sheen', [255, 255, 255]); pal('c1', [22, 40, 118]); pal('c2', [48, 84, 172]); pal('c3', [118, 148, 208]); pal('c4', [196, 210, 236]);
+        const paperRGB = { 'Cotton White': [232, 234, 236], 'Cream': [236, 226, 200], 'Rice Paper': [226, 232, 222], 'Kraft': [196, 164, 120], 'Gold Flecked': [238, 228, 196] }[paper] || [232, 234, 236];
+        pal('paper', paperRGB); pal('paperD', paperRGB.map(v => v * 0.88 | 0)); pal('fleck', [214, 170, 60]);
+        // overglaze accents, used sparingly: iron red, gold, celadon, and the cheeks' enamels
+        pal('red', [206, 54, 36]); pal('gold', [226, 180, 64]); pal('goldL', [250, 226, 140]); pal('celadon', [150, 196, 168]);
+        pal('pink', [236, 120, 140]); pal('peach', [240, 150, 96]); pal('yellow', [240, 200, 60]); pal('green', [70, 170, 110]); pal('mouthIn', [150, 40, 50]); pal('tongue', [226, 96, 106]);
+        pal('pellet', [150, 96, 44]); pal('crust', [200, 146, 70]); pal('seal', [200, 44, 40]);
+        pal('soy', [60, 36, 24]); pal('tea', [170, 120, 60]); pal('chili', [210, 50, 30]); pal('tart', [246, 206, 80]); pal('lacq', [200, 50, 40]); pal('wood', [176, 128, 70]);
+        const PX = PALS.map(([r, g2, b]) => (255 << 24 | b << 16 | g2 << 8 | r) >>> 0);
+        const P = PI, IDX = new Uint8Array(G * G), BASE = new Uint8Array(G * G);
+        const C = 31.5, RP = 27.6, WV = RP - 3.6;   // the bowl's middle, the inside of its rim, the inside of its wave border
+        const inPond = (x, y) => Math.hypot(x + 0.5 - C, y + 0.5 - C) < RP;
+        const inWell = (x, y) => Math.hypot(x + 0.5 - C, y + 0.5 - C) < WV - 0.6;
+        const pattern = ['Kohaku', 'Tancho', 'Showa', 'Kohaku', 'Ogon', 'Tancho'][Math.floor(L() * 6)];
+        // ---- the bowl, painted once: the table, the rim's border (its Dish), the wave border, the well ----
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+          const i = y * G + x, a = Math.atan2(y + 0.5 - C, x + 0.5 - C), d = Math.hypot(x + 0.5 - C, y + 0.5 - C), ang = (a + Math.PI) / (Math.PI * 2);
+          if (d >= RP + 3.6) { BASE[i] = P.paper; continue; }
+          if (d >= RP + 3) { BASE[i] = P.gold; continue; }
+          if (d >= RP) {
+            const k = Math.floor(ang * 40), r = d - RP;   // r: 0 (inner edge) .. 3 (outer edge)
+            let v = P.glaze;
+            if (dishN === 'Bamboo Steamer' || dishN === 'Stacked Steamers') v = ((Math.floor(ang * 80) + Math.floor(r * 2)) % 2) ? P.c2 : P.glaze;          // a woven lattice
+            else if (dishN === 'Blue Plate') v = (k % 2 === 0 && r > 0.8 && r < 2.2) ? P.glaze : P.c1;                                                  // deep cobalt, a ring of white dots
+            else if (dishN === 'Celadon Plate') v = r < 0.6 ? P.c1 : P.celadon;                                                                         // a celadon glaze
+            else if (dishN === 'Banana Leaf') v = Math.abs((ang * 24) % 1 - 0.5) * 2 < r / 3 ? P.glaze : P.c2;                                          // pointed leaf panels
+            else if (dishN === 'Lotus Leaf') v = Math.abs((ang * 18) % 1 - 0.5) * 2 > 0.85 - r * 0.25 ? P.c1 : P.c3;                                    // lotus petal panels
+            else if (dishN === 'Red Lacquer') v = r < 0.7 ? P.gold : P.red;                                                                             // iron red with a gold line
+            else v = (k % 3 === 0) ? P.c2 : P.c3;
+            if (dishN === 'Stacked Steamers' && Math.abs(r - 1.5) < 0.4) v = P.c1;
+            if (paper === 'Gold Flecked' && Math.abs(r - 1.5) < 0.5 && (Math.floor(ang * 120) % 11 === 3)) v = P.gold;   // gold flecks in the rim's glaze
+            BASE[i] = v; continue;
+          }
+          // the wave border: rolling crests in cobalt over a pale wash, a fine double line inside it
+          if (d >= WV) {
+            const s2 = a * RP, r = RP - d, crest = 2.8 - 2.2 * Math.abs(Math.sin(s2 * Math.PI / 8));
+            BASE[i] = Math.abs(r - crest) < 0.5 ? P.glaze : r < crest ? P.c3 : laid === 'Two-Tone' && x + y > G + 2 ? P.c1 : P.c2;
+            continue;
+          }
+          BASE[i] = d >= WV - 1 ? P.c1 : P.glaze;
+          if (laid === 'Band' && Math.abs(d - (WV - 3)) < 0.5) BASE[i] = P.c2;                         // a second painted ring
+        }
+        // the glaze's sheen: a short white arc high on the left
+        for (let k = 0; k < 14; k++) { const a = -2.75 + k * 0.06, x = Math.round(C + Math.cos(a) * (WV - 3.2) - 0.5), y = Math.round(C + Math.sin(a) * (WV - 3.2) - 0.5); if (BASE[y * G + x] === P.glaze) BASE[y * G + x] = P.sheen; }
+        // laid in Bloom: one lotus blossom painted high in the well
+        if (laid === 'Bloom') for (const [dx, dy, v] of [[0, -2, 'c2'], [-1, -1, 'c2'], [1, -1, 'c2'], [-2, 0, 'c1'], [2, 0, 'c1'], [-1, 0, 'c3'], [1, 0, 'c3'], [0, 0, 'glaze'], [0, -1, 'c3'], [-1, 1, 'c1'], [1, 1, 'c1'], [0, 1, 'c2']]) BASE[(15 + dy) * G + 18 + dx] = P[v];
+        // the table's things: Garnish bottom-left, Side Treat bottom-right, the seal top-left; Splash and Drips spatter it in cobalt
+        const putSp = (rows, x0, y0, map) => rows.forEach((r, j) => { for (let q = 0; q < r.length; q++) if (r[q] !== '.') BASE[(y0 + j) * G + x0 + q] = P[map[r[q]]]; });
+        if (garnish.n === 'Soy Dish') putSp(['.kkkk.', 'kwsswk', 'kwsswk', '.kkkk.'], 1, 57, { k: 'c1', w: 'glaze', s: 'soy' });
+        const SIDE = {
+          Teacup: [['.kkkk.', 'kcttck', 'kcccck', '.kcck.'], { k: 'c1', c: 'glaze', t: 'tea' }],
+          Teapot: [['..kk...', '.kcck.k', 'kcbbckk', 'kcccck.', '.kkkk..'], { k: 'c1', c: 'glaze', b: 'c2' }],
+          'Chili Oil': [['.kkkk.', 'kwrrwk', 'kwrrwk', '.kkkk.'], { k: 'c1', w: 'glaze', r: 'chili' }],
+          'Plum Sprig': [['k.l..', '.k.l.', 'l.k..', '...k.', '....k'], { k: 'soy', l: 'pink' }],
+          'Egg Tart': [['.cccc.', 'cyyyyc', 'cyyyyc', '.cccc.'], { c: 'crust', y: 'tart' }],
+          'Steamer Lid': [['.kkkkk.', 'krrrrrk', 'krkrkrk', '.kkkkk.'], { k: 'soy', r: 'wood' }],
+          'Paper Lantern': [['..k..', '.lll.', 'lllll', '.lll.', '..k..'], { k: 'c1', l: 'lacq' }],
+        }[prop];
+        if (SIDE) putSp(SIDE[0], 57, 57, SIDE[1]);
+        putSp(['sss', 's.s', 'sss'], 2, 2, { s: 'seal' });
+        if (laid === 'Splash' || laid === 'Drips') for (let k = 0; k < 9; k++) { const x = Math.floor(L() * G), y = Math.floor(L() * G); if (!inPond(x, y) && Math.hypot(x + 0.5 - C, y + 0.5 - C) > RP + 4) { BASE[y * G + x] = P.c2; if (laid === 'Drips' && y + 1 < G) BASE[(y + 1) * G + x] = P.c3; } }
+        const flakes = laid === 'Gold Leaf' || paper === 'Gold Flecked' ? Array.from({ length: 7 }, () => [L() * G, L() * G, L() * 6.28]) : [];
+        const strokes = Array.from({ length: 6 }, () => [C + (L() - 0.5) * 30, C + (L() - 0.5) * 30, L() * 6.28]);
+
+        // ---- the koi bun: drawn each frame in its own frame of reference (u along the body, head forward) ----
+        const KS = 1.45;
+        let kx = C + 3, ky = C, kh = Math.PI / 2, startle = -9, gulpAt = -9, lastT = 0, orbit = L() * 6.28;
+        const pellets = [], rings = [], trail = [];
+        let wakeAt = [-99, -99];
+        const spots = [];
+        for (let k = 0; k < 5; k++) spots.push([L() * 10 - 5, (L() - 0.5) * 3, 1.6 + L() * 1.2, k]);
+        const fan = (u, vv, ru, rv, len, a0, a1, sw) => { const fu = u - ru, fv = Math.abs(vv) - rv; if (fu > 1 || fu < -len || fv < 0 || fv > len) return 0; const rho = Math.hypot(fu, fv), phi = Math.atan2(fv, -fu) - sw; return rho < len && phi > a0 && phi < a1 ? (Math.abs(((phi - a0) / (a1 - a0) * 3) % 1 - 0.5) > 0.36 ? 2 : rho > len * 0.75 ? 3 : 1) : 0; };
+        const koiAt = (cx2, cy2, h, sc, t, sib) => {
+          const ca = Math.cos(h), sa = Math.sin(h), R2 = 19 * sc, fsw = Math.sin(t * 5 + (sib ? 1 : 0)) * 0.9;
+          for (let y = Math.floor(cy2 - R2); y <= cy2 + R2; y++) for (let x = Math.floor(cx2 - R2); x <= cx2 + R2; x++) {
+            if (x < 0 || y < 0 || x >= G || y >= G || !inWell(x, y)) continue;
+            const dx = (x + 0.5 - cx2) / sc, dy = (y + 0.5 - cy2) / sc, u = dx * ca + dy * sa, v = -dx * sa + dy * ca;
+            const wig = Math.sin(t * 6 - u * 0.35) * (u < 3 ? (3 - u) * 0.06 : 0), vv = v - wig;
+            // a torpedo body: a round head with the eyes, widest at the shoulders, tapering to a narrow root
+            const half = u > 2 && u < 10.4 ? 4.6 * Math.sqrt(Math.max(0, 1 - ((u - 2) / 8.4) ** 2)) : u <= 2 && u > -8 ? 1.2 + 3.4 * Math.sin(Math.PI / 2 * (u + 8) / 10) : 0;
+            // the tail: a flowing fan of brush strokes that bends and sways behind the root, each lobe trailing
+            const tu = -8 - u, bend = tu > 0 ? Math.sin(t * 4.5 - tu * 0.35) * 0.014 * tu * tu : 0, tv = vv - bend;
+            const tail = tu >= 0 && tu < 9 && Math.abs(tv) < 1.0 + tu * 0.48 - (tu > 7.5 ? (tu - 7.5) * 1.4 : 0) && !(tu > 5 && Math.abs(tv) < (tu - 5) * 0.5);
+            const stroke = tail && tu > 1.5 && (Math.abs(tv) < 0.4 || Math.abs(Math.abs(tv) - tu * 0.32) < 0.4);
+            // the fins as brush strokes fanned back from their roots: big pectorals that row as it swims, small pelvics behind
+            const finS = fan(u, vv, 3.6, 3.4, 4.6, 0.12, 0.8, fsw * (v > 0 ? 0.25 : -0.25)), finP = fan(u, vv, -3.8, 1.6, 2.4, 0.15, 0.75, fsw * (v > 0 ? -0.15 : 0.15));
+            const i = y * G + x;
+            if (Math.abs(vv) < half) {
+              // one clean silhouette in cobalt (gold for an Ogon), with a single brush highlight down its back
+              let c2 = sib ? P.c3 : pattern === 'Ogon' ? P.gold : P.c2;
+              if (!sib) {
+                for (const [su, sv, sr, k] of spots) if (k < 3 && (pattern === 'Kohaku' || pattern === 'Showa') && Math.hypot(u - su, v - sv) < sr) c2 = P.c1;
+                if (pattern === 'Showa' && Math.abs(u + 2) < 0.7) c2 = P.c1;
+                if (pattern === 'Tancho' && Math.hypot(u - 7.4, v) < 2.2) c2 = P.red;   // its one overglaze accent: the red crown
+                if (Math.abs(vv + 1.6) < 0.55 && u > -4 && u < 4.5) c2 = pattern === 'Ogon' ? P.goldL : P.glaze;
+                if (laid === 'Gold Leaf') for (const [gu, gv] of [[-4.5, 1.2], [-1, 2.2], [2.5, -0.5], [4.8, 2], [-6, -0.6]]) if (Math.abs(u - gu) < 0.6 && Math.abs(v - gv) < 0.6) c2 = pattern === 'Ogon' ? P.goldL : P.gold;   // gold leaf laid on its back
+              }
+              IDX[i] = c2; MK[i] = 1;
+            } else if (tail) MK[i] = 1, IDX[i] = sib ? P.c3 : stroke ? (pattern === 'Ogon' ? P.goldL : P.c1) : tu > 7 ? (pattern === 'Ogon' ? P.goldL : P.c3) : pattern === 'Ogon' ? P.gold : P.c2;
+            else if ((finS || finP) && !sib) { const f = finS || finP; IDX[i] = f === 2 ? (pattern === 'Ogon' ? P.gold : P.c3) : pattern === 'Ogon' ? P.goldL : P.c4; }   // fins: a pale, see-through wash with strokes
+          }
+        };
+        const MK = new Uint8Array(G * G);
+        // the print's face, painted upright on its head: eyes, mouth and cheeks as its traits name them
+        const EYE = {
+          Dots: ['...', '.k.', '...'], Content: ['...', 'k.k', '...'], 'Happy Tears': ['...', 'k.k', '..b'], Sparkle: ['kw.', 'kk.', '...'], Teary: ['kw.', 'kk.', 'b..'],
+          'Big Sparkle': ['kw.', 'kk.', '..y'], Sleepy: ['...', 'kkk', '...'], Starry: ['.y.', 'yyy', '.y.'], Shy: ['...', '.k.', 'p..'], Determined: ['k..', '.k.', '.k.'],
+          Dizzy: ['kkk', 'k.k', 'kkk'], 'Dot Brows': ['.k.', '...', '.k.'], 'Jade Glint': ['gw.', 'gg.', '...'], Wink: ['...', '.k.', '...'], Peeping: ['...', '.k.', '...'],
+        };
+        const MOUTH = {
+          'Tiny Smile': ['k...k', '.kkk.'], Open: ['.kkk.', '.krk.'], Cat: ['k.k.k', '.k.k.'], Pout: ['.kkk.', 'k...k'], Drool: ['k...k', '.kkkb'], Yawn: ['.kkk.', '.kik.'],
+          Tongue: ['k...k', '.ktk.'], 'Fang Grin': ['k...k', '.kwk.'], Nom: ['kkkkk', '.kik.'], Whistle: ['..k..', '.k.k.'], Wobbly: ['k.k.k', '.k.k.'], Kiss: ['.p.p.', '..p..'], 'Big Laugh': ['kkkkk', '.iti.'], Hidden: ['.....', '.....'],
+        };
+        const fk = pattern === 'Ogon' ? 'c1' : 'sheen', fmap = { k: fk, w: 'c4', b: 'c4', y: fk, p: 'c4', g: fk, r: 'c1', i: 'c1', t: 'c4' };
+        // the face sits on the fish's head as a fish's would: an eye on each side, the mouth at the snout, cheeks behind the eyes
+        const drawFace = (t, gulp) => {
+          const open = blinkAt(t), ca = Math.cos(kh), sa = Math.sin(kh), W = (u, v) => [Math.round(kx + (u * ca - v * sa) * KS), Math.round(ky + (u * sa + v * ca) * KS)];
+          const e = EYE[E] || EYE.Dots, put = (x, y, v) => { if (x >= 0 && y >= 0 && x < G && y < G) IDX[y * G + x] = P[v]; };
+          [-1, 1].forEach(sd => {
+            const [ex, ey] = W(6.6, sd * 2.9);
+            const glyph = !open ? ['...', 'kkk', '...'] : E === 'Wink' && sd > 0 ? EYE.Content : e;
+            glyph.forEach((r, j) => { for (let q = 0; q < 3; q++) if (r[q] !== '.') put(ex - 1 + q, ey - 1 + j, fmap[r[q]]); });
+            const ch = cheeks && cheeks !== 'None' ? (pattern === 'Ogon' ? 'c2' : 'c4') : null;
+            if (ch) { const [cx3, cy3] = W(4.4, sd * 3.2); put(cx3, cy3, ch); if (cheeks !== 'Freckled') put(cx3 + 1, cy3, ch); if (cheeks === 'Hearts' || cheeks === 'Steamy Flush') put(cx3, cy3 - 1, ch); }
+          });
+          const [mx, my] = W(9.2, 0), m = gulp ? MOUTH['Big Laugh'] : MOUTH[M] || MOUTH['Tiny Smile'];
+          m.forEach((r, j) => { for (let q = 0; q < 5; q++) if (r[q] !== '.') put(mx - 2 + q, my - 1 + j, fmap[r[q]]); });
+        };
+        const shortTap = q => [q[0] / 1000 * G, q[1] / 1000 * G];
+        const frame = t => {
+          const dt = Math.max(0, Math.min(0.1, t - lastT)); lastT = t;
+          const inp = c.input, gx = inp.x * G, gy = inp.y * G;
+          for (const q of shortTaps(t, inp)) {
+            const [x, y] = shortTap(q);
+            if (Math.hypot(x - kx, y - ky) < 11) { startle = t; kh = Math.atan2(ky - y, kx - x); rings.push([kx, ky, t]); c.sound.hit('noise', 0.12, { cutoff: 2600, dur: 0.3 }); c.sound.note(sq[4], { dur: 0.08, vel: 0.1, wave: 'sine' }); }
+            else if (inWell(Math.floor(x), Math.floor(y))) { pellets.push([x, y, t]); if (pellets.length > 4) pellets.shift(); rings.push([x, y, t]); c.sound.note(sq[1] + 12, { dur: 0.06, vel: 0.08, wave: 'sine' }); }
+            if (rings.length > 8) rings.shift();
+          }
+          // a finger dragged through the water leaves rings behind it
+          if (inp.down && inp.inside && inWell(Math.floor(gx), Math.floor(gy)) && Math.hypot(gx - wakeAt[0], gy - wakeAt[1]) > 8) { wakeAt = [gx, gy]; rings.push([gx, gy, t]); if (rings.length > 6) rings.shift(); c.sound.note(sq[(rings.length * 3) % 5] - 7, { dur: 0.07, vel: 0.05, wave: 'sine' }); }
+          if (!inp.down) wakeAt = [-99, -99];
+          // the koi swims: round the bowl at rest, to the nearest pellet when there is one, dashing off when startled
+          orbit += dt * 0.42;
+          const HD = 9.5 * KS, hx0 = kx + Math.cos(kh) * HD, hy0 = ky + Math.sin(kh) * HD;
+          let tx = C + Math.cos(orbit) * 4, ty = C + Math.sin(orbit) * 4, sp = 4.5;
+          if (pellets.length) { let best = pellets[0], bd = 1e9; for (const p2 of pellets) { const d = Math.hypot(p2[0] - hx0, p2[1] - hy0); if (d < bd) { bd = d; best = p2; } } tx = best[0] - Math.cos(kh) * HD; ty = best[1] - Math.sin(kh) * HD; sp = 9; if (bd < 2.6) { pellets.splice(pellets.indexOf(best), 1); gulpAt = t; rings.push([best[0], best[1], t]); if (rings.length > 8) rings.shift(); c.sound.note(sq[0] - 5, { dur: 0.1, vel: 0.14, wave: 'sine' }); c.sound.note(sq[2] - 5, { dur: 0.08, vel: 0.1, wave: 'sine', at: 0.08 }); } }
+          if (t - startle < 0.7) sp = 16;
+          else { const want = Math.atan2(ty - ky, tx - kx); let dh = ((want - kh + Math.PI * 3) % (Math.PI * 2)) - Math.PI; kh += Math.max(-1, Math.min(1, dh)) * dt * (pellets.length ? 3.2 : 1.6); }
+          kx += Math.cos(kh) * sp * dt; ky += Math.sin(kh) * sp * dt;
+          const mx0 = kx - Math.cos(kh) * 3 * KS, my0 = ky - Math.sin(kh) * 3 * KS, dC = Math.hypot(mx0 - C, my0 - C), lim = pellets.length ? 7 : 5; if (dC > lim) { kx -= (mx0 - C) / dC * (dC - lim); ky -= (my0 - C) / dC * (dC - lim); kh += dt * 2; }
+          trail.push([kx, ky, kh]); if (trail.length > 16) trail.shift();
+          // ---- compose the frame ----
+          IDX.set(BASE);
+          // a few slow strokes of current, painted in the palest wash
+          for (const [sx2, sy2, ph] of strokes) { const x0 = sx2 + Math.sin(t * 0.25 + ph) * 3, y0 = sy2 + Math.cos(t * 0.2 + ph) * 2; for (let k = 0; k < 5; k++) { const x = Math.round(x0 + k), y = Math.round(y0 + Math.sin(k * 0.8 + ph) * 0.8); if (x >= 0 && y >= 0 && x < G && y < G && inWell(x, y) && IDX[y * G + x] === P.glaze) IDX[y * G + x] = P.c4; } }
+          // rings on the water: crisp cobalt circles that pale as they spread
+          for (const [rx, ry, r0] of rings) { const a = t - r0; if (a > 1.4) continue; const rad = 1 + a * 9; for (let k = 0; k < 48; k++) { const an = k / 48 * 6.283, x = Math.round(rx + Math.cos(an) * rad - 0.5), y = Math.round(ry + Math.sin(an) * rad - 0.5); if (x >= 0 && y >= 0 && x < G && y < G && inWell(x, y)) if (IDX[y * G + x] === P.glaze || IDX[y * G + x] === P.c4) IDX[y * G + x] = a < 0.6 ? P.c2 : P.c3; } }
+          for (const [x, y] of pellets) { const xi = Math.floor(x), yi = Math.floor(y); for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) if (inWell(xi + a, yi + b)) IDX[(yi + b) * G + xi + a] = P.c1; }
+          // the little sibling circles on its own, out near the rim
+          if (garnish.n === 'Little Sibling') { const a = -orbit * 1.3 + 2; koiAt(C + Math.cos(a) * 17, C + Math.sin(a) * 17, a - Math.PI / 2, 0.4, t + 1, true); }
+          MK.fill(0);
+          koiAt(kx, ky, kh, KS, t, false);
+          const fx2 = kx + Math.cos(kh) * 7.4 * KS, fy2 = ky + Math.sin(kh) * 7.4 * KS;
+          drawFace(t, t - gulpAt < 0.35);
+          if (t - gulpAt < 1.2) for (let k = 0; k < 2; k++) { const a = (t - gulpAt) * 1.2 + k * 0.4, x = Math.round(fx2 + Math.cos(kh) * 6 + k * 2), y = Math.round(fy2 + Math.sin(kh) * 6 - a * 6); if (x >= 0 && y >= 0 && x < G && y < G && inWell(x, y)) IDX[y * G + x] = P.c2; }
+          // a cobalt outline round the koi (and its sibling), where it now covers the bowl
+          for (let i = G; i < G * (G - 1); i++) if (!MK[i] && (MK[i - 1] || MK[i + 1] || MK[i - G] || MK[i + G]) && inWell(i % G, (i / G) | 0)) IDX[i] = P.c1;
+          for (let i = 0; i < G * G; i++) px32[i] = PX[IDX[i]];
+          pg.putImageData(im, 0, 0);
+          ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(pc, 0, 0, N, N);
+        };
+        frame(0);
+        return frame;
+      }
+
+      // ===== Steam Spirit: a ghost of steam rising out of its steamer, wearing the lid like a hat =====
+      function spiritPainting() {
+        const night = [[34, 28, 72], [22, 34, 76], [46, 26, 66]][Math.floor(L() * 3)];
+        const [bgc, bg] = canvas();
+        bg.fillStyle = paperCol; bg.fillRect(0, 0, 1000, 1000);
+        const sheetP = path(sheet), dk = night.map(v => v * 0.45 | 0);
+        bg.fillStyle = rgba(night, 0.95); bg.fill(sheetP);
+        washOf(bg, sheet, night, 0.2, 4, 2);
+        bg.save(); bg.clip(sheetP);
+        for (let i = 0; i < 14; i++) { const x = 100 + L() * 800, y = 80 + L() * 600, r = 60 + L() * 120; washOf(bg, ellipsePts(x, y, r, r * (0.6 + L() * 0.4), 18), i % 2 ? night.map(v => v * 0.7 | 0) : mix(night, [140, 130, 200], 0.35), 0.06, 10, 2); }
+        let gr = bg.createLinearGradient(0, 40, 0, 520); gr.addColorStop(0, rgba(dk, 0.75)); gr.addColorStop(1, rgba(dk, 0)); bg.fillStyle = gr; bg.fillRect(0, 0, 1000, 1000);
+        // the steamer's light thrown up into the dark, and a pale nimbus behind the spirit's head
+        gr = bg.createRadialGradient(500, 790, 40, 500, 760, 560); gr.addColorStop(0, 'rgba(255,196,120,0.55)'); gr.addColorStop(0.45, 'rgba(240,150,110,0.16)'); gr.addColorStop(1, 'rgba(200,120,140,0)'); bg.fillStyle = gr; bg.fillRect(0, 0, 1000, 1000);
+        gr = bg.createRadialGradient(500, 300, 120, 500, 300, 330); gr.addColorStop(0, 'rgba(190,200,255,0.2)'); gr.addColorStop(1, 'rgba(190,200,255,0)'); bg.fillStyle = gr; bg.fillRect(0, 0, 1000, 1000);
+        bg.restore();
+        // a round window behind it (a marumado), moonlight through its lattice and a plum branch across it in ink
+        const WX = 520, WY = 300, WR = 238;
+        gr = bg.createRadialGradient(WX - 40, WY - 60, 20, WX, WY, WR); gr.addColorStop(0, 'rgba(176,192,240,0.55)'); gr.addColorStop(1, 'rgba(110,124,190,0.4)'); bg.fillStyle = gr; bg.beginPath(); bg.arc(WX, WY, WR, 0, 7); bg.fill();
+        bg.save(); bg.beginPath(); bg.arc(WX, WY, WR, 0, 7); bg.clip();
+        bg.strokeStyle = 'rgba(28,24,52,0.55)'; bg.lineWidth = 7;
+        for (let x = WX - WR; x <= WX + WR; x += 68) { bg.beginPath(); bg.moveTo(x, WY - WR); bg.lineTo(x, WY + WR); bg.stroke(); }
+        for (let y = WY - WR + 40; y <= WY + WR; y += 92) { bg.beginPath(); bg.moveTo(WX - WR, y); bg.lineTo(WX + WR, y); bg.stroke(); }
+        bg.restore();
+        pen(bg, g => { g.beginPath(); g.arc(WX, WY, WR, 0, 7); }, 9, 'rgba(24,18,40,0.85)');
+        pen(bg, g => { g.beginPath(); g.arc(WX, WY, WR + 16, 0, 7); }, 3, 'rgba(160,170,230,0.3)');
+        // the plum branch, coming in from the left edge of the window, with a few blossoms
+        pen(bg, g => { g.beginPath(); g.moveTo(WX - WR - 30, WY - 40); g.quadraticCurveTo(WX - 120, WY - 150, WX + 30, WY - 190); g.moveTo(WX - 130, WY - 118); g.quadraticCurveTo(WX - 160, WY - 210, WX - 90, WY - 250); }, 9, 'rgba(26,18,30,0.92)');
+        for (const [bx, by] of [[WX - 60, WY - 175], [WX + 10, WY - 196], [WX - 140, WY - 150], [WX - 100, WY - 240], [WX - 190, WY - 92]]) {
+          for (let p = 0; p < 5; p++) { const a = p * 1.2566; washOf(bg, ellipsePts(bx + Math.cos(a) * 11, by + Math.sin(a) * 11, 10, 10, 10), [240, 150, 180], 0.4, 1.5, 2); }
+          bg.fillStyle = 'rgba(250,220,120,0.9)'; bg.beginPath(); bg.arc(bx, by, 4, 0, 7); bg.fill();
+        }
+        for (let i = 0; i < 40; i++) { const x = 70 + L() * 860, y = 60 + L() * 500; if (Math.hypot(x - 520, y - 300) < 250) continue; bg.fillStyle = 'rgba(236,230,255,' + (0.3 + L() * 0.5).toFixed(2) + ')'; bg.beginPath(); bg.arc(x, y, 1.2 + L() * 2.4, 0, 7); bg.fill(); }
+
+        // the steamer: a big bamboo basket at the foot of the sheet, its open mouth glowing
+        const SX = 500, SY = 752, SW = 282, SH = 64, SB = 132;
+        washOf(bg, ellipsePts(SX + 30, SY + SB + 52, SW + 60, 34, 30), [10, 6, 20], 0.18, 8, 3);
+        washOf(bg, ellipsePts(SX, SY, SW, SH, 48), [190, 140, 80], 0.5, 3, 4);
+        washOf(bg, ellipsePts(SX, SY + 6, SW - 28, SH - 16, 48), [255, 226, 160], 0.55, 4, 5);
+        washOf(bg, ellipsePts(SX, SY + 8, SW - 80, SH - 30, 40), [255, 246, 214], 0.5, 4, 4);
+        pen(bg, g => smooth(g, ellipsePts(SX, SY, SW, SH, 48)), 4.5);
+        const [fc, f] = canvas();
+        const band = [];
+        for (let i = 0; i <= 30; i++) { const a = i / 30 * Math.PI; band.push([SX + Math.cos(a) * SW, SY + Math.sin(a) * SH]); }
+        for (let i = 30; i >= 0; i--) { const a = i / 30 * Math.PI; band.push([SX + Math.cos(a) * SW, SY + SB + Math.sin(a) * SH]); }
+        washOf(f, band, [214, 168, 96], 0.42, 4, 5);
+        washRing(f, band, band.map(([x, y]) => [SX - 120 + (x - SX + 120) * 0.84, y]), [120, 70, 60], 0.14, 6, 3);
+        f.strokeStyle = 'rgba(120,76,40,0.45)'; f.lineWidth = 4;
+        for (let i = 1; i < 5; i++) { f.beginPath(); for (let j = 0; j <= 30; j++) { const a = j / 30 * Math.PI, x = SX + Math.cos(a) * SW, y = SY + i * 26 + Math.sin(a) * SH; j ? f.lineTo(x, y) : f.moveTo(x, y); } f.stroke(); }
+        for (let i = 0; i < 13; i++) { const a = 0.12 + i / 12 * (Math.PI - 0.24), x = SX + Math.cos(a) * SW; pen(f, g => { g.beginPath(); g.moveTo(x, SY + 8 + Math.sin(a) * SH); g.lineTo(x, SY + SB - 6 + Math.sin(a) * SH); }, 2.5); }
+        f.strokeStyle = 'rgba(255,214,150,0.7)'; f.lineWidth = 6; f.beginPath(); f.ellipse(SX, SY, SW - 4, SH - 3, 0, 0.15, Math.PI - 0.15); f.stroke();
+        inkLine(f, band, 5);
+
+        // the spirit: a ghost of layered veils, a bao's pleated crown for a head, shoulders, a waist, and its tail
+        // pouring back down into the basket; two sleeves of vapour curl out from its shoulders
+        const HX = 500, HY = 318;
+        const half = [[0, 176], [64, 184], [116, 212], [150, 262], [164, 320], [156, 376], [146, 420], [176, 462], [182, 520], [158, 584], [116, 640], [104, 690], [140, 730], [230, 760]];
+        const sil = half.map(([x, y]) => [HX + x, y]).concat(half.slice(1).reverse().map(([x, y]) => [HX - x, y]));
+        const silP = path(sil);
+        const [sc, s, sr2] = part(60, 140, 940, 800);
+        // the sleeves, behind the body
+        s.lineCap = 'round';
+        const sleeve = sd => { const pts = []; for (let i = 0; i <= 40; i++) { const u = i / 40; let x, y; if (u < 0.6) { const v = u / 0.6; x = HX + sd * (150 + v * 180); y = 470 - Math.sin(v * Math.PI * 0.9) * 90 + v * 10; } else { const v = (u - 0.6) / 0.4, a = -Math.PI / 2 + sd * (v * 4.4), r = 54 * (1 - v * 0.7); x = HX + sd * 330 + Math.cos(a) * r * sd; y = 418 + 54 + Math.sin(a) * r; } pts.push([x, y]); } return pts; };
+        for (const sd of [-1, 1]) {
+          const pts = sleeve(sd);
+          for (const [lw, al] of [[76, 0.07], [52, 0.1], [30, 0.16], [14, 0.24]]) {
+            for (let i = 1; i < pts.length; i++) { const u = i / pts.length; s.strokeStyle = 'rgba(232,238,255,' + (al * (1.1 - u * 0.5)).toFixed(3) + ')'; s.lineWidth = lw * (1 - u * 0.75); s.beginPath(); s.moveTo(pts[i - 1][0], pts[i - 1][1]); s.lineTo(pts[i][0], pts[i][1]); s.stroke(); }
+          }
+          pen(s, g => strokePts(g, pts.slice(26)), 2.5, 'rgba(190,206,255,0.5)');
+        }
+        // veils: wide faint ones outside, brighter and tighter toward the core
+        for (let l = 0; l < 4; l++) washOf(s, sil.map(([x, y]) => [HX + (x - HX) * (1.16 - l * 0.04), 470 + (y - 470) * (1.06 - l * 0.015)]), [214, 226, 255], 0.05, 26, 3);
+        for (let l = 0; l < 7; l++) washOf(s, sil.map(([x, y]) => [HX + (x - HX) * (1.0 - l * 0.06), 470 + (y - 470) * (1.0 - l * 0.03)]), [236, 242, 255], 0.12, 16, 3);
+        s.save(); s.clip(silP);
+        // warm light from the basket below, cool moonlight on the crown
+        gr = s.createLinearGradient(0, 760, 0, 380); gr.addColorStop(0, 'rgba(255,190,120,0.5)'); gr.addColorStop(1, 'rgba(255,190,120,0)'); s.fillStyle = gr; s.fillRect(0, 300, 1000, 500);
+        gr = s.createLinearGradient(HX - 170, 0, HX + 170, 0); gr.addColorStop(0, 'rgba(120,130,210,0.18)'); gr.addColorStop(0.45, 'rgba(120,130,210,0)'); gr.addColorStop(1, 'rgba(90,100,190,0.22)'); s.fillStyle = gr; s.fillRect(0, 150, 1000, 650);
+        // the bao's pleats on the crown, in pale blue
+        for (let i = 0; i < 9; i++) { const a = Math.PI * (1.1 + i * 0.1), ex = HX + Math.cos(a) * 150, ey = HY + 30 + Math.sin(a) * 110; pen(s, g => { g.beginPath(); g.moveTo(HX + (i - 4) * 3, 186); g.quadraticCurveTo(HX + (ex - HX) * 0.4 + 24, 186 + (ey - 186) * 0.55, ex, ey); }, 3.2, 'rgba(120,140,220,0.55)'); }
+        s.restore();
+        // a soft edge of brighter vapour on the outline
+        s.strokeStyle = 'rgba(246,248,255,0.4)'; s.lineWidth = 6; s.stroke(silP);
+        s.strokeStyle = 'rgba(120,140,220,0.35)'; s.lineWidth = 2.5; s.stroke(silP);
+        // the face (its traits' cheeks and mouth)
+        const FY = HY + 44, GAP = 52;
+        s.save(); s.translate(HX, FY); s.scale(1.12, 1.12); faceMarks(s, 0, 0, GAP, 1, [140, 160, 220]); s.restore();
+
+        // the steamer's lid, worn tilted on the crown
+        const [lc, lg, lr2] = part(340, 370, 660, 560); lg.translate(500, 500);
+        const LW = 138, LH = 30, LB = 40;
+        const lband = []; for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI; lband.push([Math.cos(a) * LW, Math.sin(a) * LH]); } for (let i = 24; i >= 0; i--) { const a = i / 24 * Math.PI; lband.push([Math.cos(a) * LW, -LB + Math.sin(a) * LH]); }
+        washOf(lg, lband, [206, 160, 90], 0.45, 2, 4);
+        lg.strokeStyle = 'rgba(120,76,40,0.45)'; lg.lineWidth = 3; for (let i = 1; i < 3; i++) { lg.beginPath(); lg.ellipse(0, -LB + i * 13, LW, LH, 0, 0.05, Math.PI - 0.05); lg.stroke(); }
+        inkLine(lg, lband, 4);
+        const lt = ellipsePts(0, -LB, LW, LH, 40);
+        washOf(lg, lt, [222, 182, 110], 0.5, 2, 4);
+        lg.save(); smooth(lg, lt); lg.clip(); lg.strokeStyle = 'rgba(130,86,40,0.45)'; lg.lineWidth = 2.6;
+        for (let x = -LW; x <= LW; x += 18) { lg.beginPath(); lg.moveTo(x, -LB - LH); lg.lineTo(x + 30, -LB + LH); lg.moveTo(x + 30, -LB - LH); lg.lineTo(x, -LB + LH); lg.stroke(); }
+        lg.restore();
+        inkLine(lg, lt, 4);
+        lg.strokeStyle = 'rgba(255,240,200,0.6)'; lg.lineWidth = 5; lg.beginPath(); lg.ellipse(0, -LB, LW - 6, LH - 4, 0, Math.PI * 1.1, Math.PI * 1.6); lg.stroke();
+        const lidTilt = (L() - 0.5) * 0.2 - 0.22, lidX = HX + 22, lidY = 222;
+
+        // the vapour rising through it: a tile of curling strokes that repeats every 250, scrolled upward inside the outline
+        const [vc, v, vr] = part(300, 0, 700, 1250);
+        v.lineCap = 'round';
+        const wisps = []; for (let i = 0; i < 9; i++) wisps.push([HX - 170 + i * 42 + L() * 20, L() * 250, 8 + L() * 12, L() * 6.28]);
+        for (let rep = -1; rep < 5; rep++) for (const [x0, y0, lw, ph] of wisps) {
+          v.strokeStyle = 'rgba(255,255,255,0.32)'; v.lineWidth = lw; v.beginPath();
+          for (let j = 0; j <= 10; j++) { const yy = y0 + rep * 250 - j * 14, xx = x0 + Math.sin(j * 0.6 + ph) * 12; j ? v.lineTo(xx, yy) : v.moveTo(xx, yy); }
+          v.stroke();
+        }
+        const glints = []; for (let i = 0; i < 12; i++) glints.push([HX + (L() - 0.5) * 520, 160 + L() * 520, L() * 6.28, 6 + L() * 8]);
+        const curls = [[HX - 110, 0.0], [HX + 10, 0.33], [HX + 120, 0.66]];
+
+        m.save(); sign(m, sealAt[0], sealAt[1]); m.restore();
+        // ---- its toy: grab the spirit and drag, and it stretches after your finger like warm taffy, then snaps back and
+        // wobbles; tap the lid on its head and it flips up into the air and clatters back down onto its crown ----
+        const FS = 1.12;
+        let lastT = 0, grab = null, pull = [0, 0], pv = [0, 0], lid = { y: 0, vy: 0, r: 0, vr: 0, up: false }, wasDown = false;
+        const onSpirit = (x, y) => Math.abs(x - HX) < 210 && y > 160 && y < 780;
+        const lidAt = () => [lidX - pull[0] * (760 - lidY) / 440 * 0.9, lidY + pull[1] * 0.9 + lid.y];
+        const frame = t => {
+          const dt = Math.max(0, Math.min(0.05, t - lastT)); lastT = t;
+          const inp = c.input, pX = inp.x * 1000, pY = inp.y * 1000;
+          const onLid = (x, y) => { const [lx, ly] = lidAt(); return Math.abs(x - lx) < 170 && Math.abs(y - (ly - 30)) < 80; };
+          // a press on the spirit grabs it at once; a short tap on the lid flips it
+          for (const [x, y] of shortTaps(t, inp, ([x, y]) => { if (!onLid(x, y) && onSpirit(x, y)) { grab = [x, y]; c.sound.hit('noise', 0.06, { cutoff: 1800, dur: 0.4 }); } })) {
+            const [lx] = lidAt();
+            if (onLid(x, y) && !lid.up) {
+              lid.up = true; lid.vy = -1500 - Math.abs(x - lx) * 2; lid.vr = (x < lx ? -1 : 1) * 9;
+              c.sound.hit('click', 0.2); c.sound.note(sq[3], { dur: 0.12, vel: 0.1, wave: 'triangle', at: 0.02 });
+            }
+          }
+          if (grab && inp.down) {
+            const tx = Math.max(-260, Math.min(260, pX - grab[0])), ty = Math.max(-230, Math.min(170, pY - grab[1]));
+            pv = [(tx - pull[0]) / Math.max(dt, 0.016), (ty - pull[1]) / Math.max(dt, 0.016)];
+            pull = [pull[0] + (tx - pull[0]) * Math.min(1, dt * 14), pull[1] + (ty - pull[1]) * Math.min(1, dt * 14)];
+          } else {
+            if (grab) { grab = null; c.sound.note(sq[0] - 5, { dur: 0.35, vel: 0.1, wave: 'sine' }); c.sound.note(sq[2] - 5, { dur: 0.3, vel: 0.07, wave: 'sine', at: 0.09 }); }
+            for (const q of [0, 1]) { pv[q] += (-pull[q] * 150 - pv[q] * 5.5) * dt; pull[q] += pv[q] * dt; }
+            if (Math.hypot(...pull) < 0.2 && Math.hypot(...pv) < 2) { pull = [0, 0]; pv = [0, 0]; }
+          }
+          wasDown = inp.down;
+          if (lid.up) {
+            lid.vy += 3400 * dt; lid.y += lid.vy * dt; lid.r += lid.vr * dt;
+            if (lid.y >= 0 && lid.vy > 0) {
+              lid.y = 0;
+              if (lid.vy > 500) { lid.vy *= -0.32; lid.vr *= 0.4; c.sound.hit('click', 0.16); c.sound.note(sq[1] - 12, { dur: 0.08, vel: 0.1, wave: 'triangle' }); }
+              else { lid.up = false; lid.vy = 0; lid.vr = 0; lid.r = 0; }
+            }
+          }
+          ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+          ctx.drawImage(bgc, 0, 0);
+          ctx.scale(k, k);
+          // it sways from its tail in the basket, leaning a little, breathing; stretched, it bends after the pull
+          const sway = Math.sin(t * 0.9) * 0.05 + 0.05, br = 1 + Math.sin(t * 1.4 + breathPh) * 0.015;
+          const sk = sway - pull[0] / 440, st = Math.max(0.62, Math.min(1.6, br - pull[1] / 440)), wide = 1 / Math.sqrt(st);
+          const stretched = Math.hypot(...pull) > 110;
+          ctx.save();
+          ctx.translate(HX, 760); ctx.transform(wide, 0, sk, st, 0, 0); ctx.translate(-HX, -760);
+          ctx.globalAlpha = 0.94;
+          put(sc, sr2);
+          ctx.save(); ctx.clip(silP); const off = (t * (34 + Math.hypot(...pv) * 0.05)) % 250; put(vc, vr, 0, -off); ctx.restore();
+          ctx.translate(HX, FY); ctx.scale(FS, FS);
+          if (stretched) { ctx.strokeStyle = FPEN; ctx.lineWidth = 7; ctx.lineCap = 'round'; for (const sd of [-1, 1]) { const x = sd * 52; ctx.beginPath(); ctx.moveTo(x - sd * 16, -13); ctx.lineTo(x + sd * 12, 0); ctx.lineTo(x - sd * 16, 13); ctx.stroke(); } }
+          else eyesAt(blinkAt(t), t, GAP, 1);
+          ctx.restore();
+          // the lid rides on its crown, or is up in the air turning over
+          ctx.save();
+          ctx.translate(HX, 760); ctx.transform(wide, 0, sk, st, 0, 0); ctx.translate(-HX, -760);
+          ctx.translate(lidX, lidY + lid.y / st + Math.sin(t * 1.4 + breathPh) * 4); ctx.rotate(lidTilt + Math.sin(t * 1.1) * 0.05 + lid.r);
+          put(lc, lr2, -500, -500);
+          ctx.restore();
+          ctx.globalAlpha = 1;
+          // curls of steam slipping off the crown (thicker while it's stretched), glints of condensation
+          ctx.lineCap = 'round';
+          for (const [x0, o] of curls) {
+            const ph = ((t * 0.2 + o) % 1), a = Math.sin(ph * Math.PI) * (stretched ? 0.9 : 0.55); if (a < 0.03) continue;
+            const ys = 170 - ph * 150 + pull[1] * 0.8, xs = x0 + pull[0] * 0.8;
+            for (const [lw, al] of [[30, a * 0.18], [11, a * 0.8]]) {
+              ctx.strokeStyle = 'rgba(250,250,255,' + Math.min(1, al).toFixed(3) + ')'; ctx.lineWidth = lw; ctx.beginPath();
+              for (let j = 0; j <= 9; j++) { const yy = ys - j * 13, xx = xs + Math.sin(j * 0.6 + t * 1.2 + o * 9) * (10 + j * 2.4); j ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+              ctx.stroke();
+            }
+          }
+          for (const [x, y, ph, r] of glints) {
+            const tw = Math.sin(t * 1.7 + ph); if (tw < 0.2) continue;
+            ctx.fillStyle = 'rgba(240,246,255,' + (tw * 0.85).toFixed(3) + ')'; ctx.beginPath();
+            for (let q = 0; q < 8; q++) { const a = q * Math.PI / 4, rr = q % 2 ? r * 0.2 : r * tw; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } ctx.fill();
+          }
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.drawImage(fc, 0, 0);
+        };
+        // the steamer's front, the frame round the sheet with its seal, and the paper's grain, in one layer over all
+        f.setTransform(1, 0, 0, 1, 0, 0); f.drawImage(mc, 0, 0); f.drawImage(grain, 0, 0);
+        frame(0);
+        return frame;
+      }
+    }
   },
 });
 

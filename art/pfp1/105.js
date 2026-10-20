@@ -87,7 +87,7 @@ Proto.add({
     const pickC = list => { let tot = 0; for (let w = 1; w < list.length; w += 2) tot += list[w]; let r = crand() * tot; for (let w = 0; w < list.length; w += 2) { r -= list[w + 1]; if (r < 0) return list[w]; } return list[0]; };
     const counterKind = pickC(['Oak Panels', 28, 'Market Stall', 18, 'Stone Arch', 16, 'Crates', 14, 'Tree Stump', 12, 'Glass Case', 12]);
     const STALL = [[0xd83840, 0xf4ece0], [0x3c68c0, 0xf4ece0], [0x3c9050, 0xf0e4b0]][Math.floor(crand() * 3)];
-    const WDY = counterKind === 'Crates' ? [-1, -3] : [0, 0]; // how far the wares sit above or below the usual counter top, left and right
+    const WDY = legend !== 'None' ? [0, 0] : counterKind === 'Crates' ? [-1, -3] : [0, 0]; // how far the wares sit above or below the usual counter top, left and right
     // how the wares are laid out, and on which side (on the same stream, after the counter, so nothing above moves)
     const display = pickC(['Both Ends', 28, 'Heaped', 26, 'On a Stand', 22, 'Basket', 24]);
     const showSide = crand() < 0.5 ? 0 : 1;
@@ -166,6 +166,7 @@ Proto.add({
 
     function room(t) {
       L = back;
+      if (legend !== 'None') { legendRoom(t); return; }
       // plank wall
       for (let i = 0; i < N * N; i++) { // each dot of the sheet
         const x = i % N, y = (i / N) | 0; // column, row
@@ -501,116 +502,502 @@ Proto.add({
     // ---------- the legendary keepers ----------
     const mixC = (a, b2, k) => (Math.round((a >> 16 & 255) * (1 - k) + (b2 >> 16 & 255) * k) << 16) | (Math.round((a >> 8 & 255) * (1 - k) + (b2 >> 8 & 255) * k) << 8) | Math.round((a & 255) * (1 - k) + (b2 & 255) * k);
     let fairyY = 13;
-    function legendKeeper(t, happy, b, blink) {
-      const hy = 13 + b, eyeY = hy + 1, since = t - legAt;
-      const look = ptr ? Math.max(-1, Math.min(1, Math.round((ptr[0] - 20) / 7))) : 0;
+    // ---------- the legendaries: each its own scene, keeper and counter (the shop, its decor and its light give way) ----------
+    // a little per-print variety from the legendary's own stream (cosmos was drawn from it above)
+    const lv = k => cosmos[k][0], lvi = (k, n) => Math.floor(cosmos[k][1] * n);
+    const tri = (A, B2, C2, col) => {
+      const x0 = Math.floor(Math.min(A[0], B2[0], C2[0])), x1 = Math.ceil(Math.max(A[0], B2[0], C2[0])), y0 = Math.floor(Math.min(A[1], B2[1], C2[1])), y1 = Math.ceil(Math.max(A[1], B2[1], C2[1]));
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        const px = x + 0.5, py = y + 0.5, cr = (p, q) => (q[0] - p[0]) * (py - p[1]) - (q[1] - p[1]) * (px - p[0]);
+        const d1 = cr(A, B2), d2 = cr(B2, C2), d3 = cr(C2, A);
+        if ((d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0)) dot(x, y, typeof col === 'function' ? col(x, y) : col);
+      }
+    };
+    const seg = (x0, y0, x1, y1, col, th) => {
+      const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 1.5) + 1;
+      for (let k = 0; k <= n; k++) { const x = Math.round(x0 + (x1 - x0) * k / n), y = Math.round(y0 + (y1 - y0) * k / n); dot(x, y, col); if (th) dot(x + (th > 0 ? 1 : -1), y, col); }
+    };
+    const hash2 = (x, y) => { let h = Math.imul(x * 374761393 + y * 668265263, 1274126177); h ^= h >>> 13; return ((Math.imul(h, 1103515245) >>> 0) & 1023) / 1024; };
+    // the dragon's hoard: membrane colour, gem colours and the glints, per print
+    const WINGC = [[0x521830, 0x6c2240, 0x8a3050], [0x1c2a5c, 0x283c78, 0x38529a], [0x3a1c58, 0x502878, 0x683a98]][lvi(0, 3)];
+    const GEMS = [0xe03048, 0x3890f0, 0x40d070, 0xc050e0, 0xf0f0f0];
+    const glints = []; for (let k = 0; k < 12; k++) glints.push([Math.floor(cosmos[k + 3][0] * 40), cosmos[k + 3][1], cosmos[k + 3][2]]);
+    const hoardTop = x => 18 + Math.abs(x - 19.5) * 0.12 + Math.sin(x * 1.37 + lv(1) * 6) * 0.9;
+    const GOLDS = new Set([0xf8d860, 0x8c5c10, 0xf0c040, 0xfff0a0, 0xb07818, 0xd8a024, 0xd0981c]);
+    // the slime king's hall: the window's panes, per print
+    const PANES = [[0xd83860, 0x3c8ce0, 0xf0c040, 0x58c068], [0x9048d0, 0x3cb8d8, 0xf09040, 0xe04878], [0x3c70e0, 0xe8d050, 0xd04040, 0x40c0a0]][lvi(1, 3)];
+    // the starfolk's dusk: two skies
+    const DUSK = lvi(2, 2) ? [0x10183c, 0x182a5a, 0x22407a, 0x2c6a8c, 0x4c9898, 0x8cc4a4, 0xe8e0b0] : [0x140e34, 0x24164e, 0x401e66, 0x6c2a78, 0xa84070, 0xe0706a, 0xf8b070];
+    const moonSide = lv(2) < 0.5 ? -1 : 1;
+    const JELLY = [0xb8ffe0, 0x58e0a8, 0x22a078];
+    let cave = null, slab = null, duskSky = null, neb = null;
+    const clouds = [];
+    // ---------- the legendaries' toys: state, driven by the pointer in legendInput ----------
+    // dragon: steal a coin from its hoard while it sleeps; move too fast, or too near its head, and it wakes and breathes fire
+    const dg = { wake: 0, noise: 0, hold: false, coin: null, drop: null, fireT: -9, fireTo: [20, 20], loot: 0, lootAt: -9, last: null, snoreAt: 0 };
+    // slime king: grab it and pull; it stretches toward you and wobbles back when you let go
+    const sk = { grab: null, D: [0, 0], V: [0, 0], warp: null, moved: 0, wob: 0, wobAt: -9, drops: [], coin: null };
+    // starfolk: drag across the sky to draw a constellation; let go and it takes the stars into its chest
+    const sf = { pts: [], drawing: false, fly: null, flyAt: -9, absorbed: 0 };
+    let lastT = 0;
+    function legendInput(t, inp) {
+      const dt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
+      const P2 = inp.inside ? [inp.x * N, inp.y * N] : null;
+      const taps = inp.taps();
       if (legend === 'Dragon') {
-        const GOLD = 0xf0c040, GOLDD = 0xb08020, IVORY = 0xf4ecd8, IVD = 0xc8b890, WING = 0x24584a;
-        // folded wings behind the shoulders, membranes dark with gold spars
-        for (const s2 of [-1, 1]) {
-          const A = [20 + s2 * 8, hy + 10], Bp = [20 + s2 * 19, hy - 7], Cp = [20 + s2 * 18, hy + 13];
-          for (let y = hy - 8; y < hy + 15; y++) for (let x = 0; x < N; x++) {
-            const cr = (p, q) => (q[0] - p[0]) * (y + 0.5 - p[1]) - (q[1] - p[1]) * (x + 0.5 - p[0]);
-            const d1 = cr(A, Bp), d2 = cr(Bp, Cp), d3 = cr(Cp, A);
-            if ((d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0)) dot(x, y, (x + y * 2) % 7 === 0 ? 0x2e6a5a : WING);
-          }
-          for (let k = 0; k < 11; k++) { dot(A[0] + (Bp[0] - A[0]) * k / 10, A[1] + (Bp[1] - A[1]) * k / 10, k > 8 ? IVORY : GOLD); if (k > 3) dot(A[0] + (Cp[0] - A[0]) * k / 10 + s2 * 0, A[1] + (Bp[1] - A[1]) * k / 20 + k * 0.4, GOLDD); }
-        }
-        // a scaled body with a gold belly
-        for (let y = hy + 8; y < 34; y++) {
-          const w = Math.min(12.5, 5 + (y - hy - 8) * 2.2);
-          for (let x = Math.round(20 - w); x < Math.round(20 + w); x++) {
-            const u = (x + 0.5 - 20) / w;
-            dot(x, y, Math.abs(u) < 0.32 ? ((y - hy) % 2 ? GOLD : GOLDD) : u < -0.6 ? SKIN[0] : u > 0.6 ? SKIN[2] : (x + y * 2) % 5 === 0 ? SKIN[2] : SKIN[1]);
+        for (const tp of taps) {
+          const tx = Math.floor(tp.x * N), ty = Math.floor(tp.y * N), i = ty * N + tx;
+          if (dg.hold || tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
+          const onDragon = spr[i] >= 0 && front[i] < 0, onGold = !onDragon && (GOLDS.has(front[i] >= 0 ? front[i] : back[i]));
+          if (onGold && inp.down && dg.wake < 0.9) {
+            dg.hold = true; dg.coin = [tp.x * N, tp.y * N]; dg.last = dg.coin.slice(); dg.drop = null;
+            c.sound.hit('blip', 0.22, { freq: 2637 });
+          } else if (onDragon) {
+            // a poke on the nose: it snorts and half wakes
+            dg.noise = Math.max(dg.noise, 0.75); c.sound.hit('noise', 0.25, { cutoff: 700, dur: 0.4 });
           }
         }
-        fill(17, hy + 6, 22, hy + 8, SKIN[1]); fill(19, hy + 6, 20, hy + 8, GOLD);
-        // horns sweeping back from the brow
-        for (const s2 of [-1, 1]) for (let k = 0; k < 8; k++) { const x = 20 + s2 * (5.5 + k * 0.7), y = hy - 5 - k * 0.9 + (k > 5 ? (k - 5) * 0.6 : 0); dot(x, y, k > 5 ? IVORY : IVD); if (k < 6) dot(x + s2 * 0.9, y + 0.9, k < 3 ? IVD : IVORY); if (k < 3) dot(x, y + 1, IVD); }
-        // the head: a broad skull, heavy cheeks, a long snout
-        const HW = [3, 5, 6.4, 7, 7.4, 7.6, 7.6, 7.6, 7.8, 8.4, 8.8, 8.6, 8, 7, 5.4, 3.6];
-        HW.forEach((w, r) => { const y = hy - 7 + r; for (let x = Math.round(20 - w); x < Math.round(20 + w); x++) { const u = (x + 0.5 - 20) / w; dot(x, y, u < -0.45 && r < 9 ? SKIN[0] : u > 0.6 || r > 13 ? SKIN[2] : (x * 3 + y * 5) % 11 === 0 ? SKIN[2] : SKIN[1]); } });
-        for (const s2 of [-1, 1]) { dot(20 + s2 * 9, hy + 2, SKIN[2]); dot(20 + s2 * 10, hy + 3, SKIN[2]); dot(20 + s2 * 9, hy + 4, SKIN[1]); }
-        dot(19, hy - 8, GOLD); dot(20, hy - 9, GOLD); dot(21, hy - 8, GOLD); dot(20, hy - 7, GOLDD);
-        // brows and slit-pupilled gold eyes that follow the pointer
-        fill(14, eyeY - 2, 17, eyeY - 2, SKIN[2]); fill(23, eyeY - 2, 26, eyeY - 2, SKIN[2]); dot(17, eyeY - 1, SKIN[2]); dot(23, eyeY - 1, SKIN[2]);
-        for (const ex of [15, 23]) {
-          if (blink) { fill(ex, eyeY, ex + 2, eyeY, LINE); continue; }
-          fill(ex, eyeY - 1, ex + 2, eyeY, 0xffd040); dot(ex + 1 + look, eyeY - 1, LINE); dot(ex + 1 + look, eyeY, LINE); dot(ex, eyeY - 1, 0xfff4b0);
+        if (dg.hold) {
+          if (!inp.down || !P2) {
+            dg.hold = false; dg.drop = { from: dg.coin.slice(), at: t };
+            c.sound.hit('click', 0.3); c.sound.hit('click', 0.2, { at: 0.12 });
+          } else {
+            const sp = Math.hypot(P2[0] - dg.last[0], P2[1] - dg.last[1]);
+            dg.noise += Math.max(0, sp - 0.6) * 0.16 + (Math.hypot(P2[0] - 20, P2[1] - 27) < 8 ? dt * 0.5 : 0);
+            dg.coin = P2.slice(); dg.last = P2.slice();
+            if (P2[0] < 1.5 || P2[0] > 38.5 || P2[1] < 1.5) {
+              // out of the hoard and away: one more for the pile in the corner
+              dg.hold = false; dg.loot = Math.min(12, dg.loot + 1); dg.lootAt = t; dg.coin = null;
+              for (let k = 0; k < 4; k++) c.sound.note(key + 12 + maj[k], { at: k * 0.06, dur: 0.12, vel: 0.18, wave: 'square', cutoff: 3000 });
+            }
+          }
         }
-        // nostrils, and a grin full of teeth (open wide when it's pleased)
-        dot(18, hy + 4, LINE); dot(21, hy + 4, LINE);
-        if (happy || since < 0.9) { fill(15, hy + 6, 24, hy + 7, 0x601828); for (let x = 15; x <= 24; x += 2) { dot(x, hy + 6, IVORY); dot(x + 1, hy + 7, IVORY); } }
-        else { fill(15, hy + 6, 24, hy + 6, LINE); for (const x of [16, 23]) dot(x, hy + 7, IVORY); dot(14, hy + 5, LINE); dot(25, hy + 5, LINE); }
-        // smoke curling from its nostrils while you hover, and fire when you tap it
-        if (ptr) for (let k = 0; k < 4; k++) { const ph = (t * 1.2 + k * 0.25) % 1; for (const s2 of [-1, 1]) dot(20 + s2 * (2 + ph * 7), hy + 3 - ph * 6 - Math.sin(ph * 6 + k) * 0.6, ph < 0.5 ? 0xd8d8e0 : 0xa8a8b4); }
-        if (since < 0.9) {
-          const reach = Math.min(1, since / 0.25) * 18;
-          for (let k = 0; k < reach; k++) { const x = 20 + legDir * (5 + k), half = 0.6 + k * 0.32; for (let dy = -half; dy <= half; dy++) { const n = (Math.floor(x * 7 + dy * 13 + t * 30)) % 5; if (n === 4 && k > 4) continue; dot(x, hy + 7 + dy, k < 4 || n === 0 ? 0xfff0a0 : Math.abs(dy) > half - 1 ? 0xe04020 : 0xf09030); } }
+        dg.noise = Math.max(0, dg.noise - dt * 0.35);
+        if (dg.noise > 1 && t - dg.fireT > 2.6) {
+          // too loud: it wakes, and breathes fire at the thief's hand; the coin falls back
+          dg.fireT = t; dg.fireTo = dg.coin ? dg.coin.slice() : P2 ? P2.slice() : [20, 10]; dg.noise = 1.4;
+          if (dg.hold) { dg.hold = false; dg.drop = { from: dg.coin.slice(), at: t }; }
+          c.sound.hit('noise', 0.45, { cutoff: 900, dur: 0.9 });
+          for (let k = 0; k < 3; k++) c.sound.note(key - 24 + min[k], { at: k * 0.12, dur: 0.2, vel: 0.22, wave: 'sawtooth', cutoff: 380 });
+        }
+        const tgt = t - dg.fireT < 2.4 ? 1 : dg.noise > 0.45 ? 0.5 : 0;
+        dg.wake += (tgt - dg.wake) * Math.min(1, dt * 8);
+        if (dg.wake < 0.2 && t - dg.snoreAt > 3.2) { dg.snoreAt = t; c.sound.note(key - 26, { dur: 1.2, vel: 0.05, wave: 'sine', attack: 0.4 }); }
+      } else if (legend === 'Slime King') {
+        for (const tp of taps) {
+          const tx = Math.floor(tp.x * N), ty = Math.floor(tp.y * N);
+          if (!sk.grab && inp.down && tx >= 0 && ty >= 0 && tx < N && ty < N && spr[ty * N + tx] >= 0) {
+            sk.grab = [tp.x * N, tp.y * N]; sk.moved = 0; sk.V = [0, 0];
+            c.sound.note(key + 7, { dur: 0.08, vel: 0.14, wave: 'sine' });
+          }
+        }
+        if (sk.grab && inp.down && P2) {
+          let dx = P2[0] - sk.grab[0], dy = P2[1] - sk.grab[1]; const L2 = Math.hypot(dx, dy);
+          if (L2 > 24) { dx *= 24 / L2; dy *= 24 / L2; }
+          sk.moved = Math.max(sk.moved, L2);
+          sk.D[0] += (dx - sk.D[0]) * 0.5; sk.D[1] += (dy - sk.D[1]) * 0.5;
+          sk.warp = sk.grab;
+        } else if (sk.grab) {
+          // let go: the arm snaps back, the whole king squashes and wobbles, drops of jelly fly off the arm's end,
+          // and a big stretch shakes the gold coin out of its crown to bounce along the counter
+          const L2 = Math.hypot(sk.D[0], sk.D[1]);
+          sk.V = sk.moved < 1.5 ? [0, 2.2] : [-sk.D[0] * 0.3, -sk.D[1] * 0.3];
+          sk.wob = Math.min(1, 0.3 + sk.moved / 10); sk.wobAt = t;
+          if (L2 > 3) for (let k = 0; k < 7; k++) { const a = Math.atan2(sk.D[1], sk.D[0]) + (cosmos[k + 30][0] - 0.5) * 1.6, v = 10 + cosmos[k + 30][1] * 12; sk.drops.push({ x: sk.grab[0] + sk.D[0], y: sk.grab[1] + sk.D[1], vx: Math.cos(a) * v, vy: Math.sin(a) * v - 6, at: t }); }
+          if (sk.moved > 5) { sk.coin = { at: t, x0: 20, dir: sk.D[0] > 0 ? -1 : 1 }; for (let k = 1; k <= 3; k++) c.sound.hit('blip', 0.3 / k, { freq: 2637, at: k * 0.63 }); }
+          c.sound.note(key + 12, { dur: 0.1, vel: 0.2, wave: 'sine' }); c.sound.note(key + 5, { at: 0.08, dur: 0.16, vel: 0.18, wave: 'sine' });
+          sk.grab = null;
+        } else {
+          const f = Math.min(2, dt * 30);
+          sk.V[0] += (-0.32 * sk.D[0] - 0.14 * sk.V[0]) * f; sk.V[1] += (-0.32 * sk.D[1] - 0.14 * sk.V[1]) * f;
+          sk.D[0] += sk.V[0] * f; sk.D[1] += sk.V[1] * f;
+          if (Math.abs(sk.D[0]) + Math.abs(sk.D[1]) + Math.abs(sk.V[0]) + Math.abs(sk.V[1]) < 0.08) { sk.D = [0, 0]; sk.V = [0, 0]; sk.warp = null; }
+        }
+        for (const d of sk.drops) { d.x += d.vx * dt; d.y += d.vy * dt; d.vy += 40 * dt; }
+        sk.drops = sk.drops.filter(d => t - d.at < 1.4 && d.y < 39);
+        if (sk.coin && t - sk.coin.at > 3) sk.coin = null;
+        if (sk.grab) { const s = Math.hypot(sk.D[0], sk.D[1]); if (Math.floor(s) !== Math.floor(sk.lastS || 0)) c.sound.note(key + 12 + Math.floor(s), { dur: 0.05, vel: 0.06, wave: 'sine' }); sk.lastS = s; }
+      } else {
+        for (const tp of taps) {
+          const tx = Math.floor(tp.x * N), ty = Math.floor(tp.y * N);
+          if (!inp.down || tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
+          if (spr[ty * N + tx] >= 0 && t - legAt > 0.9) {
+            legAt = t; legDir = tp.x < 0.5 ? -1 : 1;
+            for (let k = 0; k < 6; k++) c.sound.note(key + 24 + maj[k % 5] + (k > 4 ? 12 : 0), { at: k * 0.07, dur: 0.6, vel: 0.08, wave: 'sine' });
+          } else if (ty < 30 && !sf.drawing) { sf.drawing = true; sf.pts = [[tp.x * N, tp.y * N]]; c.sound.note(key + 24, { dur: 0.5, vel: 0.08, wave: 'sine' }); }
+        }
+        if (sf.drawing) {
+          if (inp.down && P2) {
+            const lp = sf.pts[sf.pts.length - 1];
+            if (Math.hypot(P2[0] - lp[0], P2[1] - lp[1]) >= 3.5 && sf.pts.length < 9 && P2[1] < 30) { sf.pts.push(P2.slice()); c.sound.note(key + 24 + maj[sf.pts.length % 5] + (sf.pts.length > 4 ? 12 : 0), { dur: 0.6, vel: 0.08, wave: 'sine' }); }
+          } else {
+            sf.drawing = false;
+            if (sf.pts.length >= 2) { sf.fly = sf.pts; sf.flyAt = t; for (const d of [0, 4, 7, 12]) c.sound.note(key + 12 + d, { dur: 1.2, vel: 0.06, wave: 'sine', attack: 0.2 }); }
+            sf.pts = [];
+          }
+        }
+        if (sf.fly && t - sf.flyAt > 1.3) { sf.fly = null; sf.absorbed = Math.min(6, sf.absorbed + 1); }
+      }
+    }
+    function legendRoom(t) {
+      if (legend === 'Dragon') {
+        // a cave lit gold from below, the hoard heaped right across it
+        // (everything that doesn't move is drawn once, into its own layer; each frame only the firelight's bands change)
+        const ROCK = [[0x150d14, 0x1e131b, 0x2a1a22], [0x24151a, 0x331d22, 0x48282a], [0x3c2018, 0x542c20, 0x6e3c28]];
+        if (!cave) {
+          cave = { w: new Float32Array(N * N), n: new Uint8Array(N * N), top: new Int32Array(N * N).fill(-1) };
+          for (let i = 0; i < N * N; i++) {
+            const x = i % N, y = (i / N) | 0, n = hash2(x >> 2, (y + (x >> 2)) >> 1);
+            cave.w[i] = 1.3 - Math.hypot(x + 0.5 - 20, (y - 20) * 1.2) / 22 + (hash2(x >> 1, y >> 1) - 0.5) * 0.16;
+            cave.n[i] = (x * 5 + y * 3) % 23 === 0 ? 3 : n < 0.22 ? 0 : n > 0.82 ? 2 : 1;
+          }
+          L = cave.top;
+          for (let k = 0; k < 7; k++) { const x = 2 + k * 6 + lvi(k + 5, 3), len = 3 + lvi(k + 9, 5); for (let y = 0; y < len; y++) { dot(x, y, 0x2e1c22); if (y < len - 2) dot(x + 1, y, 0x221418); } }
+          for (let x = 0; x < N; x++) {
+            const top = Math.round(hoardTop(x));
+            for (let y = top; y < N; y++) {
+              const r = hash2(x, y), edge = y === top;
+              L[y * N + x] = edge ? 0xf8d860 : r < 0.12 ? 0x8c5c10 : (x + y * 2) % 4 === 0 ? 0xf0c040 : r > 0.86 ? 0xfff0a0 : y > top + 6 ? 0xb07818 : 0xd8a024;
+            }
+          }
+          for (let k = 0; k < 8; k++) { const x = Math.floor(cosmos[k + 12][0] * 40), y = Math.round(hoardTop(x)) + 1 + lvi(k + 12, 6); dot(x, y, GEMS[k % 5]); dot(x + 1, y, mixC(GEMS[k % 5], 0, 0.35)); dot(x, y - 1, mixC(GEMS[k % 5], 0xffffff, 0.5)); }
+          const gx = lv(20) < 0.5 ? 2 : 34, gy = Math.round(hoardTop(gx + 2)) - 4;
+          fill(gx, gy, gx + 3, gy + 1, 0xf0c040); fill(gx + 1, gy + 2, gx + 2, gy + 3, 0xd0a030); fill(gx, gy + 4, gx + 3, gy + 4, 0xb08020); dot(gx + 1, gy, 0xe03048); dot(gx, gy, 0xfff0a0);
+          const sx = gx < 20 ? 36 : 3, sy = Math.round(hoardTop(sx)) - 6;
+          fill(sx, sy, sx, sy + 4, 0x8c5c30); fill(sx - 2, sy + 4, sx + 2, sy + 4, 0xd0a040); dot(sx, sy - 1, 0x3890f0); fill(sx, sy + 5, sx, sy + 7, 0xd8e0e8);
+          L = back;
+        }
+        const fl = (Math.sin(t * 6.3) * 0.5 + Math.sin(t * 9.7) * 0.35) * 0.05 + dg.wake * 0.12;
+        for (let i = 0; i < N * N; i++) {
+          if (cave.top[i] >= 0) { L[i] = cave.top[i]; continue; }
+          const w = cave.w[i] + fl, band = w > 0.78 ? 2 : w > 0.45 ? 1 : 0, n = cave.n[i];
+          L[i] = ROCK[band][n === 3 ? (band ? 2 : 1) : n];
         }
       } else if (legend === 'Slime King') {
-        // a great royal jelly with treasure floating inside it
-        const jig = since < 1.4 ? Math.sin(since * 16) * Math.exp(-since * 3) * 2.2 : 0, breathe = Math.sin(t * 2.4) * 0.4;
-        const lean = ptr ? Math.max(-1.6, Math.min(1.6, (ptr[0] - 20) / 6)) : 0, top = hy - 5;
-        for (let y = top; y < 34; y++) {
-          const k = (y - top) / (34 - top), w = (4.5 + Math.sqrt(k) * 10.5) * (1 + (jig + breathe) * 0.05 * (1 - k * 2)), cx = 20 + lean * (1 - k) * 1.4;
-          for (let x = Math.round(cx - w); x < Math.round(cx + w); x++) {
-            const u = (x + 0.5 - cx) / w;
-            dot(x, y, (u < -0.55 && k < 0.55 && u > -0.85) || (y === top + 1 && Math.abs(u) < 0.4) ? SKIN[0] : u > 0.62 || k > 0.92 ? SKIN[2] : SKIN[1]);
+        // a throne hall: violet stone, a tall window of coloured glass, red velvet drapes and two torches
+        for (let i = 0; i < N * N; i++) {
+          const x = i % N, y = (i / N) | 0, row = y >> 2, off = row % 2 ? 3 : 0;
+          L[i] = y % 4 === 3 || (x + off) % 6 === 0 ? 0x22163a : (x + y * 3) % 11 === 0 ? 0x3e2a5c : hash2(x >> 1, y) < 0.3 ? 0x2c1e48 : 0x342452;
+        }
+        for (let y = 1; y < 27; y++) for (let x = 9; x <= 30; x++) {
+          const dx = x + 0.5 - 20, top = 9 - Math.sqrt(Math.max(0, 121 - dx * dx)) * 0.75;
+          if (y < top - 1) continue;
+          if (y < top || x === 9 || x === 30 || y === 26) { dot(x, y, 0xd0a040); continue; }
+          const lead = (x - 10) % 5 === 4 || (y - 2) % 6 === 5 || Math.abs(dx) < 0.6;
+          const pane = PANES[(Math.floor((x - 10) / 5) + Math.floor((y - 2) / 6) * 3) & 3];
+          const shine = Math.sin(t * 1.3 - x * 0.25 - y * 0.15) > 0.92;
+          dot(x, y, lead ? 0x1a1028 : shine ? mixC(pane, 0xffffff, 0.55) : (x + y) % 7 === 0 ? mixC(pane, 0xffffff, 0.25) : pane);
+        }
+        for (const s2 of [-1, 1]) for (let y = 0; y < N; y++) {
+          const reach = 7 - (y > 14 && y < 24 ? Math.round(3 * Math.sin((y - 14) / 10 * Math.PI)) : 0);
+          for (let k = 0; k < reach; k++) { const x = s2 < 0 ? k : 39 - k, fold = (k + (y > 20 ? 1 : 0)) % 3; dot(x, y, fold === 0 ? 0x7a1028 : fold === 1 ? 0xb82038 : 0xd83848); }
+          if (y > 16 && y < 20) dot(s2 < 0 ? reach : 39 - reach, y, 0xf0c040);
+        }
+        for (let x = 0; x < N; x++) { fill(x, 0, x, 1, x % 4 === 1 ? 0xd83848 : 0xa01830); dot(x, 2, x % 2 ? 0xf0c040 : 0xa07818); }
+        for (const tx of [7, 32]) {
+          fill(tx, 15, tx + 1, 18, 0x5a3c24); dot(tx, 14, 0x8c6440); dot(tx + 1, 14, 0x8c6440);
+          const f = Math.floor(t * 8 + tx) % 3;
+          dot(tx, 13, 0xf09030); dot(tx + 1, 13, f ? 0xf8e070 : 0xf09030); dot(tx + (f === 2 ? 1 : 0), 12, 0xfff4b0); if (f) dot(tx + (f === 1 ? 0 : 1), 11, 0xf8b040);
+        }
+      } else {
+        // the edge of the world at dusk: the sky in dithered bands, the first stars, a big moon
+        if (!duskSky) {
+          duskSky = new Int32Array(N * N);
+          for (let i = 0; i < N * N; i++) {
+            const x = i % N, y = (i / N) | 0, v = Math.max(0, y - 1) / 33 * 6, b0 = Math.min(6, Math.floor(v)), f = v - b0;
+            const dith = [0, 8, 2, 10, 12, 4, 14, 6][(x & 3) + ((y & 1) << 2)] / 16;
+            duskSky[i] = DUSK[Math.min(6, b0 + (f > 0.55 + dith * 0.4 ? 1 : 0))];
           }
         }
-        const sink = cc => mixC(cc, SKIN[1], 0.3);
-        // a sword, a coin, a key and a bone, drifting in the jelly
+        L.set(duskSky);
+        for (const [a, bq, ph] of cosmos) {
+          const x = Math.floor(a * 40), y = Math.floor(bq * 17);
+          const tw = Math.sin(t * (0.8 + bq * 2) + ph);
+          if (tw > 0.2) dot(x, y, tw > 0.85 ? 0xffffff : y < 9 ? 0xc8c0f0 : 0xf0c8d8);
+        }
+        const mx = moonSide > 0 ? 33 : 6, my = 6;
+        oval(mx, my, 4.6, 4.6, (x, y, u, v) => Math.hypot(u + 0.55 * moonSide, v + 0.3) < 0.85 ? L[y * N + x] : u * moonSide < -0.2 ? 0xfff4d8 : 0xf0dcb0);
+        for (let k = 0; k < 3; k++) { const y = 15 + k * 5, x0 = ((t * (0.6 + k * 0.3) + k * 13 + lv(k) * 40) % 56) - 16; for (let x = 0; x < 12 + k * 3; x++) { dot(x0 + x, y, mixC(DUSK[3 + k], 0xffe0e8, 0.35)); if (x > 2 && x < 9 + k * 3) dot(x0 + x + 1, y - 1, mixC(DUSK[3 + k], 0xffe0e8, 0.2)); } }
+      }
+    }
+
+    let legHy = 13;
+    function legendKeeper(t, happy, b, blink) {
+      const hy = 13 + b, eyeY = hy + 1, since = t - legAt;
+      legHy = hy;
+      const look = ptr ? Math.max(-1, Math.min(1, Math.round((ptr[0] - 20) / 7))) : 0;
+      if (legend === 'Dragon') {
+        // a dragon asleep on its hoard: wings folded up behind it like a cloak, its head down on its claws
+        const GOLD = 0xf0c040, GOLDD = 0xb08020, IVORY = 0xf4ecd8, IVD = 0xc8b890;
+        const w = dg.wake, br = Math.sin(t * (w > 0.5 ? 3 : 1.25)) * (w > 0.5 ? 0.3 : 0.7), lift = Math.round(w * 3), ey = 24 - lift;
+        for (const s2 of [-1, 1]) {
+          const S = [20 + s2 * 8, 21], T = [20 + s2 * (15 + w * 3), 4 - w * 3 + br * 0.4], B2 = [20 + s2 * (18.5 + w * 1.5), 26], M = [20 + s2 * (13.5 + w * 2), 12];
+          tri(S, T, B2, (x, y) => (Math.abs((x - S[0]) * (M[1] - S[1]) - (y - S[1]) * (M[0] - S[0])) < 9) ? WINGC[1] : WINGC[0]);
+          seg(S[0], S[1], T[0], T[1], SKIN[2], s2); seg(T[0], T[1], B2[0], B2[1], WINGC[2]); seg(T[0], T[1], M[0] + s2 * 2, 25, WINGC[2]);
+          dot(T[0], T[1] - 1, IVORY); dot(T[0] + s2, T[1] - 2, IVORY);
+        }
+        // the great body behind, in its own shadow, breathing; a ridge of gold spines along its back
+        const ry = 9.5 + br * 0.5, BODY = [0x3c9460, 0x2a7448, 0x1a5034];
+        for (let y = 12; y < 33; y++) {
+          const v = (y - 23.5) / ry; if (Math.abs(v) > 1) continue;
+          const half = 12.5 * Math.sqrt(1 - v * v);
+          for (let x = Math.round(20 - half); x < Math.round(20 + half); x++) { const u = (x + 0.5 - 20) / half; dot(x, y, u < -0.5 && v < 0 ? BODY[0] : u > 0.55 || v > 0.6 ? BODY[2] : ((x + (y >> 1) * 2) % 4 === 0 && y % 2 === 0) ? BODY[2] : BODY[1]); }
+        }
+        for (let x = 10; x <= 30; x += 3) { const v = (x + 0.5 - 20) / 12.5, top = Math.round(23.5 - ry * Math.sqrt(Math.max(0, 1 - v * v))); dot(x, top - 1, GOLD); if (Math.abs(x - 20) < 6) dot(x, top - 2, GOLDD); dot(x + 1, top - 1, GOLDD); }
+        // forepaws on the gold, ivory claws
+        for (const px of [9, 26]) { fill(px, 30, px + 5, 34, SKIN[1]); fill(px, 30, px + 5, 30, SKIN[0]); fill(px + 5, 31, px + 5, 34, SKIN[2]); fill(px, 30, px, 34, 0x1a5034); for (const k of [0, 2, 4]) { dot(px + k, 35, IVORY); dot(px + k + 1, 35, IVD); } }
+        for (const s2 of [-1, 1]) { tri([20 + s2 * 7, ey + 1], [20 + s2 * 12.5, ey - 2], [20 + s2 * 8, ey + 5], (x, y) => (x + y) % 3 === 0 ? WINGC[2] : WINGC[1]); }
+        // the head, low and long, its chin on its claws, ringed in a dark line so it stands off the body
+        const HW = [3.5, 5.5, 7, 7.8, 8, 8, 7.6, 6.8, 6.2, 6, 5.8, 5.6, 5.2, 4.4];
+        HW.forEach((hw, r) => { const y = ey - 5 + r; for (let x = Math.round(20 - hw - 1); x < Math.round(20 + hw + 1); x++) dot(x, y, 0x123222); });
+        for (let x = Math.round(20 - HW[0]); x < Math.round(20 + HW[0]); x++) dot(x, ey - 6, 0x123222);
+        HW.forEach((hw, r) => { const y = ey - 5 + r; for (let x = Math.round(20 - hw); x < Math.round(20 + hw); x++) { const u = (x + 0.5 - 20) / hw; dot(x, y, r > 7 && Math.abs(u) < 0.45 ? (r % 2 ? 0x9ce8b0 : 0x78d090) : u < -0.45 && r < 7 ? SKIN[0] : u > 0.6 || r > 12 ? SKIN[2] : (x * 3 + y * 5) % 11 === 0 ? SKIN[2] : SKIN[1]); } });
+        for (let k = 0; k < 3; k++) { dot(20, ey - 6 + k * 1.5, k % 2 ? GOLDD : GOLD); dot(19, ey - 5 + k * 1.5, GOLDD); }
+        // horns sweeping back over the body, from the top of the head
+        for (const s2 of [-1, 1]) for (let k = 0; k <= 12; k++) {
+          const a = k / 12, x = 20 + s2 * (4 + 8.5 * a + a * a * 2), y = ey - 5 - 12 * a + a * a * 3.5;
+          dot(x, y, a > 0.75 ? IVORY : k % 3 === 0 ? 0xa89878 : IVD); if (a < 0.7) dot(x - s2, y + 1, a < 0.3 ? 0xa89878 : IVD); if (a < 0.4) dot(x - s2, y, IVD);
+        }
+        // eyes: shut lids when it sleeps, a glowing crack when it stirs, burning slits that follow you when it wakes
+        const lk = dg.coin ? dg.coin : ptr, lx = lk ? Math.max(-1, Math.min(1, Math.round((lk[0] - 20) / 6))) : 0;
+        for (const [ex, s2] of [[14, -1], [23, 1]]) {
+          fill(ex, ey - 2, ex + 2, ey - 2, SKIN[2]); dot(ex + (s2 < 0 ? 2 : 0), ey - 1, SKIN[2]);
+          if (w < 0.25) { fill(ex, ey - 1, ex + 2, ey - 1, SKIN[0]); fill(ex, ey, ex + 2, ey, 0x123222); dot(ex + (s2 < 0 ? 0 : 2), ey + 1, 0x123222); }
+          else if (w < 0.75) { fill(ex, ey, ex + 2, ey, Math.sin(t * 9) > 0 ? 0xffc020 : 0xf08020); dot(ex + 1 + lx, ey, LINE); }
+          else { fill(ex, ey - 1, ex + 2, ey, Math.sin(t * 6) > 0 ? 0xfff070 : 0xffc020); dot(ex + 1 + lx, ey - 1, LINE); dot(ex + 1 + lx, ey, LINE); }
+        }
+        dot(17, ey + 6, LINE); dot(22, ey + 6, LINE);
+        const fire = t - dg.fireT < 1.1;
+        if (fire) { fill(16, ey + 7, 23, ey + 8, 0x601828); for (let x = 16; x <= 23; x += 2) { dot(x, ey + 7, IVORY); dot(x + 1, ey + 8, IVORY); } }
+        else { fill(16, ey + 8, 23, ey + 8, LINE); dot(17, ey + 9, IVORY); dot(22, ey + 9, IVORY); }
+      } else if (legend === 'Slime King') {
+        // a great royal jelly, see-through: the hall's coloured window glows through it
+        const wb = sk.wob * Math.exp(-(t - sk.wobAt) * 3) * Math.sin((t - sk.wobAt) * 15);
+        const jig = (since < 1.4 ? Math.sin(since * 16) * Math.exp(-since * 3) * 2.2 : 0) + wb * 3, breathe = Math.sin(t * 2.4) * 0.6;
+        const pullX = sk.grab ? Math.max(-1.6, Math.min(1.6, sk.D[0] / 6)) : 0;
+        const lean = sk.grab ? pullX : ptr ? Math.max(-1.6, Math.min(1.6, (ptr[0] - 20) / 6)) : Math.sin(t * 0.7) * 0.5, top = hy - 5 + Math.round(-breathe * 0.6 - jig * 0.5);
+        const jellyAt = (x, y, edge, u) => edge ? (u > 0 ? JELLY[2] : JELLY[1]) : glass(back[y * N + x], u > 0.5 ? 1 : 0);
+        // pulled: a long gooey arm reaches out of it after the finger, a bulb of jelly at its end (drawn first, the body covers its root)
+        const DL = Math.hypot(sk.D[0], sk.D[1]);
+        if (sk.warp && DL > 1.2) {
+          const g0 = sk.warp[0], g1 = sk.warp[1], steps = Math.ceil(DL * 2);
+          for (let k = 0; k <= steps; k++) {
+            const sF = k / steps, cx = g0 + sk.D[0] * sF, cy = g1 + sk.D[1] * sF, r = sF > 0.85 ? 2.9 : 3.3 - 1.4 * sF;
+            for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) {
+              if (x < 0 || y < 0 || x >= N || y >= N) continue;
+              const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy); if (d > r) continue;
+              const edge = d > r - 0.9, hl = (x + 0.5 - cx) + (y + 0.5 - cy) < -r * 0.5 && d > r * 0.35 && !edge;
+              dot(x, y, hl ? JELLY[0] : jellyAt(x, y, edge, (x + 0.5 - cx) / r));
+            }
+          }
+        }
+        for (let y = top; y < 34; y++) {
+          const k = (y - top) / (34 - top), w = (5 + Math.sqrt(k) * 12.5) * (1 + (jig + breathe) * 0.04 * (1 - k * 2)), cx = 20 + lean * (1 - k) * 1.6;
+          for (let x = Math.round(cx - w); x < Math.round(cx + w); x++) {
+            if (x < 0 || x >= N) continue;
+            const u = (x + 0.5 - cx) / w, rim = Math.abs(u) > 0.86 || y === top;
+            let cc = jellyAt(x, y, rim, u);
+            if (rim && y === top) cc = JELLY[2];
+            if ((u < -0.52 && u > -0.72 && k > 0.12 && k < 0.6) || (y === top + 1 && u > -0.45 && u < 0.1)) cc = JELLY[0];
+            if (y === top + 2 && u > -0.62 && u < -0.5) cc = 0xffffff;
+            dot(x, y, cc);
+          }
+        }
+        const sink2 = cc => mixC(cc, JELLY[1], 0.25);
         const bob = k => Math.round(Math.sin(t * 0.8 + k * 1.7) * 1);
-        for (let k = 0; k < 7; k++) { dot(9 + k, 28 - k + bob(0), k < 2 ? sink(0x8c6440) : k === 2 ? sink(0xd0a040) : sink(0xe8eef4)); if (k > 2) dot(10 + k, 28 - k + bob(0), sink(0x8890a0)); }
-        dot(10, 25 + bob(0), sink(0xd0a040)); dot(13, 28 + bob(0), sink(0xd0a040));
-        oval(27, 21 + bob(1), 1.7, 1.7, sink(0xf0c040)); dot(26, 20 + bob(1), sink(0xfff0a0)); dot(27, 21 + bob(1), sink(0xb08020));
-        fill(22, 25 + bob(2), 26, 25 + bob(2), sink(0xd0a040)); dot(26, 26 + bob(2), sink(0xd0a040)); dot(24, 26 + bob(2), sink(0xd0a040)); oval(21, 25 + bob(2), 1.4, 1.4, sink(0xd0a040)); dot(21, 25 + bob(2), SKIN[1]);
-        fill(14, 22 + bob(3), 17, 22 + bob(3), sink(0xf4ecd8)); dot(13, 21 + bob(3), sink(0xf4ecd8)); dot(13, 23 + bob(3), sink(0xf4ecd8)); dot(18, 21 + bob(3), sink(0xf4ecd8)); dot(18, 23 + bob(3), sink(0xf4ecd8));
-        for (let k = 0; k < 4; k++) { const ph = (t * 0.35 + k * 0.27) % 1; dot(15 + k * 3.4, 33 - ph * 18, SKIN[0]); }
-        // the face, the grin, and the crown riding on top
-        const fx0 = Math.round(lean * 0.9);
-        for (const ex of [16, 23]) { if (blink) fill(ex + fx0, eyeY + 1, ex + 1 + fx0, eyeY + 1, LINE); else { fill(ex + fx0, eyeY, ex + 1 + fx0, eyeY + 2, LINE); dot(ex + fx0, eyeY, 0xffffff); } }
-        if (happy || since < 1) { fill(17 + fx0, hy + 5, 22 + fx0, hy + 5, LINE); fill(18 + fx0, hy + 6, 21 + fx0, hy + 6, 0xc04858); dot(17 + fx0, hy + 4, LINE); dot(22 + fx0, hy + 4, LINE); }
-        else { fill(18 + fx0, hy + 5, 21 + fx0, hy + 5, LINE); dot(17 + fx0, hy + 4, LINE); dot(22 + fx0, hy + 4, LINE); }
-        const cx0 = Math.round(20 + lean * 1.4), cy = top - 1 - Math.round(jig * 0.5);
-        fill(cx0 - 5, cy, cx0 + 4, cy + 1, 0xf0c040); fill(cx0 - 5, cy + 1, cx0 + 4, cy + 1, 0xb08020);
-        for (const px of [-5, -2, 1, 4]) { dot(cx0 + px, cy - 1, 0xf0c040); dot(cx0 + px, cy - 2, px === -2 || px === 1 ? 0xf0c040 : -1); }
-        dot(cx0 - 1, cy, 0xe03850); dot(cx0 + 2, cy, 0x40c0f0); dot(cx0 - 4, cy, 0xfff4b0);
-        // a tap shakes a coin loose: it pops out of the top and drops back in
-        if (since < 0.9) { const u = since / 0.9, x = cx0 + 6 * u, y = cy - 2 - Math.sin(u * Math.PI) * 7; fill(x, y, x + 1, y + 1, 0xf0c040); dot(x, y, 0xfff0a0); }
+        for (let k = 0; k < 7; k++) { dot(9 + k, 29 - k + bob(0), k < 2 ? sink2(0x8c6440) : k === 2 ? sink2(0xd0a040) : sink2(0xe8eef4)); if (k > 2) dot(10 + k, 29 - k + bob(0), sink2(0x8890a0)); }
+        dot(10, 26 + bob(0), sink2(0xd0a040)); dot(13, 29 + bob(0), sink2(0xd0a040));
+        oval(28, 23 + bob(1), 1.7, 1.7, sink2(0xf0c040)); dot(27, 22 + bob(1), sink2(0xfff0a0)); dot(28, 23 + bob(1), sink2(0xb08020));
+        fill(22, 28 + bob(2), 26, 28 + bob(2), sink2(0xd0a040)); dot(26, 29 + bob(2), sink2(0xd0a040)); dot(24, 29 + bob(2), sink2(0xd0a040)); oval(21, 28 + bob(2), 1.4, 1.4, sink2(0xd0a040));
+        for (let k = 0; k < 6; k++) { const ph = (t * 0.3 + k * 0.19) % 1, x = 12 + k * 3.2 + Math.sin(t * 2 + k) * 0.7, y = 33 - ph * 20; if (y > top + 3) dot(x, y, JELLY[0]); }
+        for (let k = 0; k < 10; k++) dot(31 + k * 0.45, 26 - k, k < 4 ? 0xb08020 : 0xf0c040);
+        oval(35.6, 15.5, 1.5, 1.5, 0xe03048); dot(35, 15, 0xffb0c0);
+        // the face, drawn to read over the glass: dark-ringed white eyes with a pupil that watches the finger (or the hand
+        // being pulled out of it), rosy cheeks, a smug grin; pulled, the eyes go wide and the mouth makes an O
+        const fx0 = Math.round(lean * 1.1), fy = Math.min(eyeY + 2, top + 10), pulled = sk.grab && DL > 3;
+        const tgt = sk.warp && DL > 1.2 ? [sk.warp[0] + sk.D[0], sk.warp[1] + sk.D[1]] : ptr, lx = tgt ? (tgt[0] > 20 + fx0 ? 1 : 0) : (Math.floor(t / 2.3) % 2), ly = tgt && tgt[1] < fy ? -1 : 0;
+        const RING = 0x0a2418;
+        for (const ex of [14, 22]) {
+          const e0 = ex + fx0;
+          if (blink && !pulled) { fill(e0, fy, e0 + 3, fy, RING); continue; }
+          const w = pulled ? 1 : 0;
+          fill(e0 - w, fy - 2 - w, e0 + 3 + w, fy + 1 + w, RING);
+          fill(e0 + 1 - w, fy - 1 - w, e0 + 2 + w, fy + w, 0xffffff);
+          dot(e0 + 1 + lx * (1 + w) - (w && !lx ? 1 : 0), fy + ly + (w ? 0 : 0), 0x0a2418);
+        }
+        dot(12 + fx0, fy + 3, 0xf890b0); dot(13 + fx0, fy + 3, 0xf890b0); dot(26 + fx0, fy + 3, 0xf890b0); dot(27 + fx0, fy + 3, 0xf890b0);
+        if (pulled) { oval(20 + fx0, fy + 5, 2, 1.8, RING); dot(20 + fx0, fy + 5, 0xc04858); }
+        else if (happy || since < 1) { fill(17 + fx0, fy + 4, 22 + fx0, fy + 4, RING); fill(18 + fx0, fy + 5, 21 + fx0, fy + 5, 0xc04858); dot(16 + fx0, fy + 3, RING); dot(23 + fx0, fy + 3, RING); }
+        else { fill(18 + fx0, fy + 4, 21 + fx0, fy + 4, RING); dot(17 + fx0, fy + 3, RING); dot(22 + fx0, fy + 3, RING); dot(22 + fx0, fy + 5, JELLY[1]); }
+        const cx0 = Math.round(20 + lean * 1.6), cy = top - 1;
+        fill(cx0 - 6, cy - 1, cx0 + 5, cy + 1, 0xf0c040); fill(cx0 - 6, cy + 1, cx0 + 5, cy + 1, 0xb08020); fill(cx0 - 6, cy - 1, cx0 + 5, cy - 1, 0xfff0a0);
+        for (const [px, h] of [[-6, 3], [-3, 4], [-1, 5], [2, 4], [5, 3]]) { for (let k = 1; k < h; k++) { dot(cx0 + px, cy - 1 - k, 0xf0c040); if (k < h - 1) dot(cx0 + px + (px < 0 ? 1 : -1), cy - 1 - k, 0xd0a030); } dot(cx0 + px, cy - 1 - h, 0xfff8e8); }
+        for (let x = cx0 - 6; x <= cx0 + 5; x++) dot(x, cy - 2, 0xf0c040);
+        const gl = Math.floor(t * 2) % 4;
+        [[cx0 - 4, 0xe03048], [cx0 - 1, 0x40c0f0], [cx0 + 3, 0x40d070]].forEach(([x, cc], k) => dot(x, cy, gl === k ? 0xffffff : cc));
       } else {
-        // a keeper cut out of the night sky: a hooded shape full of stars, with a galaxy turning in its chest
+        // a tall hooded shape cut out of the night itself, a galaxy turning in its chest
         const inside = [];
-        oval(20, hy + 0.5, 9.4, 8.8, 0x2a2470);
-        for (let y = hy + 7; y < 34; y++) { const w = Math.min(12.5, 6 + (y - hy - 7) * 2.2); for (let x = Math.round(20 - w); x < Math.round(20 + w); x++) dot(x, y, 0x2a2470); }
-        for (let i = 0; i < N * N; i++) { // a dot of the keeper
+        const tipX = 20 + Math.round(Math.sin(t * 0.9) * 1.2);
+        for (let y = hy - 13; y < 34; y++) {
+          const r = y - hy;
+          const w = r < -7 ? (r + 13) * 0.62 : r < 6 ? Math.sqrt(Math.max(0, 1 - ((r - 0.5) / 7.5) ** 2)) * 4 + 4.2 : r < 9 ? 8.2 + (r - 6) * 1.5 : Math.min(19, 12.7 + (r - 9) * 0.55);
+          const cx = r < -7 ? 20 + (-7 - r) * 0.55 * (tipX >= 20 ? 1 : -1) * (1 + Math.abs(tipX - 20) * 0.4) : 20;
+          for (let x = Math.round(cx - w); x < Math.round(cx + w); x++) dot(x, y, 0x0c0a2a);
+        }
+        if (!neb) {
+          neb = { s1: new Float32Array(N * N), c1: new Float32Array(N * N), s2: new Float32Array(N * N), c2: new Float32Array(N * N) };
+          for (let i = 0; i < N * N; i++) { const x = i % N, y = (i / N) | 0, a = x * 0.3 + y * 0.22, b2 = y * 0.27 - x * 0.16; neb.s1[i] = Math.sin(a); neb.c1[i] = Math.cos(a); neb.s2[i] = Math.sin(b2); neb.c2[i] = Math.cos(b2); }
+        }
+        const s1 = Math.sin(t * 0.25), c1 = Math.cos(t * 0.25), s2 = Math.sin(t * 0.1), c2 = Math.cos(t * 0.1);
+        for (let i = 0; i < N * N; i++) {
           if (spr[i] < 0) continue;
-          const x = i % N, y = (i / N) | 0, n = Math.sin(x * 0.5 + y * 0.3 + t * 0.2) * Math.sin(y * 0.45 - x * 0.2), d = ptr ? Math.hypot(x + 0.5 - ptr[0], y + 0.5 - ptr[1]) : 99;
-          let cc = n > 0.45 ? 0x6a3aa8 : n > 0.15 ? 0x40308c : n < -0.5 ? 0x1c1650 : 0x2a2470;
-          if (d < 6) cc = mixC(cc, 0x8a6ae0, (1 - d / 6) * 0.6);
-          if (d < 5 && (x * 7 + y * 13 + Math.floor(t * 6)) % 6 === 0) cc = 0xfff8e0;
+          const x = i % N, y = (i / N) | 0;
+          const n = (neb.s1[i] * c1 + neb.c1[i] * s1) * (neb.s2[i] * c2 - neb.c2[i] * s2);
+          let cc = n > 0.55 ? 0x5a2c90 : n > 0.2 ? 0x2e2070 : n < -0.55 ? 0x10385a : 0x14124a;
+          const d = ptr ? Math.hypot(x + 0.5 - ptr[0], y + 0.5 - ptr[1]) : 99;
+          if (d < 5) cc = mixC(cc, 0x8a6ae0, (1 - d / 5) * 0.6);
           spr[i] = cc; inside.push(i);
         }
-        // the rim of the hood catches starlight; the face inside is a deeper dark
-        oval(20, hy + 1.2, 5.6, 5.4, 0x0c0828);
-        for (let x = 13; x < 27; x++) { const y = Math.round(hy - 5.6 + Math.abs(x - 19.5) * 0.12); dot(x, y, x < 17 ? 0xb0a0f0 : 0x7c6cd0); }
-        for (let y = hy - 4; y < hy + 6; y++) dot(Math.round(13 - Math.max(0, y - hy - 2) * 0.3), y, 0x9c8ce8);
-        // its stars, twinkling
-        for (const [a, bq, ph] of cosmos) {
-          const i = inside[Math.floor(a * inside.length)];
-          if (i === undefined || spr[i] === 0x0c0828) continue;
+        for (const [a, bq, ph] of cosmos.slice(0, 22)) {
+          const i = inside[Math.floor(((a * 7.31) % 1) * inside.length)];
+          if (i === undefined) continue;
           const tw = Math.sin(t * (1 + bq * 1.5) + ph);
-          if (tw > -0.2) spr[i] = tw > 0.7 ? 0xffffff : 0xd8d0ff;
+          if (tw > 0) spr[i] = tw > 0.7 ? 0xffffff : 0xb8b0ff;
         }
-        // a galaxy turning in the chest
-        const gx = 20, gy = hy + 11.5;
-        for (let k = 0; k < 16; k++) for (const arm of [0, Math.PI]) { const r = k * 0.28, a = arm + k * 0.5 + t * 0.6; dot(gx + Math.cos(a) * r * 1.4, gy + Math.sin(a) * r * 0.8, k < 3 ? 0xffffff : k < 9 ? 0xe0d0ff : 0xa080e8); }
-        // two star eyes (they crinkle into arcs when it's pleased)
+        const CON = [[11, 30], [14, 26], [17, 28], [15, 32], [24, 27], [27, 30], [30, 26]];
+        for (let k = 0; k < CON.length - 1; k++) if (k !== 3) { const [x0, y0] = CON[k], [x1, y1] = CON[k + 1]; const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let j = 1; j < n; j++) { const x = Math.round(x0 + (x1 - x0) * j / n), y = Math.round(y0 + (y1 - y0) * j / n); if (spr[y * N + x] >= 0) spr[y * N + x] = 0x4c4498; } }
+        CON.forEach(([x, y], k) => { if (spr[y * N + x] >= 0) spr[y * N + x] = Math.sin(t * 2 + k) > 0 ? 0xffffff : 0xd8d0ff; });
+        for (let y = 0; y < N; y++) { let x0 = -1, x1 = -1; for (let x = 0; x < N; x++) if (spr[y * N + x] >= 0) { if (x0 < 0) x0 = x; x1 = x; } if (x0 < 0) continue; const x = moonSide > 0 ? x1 : x0; spr[y * N + x] = y % 3 ? 0xb0a0f0 : 0xe0d8ff; }
+        oval(20, hy + 1.2, 6.3, 6.3, (x, y, u, v) => u * moonSide > 0.2 ? 0xd8d0ff : 0x9a88e8);
+        oval(20, hy + 1.4, 5.1, 5.3, 0x04030f);
+        // a galaxy turning in the chest: every constellation it takes in makes it bigger and brighter
+        const gx = 20, gy = hy + 12, arms = 16 + sf.absorbed * 3, fed = sf.fly ? Math.min(1, (t - sf.flyAt) / 1.3) : 0;
+        for (let k = 0; k < arms; k++) for (const arm of [0, Math.PI]) { const r = k * 0.3, a = arm + k * 0.5 + t * (0.6 + fed * 2); dot(gx + Math.cos(a) * r * 1.5, gy + Math.sin(a) * r * 0.8, k < 3 + sf.absorbed ? 0xffffff : k < 9 + sf.absorbed ? 0xf0d0ff : 0xa080e8); }
         for (const ex of [17, 23]) {
-          if (happy) { dot(ex - 1, eyeY + 1, 0xfff8c0); dot(ex, eyeY, 0xfff8c0); dot(ex + 1, eyeY + 1, 0xfff8c0); continue; }
+          if (happy || fed > 0.6) { dot(ex - 1, eyeY + 1, 0xfff8c0); dot(ex, eyeY, 0xfff8c0); dot(ex + 1, eyeY + 1, 0xfff8c0); continue; }
           if (blink) { dot(ex, eyeY, 0x8c7cd0); continue; }
-          dot(ex + look, eyeY, 0xffffff); dot(ex - 1 + look, eyeY, 0xfff8c0); dot(ex + 1 + look, eyeY, 0xfff8c0); dot(ex + look, eyeY - 1, 0xfff8c0); dot(ex + look, eyeY + 1, 0xfff8c0);
+          const p = Math.sin(t * 2.2 + ex) > 0.3;
+          dot(ex + look, eyeY, 0xffffff); for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) dot(ex + look + dx, eyeY + dy, p ? 0xfff8c0 : 0xe0d8a0);
+        }
+        // a small ringed world going round the hood, and its moon
+        for (const [ph, r, sp, kind] of [[0, 1, 0.55, 0], [2.6, 0, 0.9, 1]]) {
+          const a = t * sp + ph + lv(6) * 6, x = Math.round(20 + Math.cos(a) * (12 + r * 2)), y = Math.round(hy - 1 + Math.sin(a) * (4 + r));
+          if (Math.sin(a) < 0 && y >= 0 && spr[y * N + x] >= 0) continue;
+          if (kind === 0) { oval(x + 0.5, y + 0.5, 1.6, 1.6, (xx, yy, u, v) => u + v < -0.5 ? 0xfff0c8 : 0xf0a060); for (const k of [-3, -2, 2, 3]) dot(x + k, y + (k < 0 ? 1 : 0), 0xfff4e0); }
+          else { dot(x, y, 0xe8f0ff); dot(x + 1, y, 0xa8b8e0); }
+        }
+      }
+    }
+    // the hall seen through the jelly: each colour mixed once and kept
+    const glassMemo = new Map(), glass = (bg, side) => { const k = bg * 2 + side; let v = glassMemo.get(k); if (v === undefined) { v = mixC(bg, side ? JELLY[2] : JELLY[1], 0.4); glassMemo.set(k, v); } return v; };
+    function legendCounter(t) {
+      if (legend === 'Dragon') {
+        // no counter: the hoard runs right down to the front, a goblet and gems in it, and its tail curled round
+        if (!slab) {
+          slab = new Int32Array(N * N).fill(-1); L = slab;
+          for (let x = 0; x < N; x++) { const h = 35 + Math.round(Math.sin(x * 0.6 + lv(7) * 6) * 1.3 + Math.sin(x * 1.7) * 0.6); for (let y = h; y < N; y++) dot(x, y, y === h ? 0xf8d860 : hash2(x, y) < 0.15 ? 0x8c5c10 : (x + y * 2) % 4 === 0 ? 0xf0c040 : hash2(x + 9, y) > 0.85 ? 0xfff0a0 : 0xd0981c); }
+          for (let k = 0; k < 5; k++) { const x = 3 + k * 8 + lvi(k + 16, 3), y = 37 + (k % 2); dot(x, y, GEMS[(k + 2) % 5]); dot(x + 1, y, mixC(GEMS[(k + 2) % 5], 0, 0.35)); }
+          L = front;
+        }
+        for (let i = 33 * N; i < N * N; i++) if (slab[i] >= 0) front[i] = slab[i];
+        // the tail, curled along the front of the hoard, its spade tip twitching
+        const tw = Math.round(Math.sin(t * (dg.wake > 0.5 ? 6 : 0.8)) * (dg.wake > 0.5 ? 1.5 : 0.6));
+        for (let k = 0; k < 26; k++) { const a = k / 25, x = 37 - a * 26, y = 31 + Math.sin(a * Math.PI) * 4 + a * 1.2; dot(x, y, SKIN[1]); dot(x, y + 1, SKIN[2]); if (k % 3 === 0 && k < 24) dot(x, y - 1, 0xf0c040); }
+        tri([9, 34 + tw], [13, 32 + tw], [10.5, 37 + tw], SKIN[1]); dot(10, 34 + tw, SKIN[0]);
+      } else if (legend === 'Slime King') {
+        fill(0, 29, 39, 39, 0x4a1c5c); fill(0, 29, 39, 30, 0xf0c040); fill(0, 30, 39, 30, 0xb08020); fill(0, 38, 39, 38, 0xf0c040); fill(0, 39, 39, 39, 0xb08020);
+        for (let y = 31; y < 38; y++) for (let x = 0; x < N; x++) if ((x + y) % 6 === 0 || (x - y + 60) % 6 === 0) dot(x, y, 0x6a2c80);
+        for (let x = 1; x < N; x += 6) for (let y = 31; y < 38; y++) if ((x + y) % 6 === 0) dot(x, y, 0xf0c040);
+        for (let x = 6; x < 34; x++) { dot(x, 29, JELLY[1]); if (x > 8 && x < 31) dot(x, 30, JELLY[2]); }
+        for (let k = 0; k < 6; k++) {
+          const x = 8 + k * 4.4 + lvi(k + 22, 2), sp = 0.35 + cosmos[k + 22][2] * 0.05, ph = (t * sp + cosmos[k + 22][0]) % 1, len = Math.floor(ph * 9);
+          for (let y = 30; y < 31 + Math.min(len, 6); y++) dot(x, y, JELLY[1]);
+          dot(x, 31 + len, len >= 6 ? JELLY[0] : JELLY[2]);
+        }
+      } else {
+        // no counter: a bank of dusk cloud, drifting, the wares resting on it
+        // (the bank repeats every 7.5 seconds: each quarter-step of its drift is drawn once and kept)
+        const step = Math.floor(t * 3.2) % 24;
+        if (!clouds[step]) {
+          const off = step / 4, puffs = [], layer = new Int32Array(N * N).fill(-1);
+          for (let k = -1; k < 8; k++) { const r = 4.2 + ((k + 3) % 3) * 0.7; puffs.push(k * 6 + ((off + k * 2.3) % 6), 31 + (k & 1) * 1.5 + Math.sin(k * 1.9) * 0.8, 1 / (r * r)); }
+          for (let y = 26; y < N; y++) for (let x = 0; x < N; x++) {
+            let best = 81;
+            for (let k = 0; k < puffs.length; k += 3) { const dx = x + 0.5 - puffs[k], dy = (y + 0.5 - puffs[k + 1]) * 1.25, q = (dx * dx + dy * dy) * puffs[k + 2]; if (q < best) best = q; }
+            best = Math.sqrt(best);
+            if (best > 1 && y < 34) continue;
+            const lit2 = y < 30 ? 0 : y < 33 ? 1 : y < 36 ? 2 : 3;
+            layer[y * N + x] = [0xfff0f4, 0xf4c8dc, 0xc8a0d0, 0x9c7cc0][Math.min(3, lit2 + (best > 0.8 && y > 29 ? 1 : 0))];
+          }
+          clouds[step] = layer;
+        }
+        const cl = clouds[step];
+        for (let i = 26 * N; i < N * N; i++) if (cl[i] >= 0) front[i] = cl[i];
+      }
+    }
+    function legendHands(t) {
+      if (legend === 'Starfolk') for (const hx0 of [9, 28]) {
+        fill(hx0 - 1, 27, hx0 + 2, 29, 0x14104a); dot(hx0, 28, Math.sin(t * 3 + hx0) > 0 ? 0xffffff : 0xfff0a0); dot(hx0 + 1, 28, 0xd8d0ff);
+      }
+    }
+    // after the merge, unoutlined: the dragon's smoke, fire, glints and the thief's coin; the starfolk's constellations
+    function legendOver(t) {
+      const put = (x, y, cc) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && x < N && y >= 0 && y < N) { const i = (y * N + x) * 4; img.data[i] = cc >> 16 & 255; img.data[i + 1] = cc >> 8 & 255; img.data[i + 2] = cc & 255; } };
+      const bgp = (x, y) => { x = Math.round(x); y = Math.round(y); return x >= 0 && x < N && y >= 0 && y < N && sprite[y * N + x] < 0; };
+      if (legend === 'Dragon') {
+        const ey = 24 - Math.round(dg.wake * 3);
+        // asleep: rings of smoke from its nostrils drift up and away
+        if (dg.wake < 0.5) for (let k = 0; k < 3; k++) {
+          const ph = (t * 0.32 + k / 3) % 1, x = 20 + (k - 1) * 3 + Math.sin(ph * 6 + k) * 1.5, y = ey + 4 - ph * 26, r = 0.6 + ph * 1.6, cc = ph < 0.4 ? 0xc8c0c8 : ph < 0.7 ? 0x9a909c : 0x6c6070;
+          if (ph < 0.12) continue;
+          for (let a = 0; a < 8; a++) { const xx = x + Math.cos(a * 0.785) * r, yy = y + Math.sin(a * 0.785) * r * 0.7; if (bgp(xx, yy)) put(xx, yy, cc); }
+        }
+        for (let k = 0; k < 6; k++) { const ph = (t * (0.18 + cosmos[k + 25][2] * 0.02) + cosmos[k + 25][0]) % 1, x = Math.round(cosmos[k + 25][1] * 38 + 1 + Math.sin(t * 2 + k) * 1.2), y = Math.round(36 - ph * 36); if (bgp(x, y) || y < 4) put(x, y, ph > 0.7 ? 0xc04020 : ph > 0.4 ? 0xf08030 : 0xffd060); }
+        for (const [gx, sp, ph] of glints) { const s = Math.sin(t * (1.2 + sp * 1.6) + ph); if (s < 0.75) continue; const gy = Math.round(hoardTop(gx)) + 1 + Math.floor(sp * 8); if (!bgp(gx, gy)) continue; put(gx, gy, 0xffffff); if (s > 0.93) { put(gx - 1, gy, 0xfff4b0); put(gx + 1, gy, 0xfff4b0); put(gx, gy - 1, 0xfff4b0); } }
+        // fire, from its jaws to where the thief's hand was
+        const fu = t - dg.fireT;
+        if (fu < 1.1) {
+          const mx = 20, my = ey + 8, tx = dg.fireTo[0], ty = dg.fireTo[1], L2 = Math.hypot(tx - mx, ty - my) || 1, reach = Math.min(1, fu / 0.25) * L2;
+          for (let k = 0; k < reach; k += 0.5) {
+            const x = mx + (tx - mx) * k / L2, y = my + (ty - my) * k / L2, half = 0.5 + k * 0.12;
+            for (let d = -half; d <= half; d += 0.7) { const n = (Math.floor(x * 7 + d * 13 + t * 30)) % 5; if (n === 4 && k > 3) continue; put(x - (ty - my) / L2 * d, y + (tx - mx) / L2 * d, k < 3 || n === 0 ? 0xfff0a0 : Math.abs(d) > half - 0.8 ? 0xe04020 : 0xf09030); }
+          }
+        }
+        // the coin in the thief's hand, or falling back into the hoard
+        const coin = (x, y) => { put(x, y, 0xfff0a0); put(x + 1, y, 0xf0c040); put(x, y + 1, 0xf0c040); put(x + 1, y + 1, 0xb08020); put(x - 1, y, 0x8c5c10); put(x + 2, y + 1, 0x8c5c10); };
+        if (dg.coin && dg.hold) coin(Math.round(dg.coin[0]), Math.round(dg.coin[1]) - 1);
+        if (dg.drop) { const u = (t - dg.drop.at) / 0.45; if (u > 1) dg.drop = null; else coin(Math.round(dg.drop.from[0]), Math.round(dg.drop.from[1] + u * u * 6)); }
+        // the stolen ones, heaped in the corner
+        for (let k = 0; k < dg.loot; k++) { const x = 2 + (k % 4) * 3, y = 5 - Math.floor(k / 4) * 2; coin(x, y); if (k === dg.loot - 1 && t - dg.lootAt < 0.8) { const r = 1 + Math.floor((t - dg.lootAt) * 5); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx * r, y + dy * r, 0xfff4b0); } }
+      } else if (legend === 'Slime King') {
+        // drops of jelly flung off the arm, and the crown's coin bouncing along the counter
+        for (const d of sk.drops) { put(d.x, d.y, t - d.at < 0.5 ? JELLY[0] : JELLY[1]); put(d.x - d.vx * 0.02, d.y - d.vy * 0.02, JELLY[1]); }
+        if (sk.coin) {
+          const u = t - sk.coin.at, x = Math.max(3, Math.min(36, sk.coin.x0 + sk.coin.dir * u * 6)), y = 26 - Math.abs(Math.sin(u * 5)) * 11 * Math.exp(-u * 1.1) - (u < 0.3 ? (0.3 - u) * 20 : 0), wide = u > 2.2 || Math.floor(u * 10) % 2;
+          const cx = Math.round(x), cy = Math.round(y), w = wide ? 1 : 0;
+          for (let dy = -2; dy <= 2; dy++) for (let dx = -1 - w; dx <= 1 + w; dx++) {
+            const edge = Math.abs(dy) === 2 || Math.abs(dx) === 1 + w;
+            if (Math.abs(dy) === 2 && Math.abs(dx) === 1 + w) continue;
+            put(cx + dx, cy + dy, edge ? 0x6c4410 : dx < 0 && dy < 0 ? 0xfff0a0 : 0xf0c040);
+          }
+          if (wide) put(cx, cy, 0xb08020);
+        }
+      } else if (legend === 'Starfolk') {
+        const p = (t % 7) / 7;
+        if (p < 0.16) { const u = p / 0.16, x0 = Math.round((moonSide > 0 ? 2 : 37) + moonSide * u * 26), y0 = Math.round(2 + u * 9); for (let k = 0; k < 5; k++) { const x = x0 - moonSide * k, y = y0 - Math.round(k * 0.4); if (bgp(x, y)) put(x, y, k === 0 ? 0xffffff : k < 2 ? 0xffe8f0 : 0xd8a0c0); } }
+        // the constellation being drawn: stars where you passed, lines between them
+        const star = (x, y, big) => { put(x, y, 0xffffff); if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, 0xfff8c0); };
+        const lineTo = (a, b2, cc) => { const n = Math.max(Math.abs(b2[0] - a[0]), Math.abs(b2[1] - a[1])); for (let j = 1; j < n; j++) put(a[0] + (b2[0] - a[0]) * j / n, a[1] + (b2[1] - a[1]) * j / n, cc); };
+        const pts = sf.pts.slice(); if (sf.drawing && ptr) pts.push(ptr);
+        for (let k = 1; k < pts.length; k++) lineTo(pts[k - 1], pts[k], k === pts.length - 1 && sf.drawing ? 0x7c6cd0 : 0xb8a8ff);
+        sf.pts.forEach(([x, y], k) => star(x, y, Math.sin(t * 5 + k) > -0.3));
+        // let go: the stars fly into its chest, trailing light
+        if (sf.fly) {
+          const u = Math.min(1, (t - sf.flyAt) / 1.3), e = u * u * (3 - 2 * u), gx = 20, gy = legHy + 12;
+          const at = sf.fly.map(([x, y], k) => [x + (gx - x) * Math.min(1, e * (1 + k * 0.08)), y + (gy - y) * Math.min(1, e * (1 + k * 0.08))]);
+          if (u < 0.5) for (let k = 1; k < at.length; k++) lineTo(at[k - 1], at[k], 0x8c7ce0);
+          at.forEach(([x, y]) => { star(x, y, u < 0.85); put(x + (x - gx) * 0.12, y + (y - gy) * 0.12, 0x9c8ce8); });
         }
       }
     }
@@ -619,7 +1006,8 @@ Proto.add({
     function counter(t) {
       L = front;
       front.fill(-1);
-      if (counterKind === 'Market Stall') {
+      if (legend !== 'None') legendCounter(t);
+      else if (counterKind === 'Market Stall') {
         // a board on trestles, a striped cloth hung in front with a scalloped hem
         fill(0, 29, 39, 30, 0xc89868); fill(0, 29, 39, 29, 0xe8c088); fill(0, 31, 39, 31, 0x6c4428);
         for (let x = 0; x < N; x++) { const st = STALL[Math.floor(x / 4) % 2], hem = 36 + (x % 4 === 1 || x % 4 === 2 ? 1 : 0); fill(x, 32, x, hem, (x % 4 === 3) ? sink(st, 0.82) : st); }
@@ -660,7 +1048,8 @@ Proto.add({
         for (let x = 2; x < N; x += 10) { fill(x, 35, x + 7, 35, 0x704420); fill(x, 35, x, 38, 0x704420); fill(x + 7, 35, x + 7, 38, 0xb88850); fill(x, 38, x + 7, 38, 0xb88850); }
       }
       // hands resting on the top
-      if (keeper !== 'Mimic') for (const hx0 of [9, 28]) {
+      if (legend !== 'None') legendHands(t);
+      else if (keeper !== 'Mimic') for (const hx0 of [9, 28]) {
         const hc = keeper === 'Mole' ? [0xffe0e8, 0xf8b8c8, 0xd08098] : SKIN, hd = WDY[hx0 > 20 ? 1 : 0];
         fill(hx0 - 1, 28 + hd, hx0 + 2, 30 + hd, hc[1]);
         dot(hx0 + 2, 30 + hd, hc[2]); dot(hx0 - 1, 28 + hd, hc[0]); dot(hx0, 30 + hd, hc[2]); dot(hx0 + 1, 30 + hd, hc[2]);
@@ -676,7 +1065,7 @@ Proto.add({
       };
       if (display !== 'Both Ends') {
         const side = showSide, x0 = side ? 30 : 2, y0 = 27 + WDY[side];
-        if (!(display === 'Heaped' && side === soldSide && t - soldAt < 1.4)) signAt(1 - side);
+        if (legend === 'None' && !(display === 'Heaped' && side === soldSide && t - soldAt < 1.4)) signAt(1 - side);
         if (display === 'On a Stand') { fill(x0 - 1, y0 + 2, x0 + 8, y0 + 4, 0x7c2840); fill(x0 - 1, y0 + 2, x0 + 8, y0 + 2, 0xb84868); for (let x = x0; x <= x0 + 7; x += 2) dot(x, y0 + 5, 0x7c2840); }
         if (display === 'Basket') { fill(x0 - 1, y0 + 2, x0 + 8, y0 + 5, 0xb88848); for (let x = x0 - 1; x <= x0 + 8; x++) for (let y = y0 + 2; y <= y0 + 5; y++) if ((x + y) % 3 === 0) dot(x, y, 0x8c6030); fill(x0 - 1, y0 + 2, x0 + 8, y0 + 2, 0xd8a868); }
       }
@@ -715,6 +1104,7 @@ Proto.add({
           oval(x + 3.5, y + 2.5, 3.6, 2.2, 0xd89040); for (let k = 0; k < 3; k++) dot(x + 2 + k * 2, y + 1, 0xf0c070); fill(x + 1, y + 4, x + 6, y + 4, 0x9c5c20);
         }
       }
+      if (legend === 'Dragon') return;   // the sleeping dragon's head lies where the extra and the pet would be
       // the counter extra, in the middle
       if (extra === 'Coin Pile') {
         for (let i = 0; i < coinCount; i++) { const cx = 17 + (i % 4) * 2, cy = 31 - Math.floor(i / 4); fill(cx, cy, cx + 1, cy, 0xf0c040); dot(cx, cy, 0xfff0a0); dot(cx + 1, cy + 1, 0xa07010); }
@@ -774,7 +1164,7 @@ Proto.add({
     const sx2 = sheet.getContext('2d');
     const img = sx2.createImageData(N, N);
     // the hour's light, laid over every colour as it is written out
-    const LIGHT = { Daylight: null, Lamplit: [1.04, 0.84, 0.6], 'Golden Hour': [1.08, 0.9, 0.7], Moonlit: [0.64, 0.76, 1.06] }[hour];
+    const LIGHT = legend !== 'None' ? null : { Daylight: null, Lamplit: [1.04, 0.84, 0.6], 'Golden Hour': [1.08, 0.9, 0.7], Moonlit: [0.64, 0.76, 1.06] }[hour];
     // by moonlight the keeper keeps more of its own colour than the shop round it, so dark skin and beards still read,
     // and catches a one-dot cool rim on the window side
     const LIGHTK = hour === 'Moonlit' ? [0.85, 0.9, 1.04] : LIGHT, winDir = decorSide ? 1 : -1;
@@ -863,6 +1253,7 @@ Proto.add({
         const u = (t - legAt) / 0.9, x0 = 20 + legDir * u * 24, y0 = 28 - u * 26;
         for (let k = 0; k < 6; k++) { const x = Math.round(x0 - legDir * k * 1.3), y = Math.round(y0 + k * 1.1); if (x >= 0 && x < N && y >= 0 && y < N) ink(y * N + x, k === 0 ? 0xffffff : k < 3 ? 0xe0d8ff : 0x8070c8); }
       }
+      if (legend !== 'None') legendOver(t);
       sx2.putImageData(img, 0, 0);
       g2.imageSmoothingEnabled = false;
       const k = S / N;
@@ -879,6 +1270,8 @@ Proto.add({
       const zone = (x, y) => y > 0.6 ? (x < 0.3 ? 0 : x > 0.7 ? 1 : 2) : (x > 0.25 && x < 0.75 && y > 0.1 ? 2 : -1);
       cursor = inp.inside ? zone(inp.x, inp.y) : -1;
       ptr = inp.inside ? [inp.x * N, inp.y * N] : null;
+      // a legendary keeper is a toy of its own (see legendInput)
+      if (legend !== 'None') { cursor = -1; legendInput(t, inp); draw(t); return; }
       const onKeeper = cursor === 2 && inp.y < 0.6;
       if (onKeeper && !wasOn) {
         // stepping up to a legendary keeper: a purr, a squelch or a twinkle

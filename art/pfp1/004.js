@@ -158,6 +158,796 @@ Proto.add({
       c.trait('Legendary', legend);
     }
     c.trait('Trinket', trinket);
+    // the legendaries drawn as 1/1 pictures of their own (legendWizard, below); every other wizard is drawn as before.
+    // A type left out of this list falls back to the older drawing further down.
+    const ONE_OF_ONE = ['Starweave', 'Hedge Born', 'Living Flame', 'Swapped'];
+    if (legend === 'Hedge Born') return hedgeSampler();
+    if (ONE_OF_ONE.includes(legend)) return legendWizard();
+
+    // ---------- Hedge Born, redrawn as a claymation still: the hedge wizard sculpted in plasticine on a little
+    // stop-motion set (80 x 80 pixels). Every lump is shaded as rounded clay from its own shape (lit from the top left,
+    // a soft shadow where one lump sits on another and on the backdrop), with big clay eyeballs, a big clay nose and a
+    // beard of leaf-green clay; the shading boils from frame to frame the way hand-moved clay does. Every trait the print
+    // lists is sculpted: the sky as the set's backdrop (clay stars, moon, sun, pines, clouds, aurora or a bookcase), the
+    // hat's shape, band and badge, the face, eyes, brows, nose, moustache, beard and hair, the familiar on his shoulder,
+    // the staff and its orb, the trinket, the stance. The toy: tap to poke a fingerprint dent into the clay (the clay
+    // keeps it a while); drag to drag a finger through it, a groove the animator smooths away when you let go (he winces
+    // while you do); a tap on the orb makes it flare. ----------
+    function hedgeSampler() {
+      const M = 80, N = M * M, g = c.ctx, cel = Math.max(1, Math.floor(S / M)), of = Math.floor((S - cel * M) / 2);
+      const can = document.createElement('canvas');
+      can.width = can.height = M;
+      const cx2 = can.getContext('2d'), img = cx2.createImageData(M, M), OUT = new Uint32Array(img.data.buffer);
+      const mk = (r, gg, b) => ((255 << 24) | (b << 16) | (gg << 8) | r) >>> 0;
+      const U = h => mk(parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16));
+      const lyd3 = k => 55 + parseInt(c.hash.slice(-3), 16) % 10 + 12 * Math.floor(k / 7) + [0, 2, 4, 6, 7, 9, 11][((k % 7) + 7) % 7];
+      // clay colours, each with a ramp of five tones (deep shadow, shadow, clay, lit, highlight)
+      const RAMPS = [], RIDX = new Map();
+      const rampOf = col => {
+        let k = RIDX.get(col);
+        if (k === undefined) {
+          const r = col & 255, gg = (col >>> 8) & 255, b = (col >>> 16) & 255;
+          const tone = f => f <= 1 ? mk(r * f | 0, gg * f | 0, b * f | 0) : mk(r + (255 - r) * (f - 1) | 0, gg + (255 - gg) * (f - 1) | 0, b + (255 - b) * (f - 1) | 0);
+          RAMPS.push(Uint32Array.of(tone(0.5), tone(0.74), tone(1), tone(1.22), tone(1.5)));
+          k = RAMPS.length - 1; RIDX.set(col, k);
+        }
+        return k;
+      };
+      const K = U('#1c1612'), RED = U('#d8402e'), YEL = U('#f2c234'), WHITE = U('#f4efe2'), HATC = U('#25633e'), ROBEC = U('#4a9a3a'), SLEEVEC = U('#3d8a34'),
+        LEAFC = U('#b4da58'), LEAF2 = U('#4e8a2c'), FACEC = U('#e6a674'), NOSEC = U('#d8684a'), STAFFC = U('#8a5a2e'), BLUE = U('#3a78d0'), ORANGE = U('#f08a2e'),
+        PINK = U('#f28aa4'), GREY = U('#e2e2e6'), MOUTH = U('#5a2418');
+      const Z = new Uint8Array(N), C = new Uint32Array(N), FL = new Uint8Array(N);
+      let zc = 0, SC = 1;
+      // the wizard is modelled at 80 x 80 and set on the stage a fifth bigger, hat tip at the top
+      const FX = x => 38 + (x - 38) * SC, FY = y => 2 + (y - 2) * SC;
+      // paint a lump (a test per pixel centre, in the model's units; the test may return a colour of its own) on top of what's there
+      const paint = (col, f, flat) => { zc++; const bb = f.bb, xa = bb ? Math.max(0, Math.floor(FX(bb[0])) - 1) : 0, xb = bb ? Math.min(M - 1, Math.ceil(FX(bb[2])) + 1) : M - 1, ya = bb ? Math.max(0, Math.floor(FY(bb[1])) - 1) : 0, yb = bb ? Math.min(M - 1, Math.ceil(FY(bb[3])) + 1) : M - 1; for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) { const v = f(38 + (x + 0.5 - 38) / SC, 2 + (y + 0.5 - 2) / SC, x + 0.5, y + 0.5); if (v) { const i = y * M + x; Z[i] = zc; C[i] = v === true ? col : v; FL[i] = flat ? 1 : 0; } } return zc; };
+      const withBB = (f, bb) => { f.bb = bb; return f; };
+      const disc = (cx, cy, r) => withBB((X, Y) => (X - cx) * (X - cx) + (Y - cy) * (Y - cy) <= r * r, [cx - r, cy - r, cx + r, cy + r]);
+      const ell = (cx, cy, rx, ry) => withBB((X, Y) => ((X - cx) / rx) ** 2 + ((Y - cy) / ry) ** 2 <= 1, [cx - rx, cy - ry, cx + rx, cy + ry]);
+      const segD = (X, Y, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy, u = l ? Math.max(0, Math.min(1, ((X - ax) * dx + (Y - ay) * dy) / l)) : 0; return Math.hypot(X - ax - dx * u, Y - ay - dy * u); };
+      const seg = (ax, ay, bx, by, r) => withBB((X, Y) => segD(X, Y, ax, ay, bx, by) <= r, [Math.min(ax, bx) - r, Math.min(ay, by) - r, Math.max(ax, bx) + r, Math.max(ay, by) + r]);
+      const any = (...fs) => withBB((X, Y) => { for (const f of fs) if (f(X, Y)) return true; return false; }, fs.every(f => f.bb) ? [Math.min(...fs.map(f => f.bb[0])), Math.min(...fs.map(f => f.bb[1])), Math.max(...fs.map(f => f.bb[2])), Math.max(...fs.map(f => f.bb[3]))] : undefined);
+      const mirror = f => withBB((X, Y) => f(76 - X, Y), f.bb && [76 - f.bb[2], f.bb[1], 76 - f.bb[0], f.bb[3]]);
+      const at = (x, y) => (x >= 0 && y >= 0 && x < M && y < M ? y * M + x : -1);
+      const sk = sky[0], hasStaff = !!orb[1], SX = 63.5, OY = 9;
+      // ---- the set's backdrop, as rolled ----
+      const SKYC = { Night: '#26346e', Moonlit: '#1e2c62', Dusk: '#e0704c', Dawn: '#f2b08c', Forest: '#2e5a3a', Storm: '#5e6878', Aurora: '#173246', Library: '#6a4024' }[sk] || '#26346e';
+      const zSky = paint(U(SKYC), () => true);
+      const star5 = (cx, cy, R) => withBB((X, Y) => { const dx = X - cx, dy = Y - cy; return Math.hypot(dx, dy) <= R * (0.62 + 0.38 * Math.cos(5 * (Math.atan2(dy, dx) + Math.PI / 2))); }, [cx - R, cy - R, cx + R, cy + R]);
+      if (sk === 'Night' || sk === 'Moonlit') for (const [a, b, r] of [[9, 12, 3.6], [22, 5, 3], [72, 30, 3.4], [7, 38, 3], [73, 50, 3.2], [58, 4, 2.8]]) if (!(sk === 'Moonlit' && a < 26 && b < 20)) paint(YEL, star5(a, b, r));
+      if (sk === 'Moonlit') paint(U('#f4e6a8'), (X, Y) => disc(14, 14, 7)(X, Y) && !disc(17.5, 11.5, 6)(X, Y));
+      if (sk === 'Dusk') paint(U('#ffb040'), disc(66, 44, 11));
+      if (sk === 'Dawn') { paint(U('#ffe070'), disc(14, 50, 10)); paint(U('#a8c8ec'), (X, Y) => Y < 14 + Math.sin(X * 0.2) * 2); }
+      if (sk === 'Forest') for (const [tx, ty] of [[8, 14], [18, 22], [70, 16], [60, 26]]) paint(U('#1d4a2a'), (X, Y) => Y > ty && Y < ty + 34 && Math.abs(X - tx) < ((Y - ty) % 8 + 2) * 0.9 + (Y - ty) * 0.12);
+      if (sk === 'Storm') { paint(U('#d8dce4'), any(disc(10, 10, 6), disc(19, 7, 6), disc(28, 9, 4), disc(56, 8, 5), disc(66, 6, 6), disc(74, 11, 5))); paint(YEL, any(seg(15, 14, 10, 26, 1.6), seg(10, 26, 16, 26, 1.6), seg(16, 26, 9, 40, 1.6))); }
+      if (sk === 'Aurora') { paint(U('#6ff0a4'), (X, Y) => Math.abs(Y - (12 + 4 * Math.sin(X * 0.18))) < 2.4); paint(U('#f07ac8'), (X, Y) => Math.abs(Y - (21 + 4 * Math.sin(X * 0.18 + 1.6))) < 1.6); }
+      if (sk === 'Library') { const BK = [RED, BLUE, YEL, U('#45903e'), U('#9a4ab0')]; for (const s of [20, 40, 60]) { paint(U('#4a2a14'), (X, Y) => Y > s && Y < s + 3); paint(0, (X, Y) => { const bk = Math.floor(X / 4), h = 9 + (bk * 7 + s) % 5; return Y < s + 0.5 && Y > s - h && X % 4 < 3.2 && X % 4 > 0.4 ? BK[(bk + s) % 5] : false; }); } }
+      const skyTop = zc;
+      SC = 1.2;
+      // ---- the wizard, back to front ----
+      if (hasStaff) paint(STAFFC, seg(SX, 12, SX, 80, 1.8));
+      const zRobe = paint(ROBEC, (X, Y) => Y > 49 && Math.abs(X - 38) <= Math.min(36, 15 + (Y - 49) * 1.1));
+      const FR = { Long: [7.5, 10], Round: [9.5, 8.6], Gaunt: [7, 10], Broad: [10.5, 8.6], Heart: [9.5, 9.6] }[faceShape] || [8.5, 9.6];
+      const faceHW = Y => { const dy = (Y - 36) / FR[1]; if (Math.abs(dy) > 1) return -1; let w = FR[0] * Math.sqrt(1 - dy * dy); if (faceShape === 'Heart' && dy > 0) w *= 1 - dy * 0.5; if (faceShape === 'Gaunt' && dy > 0.2) w *= 0.84; return w; };
+      const hs = shapeH, hood = hs === 'Hood';
+      if (hood) paint(HATC, (X, Y) => Y < 53 && (ell(38, 34, FR[0] + 7.5, 17)(X, Y) || (Y < 24 && Math.abs(X - 38) < (Y - 5) * 0.75)));
+      const hd = hairDo, hEnd = { 'Long Locks': 57, 'Braided Locks': 57, Tucked: 36, Bushy: 45 }[hd] || 45, hW = { Bushy: 5.8, 'Long Locks': 3.8, Tucked: 2.8, 'Braided Locks': 3.4 }[hd] || 3.5;
+      const zHair = paint(LEAF2, (X, Y) => { const d = Math.abs(X - 38); return Y > 25 && Y < hEnd && d > FR[0] - 2.5 && d < FR[0] + hW + (hd === 'Bushy' ? Math.sin(Y * 1.1) * 1.4 : 0) - (Y > hEnd - 3 ? (Y - hEnd + 3) * 1.2 : 0); });
+      if (hd === 'Braided Locks') paint(RED, (X, Y, x, y) => Math.abs(Y - (hEnd - 4)) < 1 && Z[at(Math.floor(x), Math.floor(y))] === zHair);
+      const zFace = paint(FACEC, (X, Y) => { const w = faceHW(Y); return w > 0 && Math.abs(X - 38) <= w; });
+      // the beard, of leaf-green clay
+      const bn = beard[0];
+      const BP = { Long: [24, 10], Forked: [24, 10], Braided: [12, 9], Short: [10, 9.5], Spade: [19, 11], Wispy: [20, 6.5], Plaited: [10, 9.5] }[bn] || (bn === 'Clean Shaven' ? null : [24, 10]);
+      let zBeard = -1;
+      if (BP) {
+        const [len, bw] = BP, bTop = 40;
+        zBeard = paint(LEAFC, (X, Y) => {
+          if (Y < bTop) return false;
+          const v = (Y - bTop) / len;
+          let dx = X - 38;
+          if (bn === 'Wispy') dx -= Math.sin(v * 3) * 1.5 * v;
+          let w = -1;
+          if (v <= 1) {
+            if (bn === 'Short' || bn === 'Braided' || bn === 'Plaited') w = bw * Math.sqrt(Math.max(0, 1 - v * v));
+            else if (bn === 'Spade') w = v < 0.55 ? bw * (0.85 + v * 0.3) : bw * (1 - v) / 0.45;
+            else if (bn === 'Wispy') w = bw * (1 - v * 0.9);
+            else w = v < 0.3 ? bw : bw * (1 - (v - 0.3) / 0.7 * 0.85);
+          }
+          if (bn === 'Forked' && v > 0.55 && Math.abs(dx) < (v - 0.55) * 9) return false;
+          if (Math.abs(dx) <= w) return true;
+          if (bn === 'Braided' && Y < 65 && Math.abs(dx) < 2.6) return true;
+          if (bn === 'Plaited' && Y < 62 && Math.abs(Math.abs(dx) - 4.5) < 2.2) return true;
+          return false;
+        });
+        if (bn === 'Braided') paint(RED, ell(38, 61.5, 3.2, 1.3));
+        if (bn === 'Plaited') paint(RED, any(ell(33.5, 57.5, 2.8, 1.2), ell(42.5, 57.5, 2.8, 1.2)));
+        // blossoms and berries in it, little clay balls
+        paint(WHITE, any(disc(33, 48, 1.3), disc(43, 52, 1.3), disc(38, 57, 1.3)));
+        paint(RED, any(disc(40.5, 46.5, 1.1), disc(35.5, 53.5, 1.1)));
+        const MU = { Walrus: ell(38, 42.2, 6.8, 2.7), Handlebar: any(seg(33.5, 42, 42.5, 42, 1.6), seg(33.5, 42, 30.5, 39, 1.3), seg(42.5, 42, 45.5, 39, 1.3)), Droopy: any(seg(34, 42, 42, 42, 1.8), seg(34, 42, 32.5, 47, 1.5), seg(42, 42, 43.5, 47, 1.5)), Wispy: seg(35, 42, 41, 42, 1.4) }[stache];
+        if (MU) paint(LEAFC, MU);
+        if (stache !== 'Walrus') paint(MOUTH, seg(36.5, 44.6, 39.5, 44.6, 0.8), 1);
+      } else {
+        paint(MOUTH, any(seg(35, 42.6, 38, 43.8, 0.7), seg(38, 43.8, 41, 42.6, 0.7)), 1);
+        paint(WHITE, any(disc(29, 33, 1.3), disc(47.5, 38, 1.3)));
+      }
+      // the eyes, as rolled: big clay eyeballs with dark pupils and a glint (lids for kind, wise and squinting eyes)
+      const EYES = eyes[0], EX = [33.4, 42.6], EYc = 34.8, SEX = EX.map(FX), SEY = FY(EYc);
+      const ER = k => EYES === 'Wide' ? 3.7 : EYES === 'Mismatched' ? (k ? 3.7 : 2.7) : 3.2;
+      const zEye = paint(EYES === 'Glowing' ? U('#ffe060') : WHITE, any(disc(EX[0], EYc, ER(0)), disc(EX[1], EYc, ER(1))));
+      if (EYES !== 'Glowing') {
+        const pr = EYES === 'Wide' ? 1.3 : EYES === 'Starry' ? 1.25 : 1.55;
+        paint(0, (X, Y) => { for (let k = 0; k < 2; k++) if (Math.hypot(X - EX[k] - (k ? -0.4 : 0.4), Y - EYc - 0.4) <= (EYES === 'Mismatched' && k ? 1.7 : pr)) return EYES === 'Starry' ? YEL : EYES === 'Mismatched' && k ? BLUE : K; return false; }, 1);
+      }
+      const lid = (top, bot) => paint(FACEC, (X, Y) => { for (let k = 0; k < 2; k++) { const r = ER(k) + 0.6; if (Math.hypot(X - EX[k], Y - EYc) <= r && (Y < EYc - r + top * 2 * r || Y > EYc + r - bot * 2 * r)) return true; } return false; });
+      if (EYES === 'Kind') lid(0.3, 0);
+      if (EYES === 'Wise') lid(0.5, 0);
+      if (EYES === 'Squint') lid(0.42, 0.28);
+      if (EYES === 'Spectacles') paint(YEL, (X, Y) => { for (let k = 0; k < 2; k++) { const d = Math.hypot(X - EX[k], Y - EYc); if (d > ER(k) + 0.5 && d < ER(k) + 1.5) return true; } return Math.abs(Y - EYc) < 0.6 && X > 36.5 && X < 39.5; });
+      // the brows, clay rolls by their kind (the right one mirrors the left)
+      const BRW = { Bushy: seg(29.5, 30.6, 36.5, 29.8, 1.8), Wild: any(seg(30.5, 28.5, 36.5, 31, 1.3), seg(30.5, 28.5, 29, 27, 1)), Drooping: seg(29.5, 32, 36.5, 29.8, 1.3), Arched: any(seg(30, 31.4, 33.5, 29, 1.2), seg(33.5, 29, 37, 31, 1.2)), Knitted: seg(30, 29.2, 37, 31.8, 1.3) }[brow] || seg(30.5, 30.5, 36.5, 30.5, 1.3);
+      paint(LEAF2, any(BRW, mirror(BRW)));
+      // the nose, big, as claymation noses are
+      const NOSE = { Button: disc(38, 38.6, 2.1), Bulbous: disc(38, 38.8, 3.5), Long: seg(38, 35.5, 38, 41.2, 1.8), Hooked: any(seg(37.6, 35.5, 40.2, 39, 1.7), seg(40.2, 39, 38.4, 41.4, 1.6)), Crooked: any(seg(37, 35.5, 40.2, 38.2, 1.7), seg(40.2, 38.2, 38.8, 41, 1.6)), Pointy: seg(38, 35.5, 41.8, 40.2, 1.7) }[noseW] || disc(38, 38.6, 2.6);
+      const zNose = paint(NOSEC, NOSE);
+      // the hat, by its shape: a cone swept along its own curve, a red band, a brim, the badge; or a hood
+      let tip = [38, 4];
+      if (!hood) {
+        const top = { Towering: 1, Pointed: 4, Crooked: 5, 'Curled Tip': 6, 'Wide Brim': 5, Floppy: 4, 'Star-Spangled': 4 }[hs] ?? 4;
+        const CL = u => hs === 'Crooked' ? [38 + bend * 8 * u * u, 24 - (24 - top) * u] : hs === 'Floppy' ? [38 + bend * 15 * u ** 1.7, 24 - 21 * Math.sin(u * Math.PI * 0.8)] : hs === 'Curled Tip' ? [38 + bend * 3 * u, 24 - (24 - top) * u] : [38, 24 - (24 - top) * u];
+        const pts = [];
+        for (let k = 0; k <= 80; k++) { const u = k / 80, [x, y] = CL(u); pts.push([x, y, 1 + 10.4 * (1 - u)]); }
+        tip = CL(1);
+        if (hs === 'Curled Tip') { const [qx, qy] = tip; for (let k = 0; k <= 30; k++) { const a = k / 30 * Math.PI * 1.7, r = 3 - k / 30 * 1.6; pts.push([qx + bend * (r - Math.cos(a) * r), qy + 1 - Math.sin(a) * r * 1.1, 1.2]); } tip = [qx + bend * 3, qy + 2]; }
+        const zCone = paint(HATC, withBB((X, Y) => { if (Y > 25) return false; for (const [x, y, r] of pts) if ((X - x) * (X - x) + (Y - y) * (Y - y) <= r * r) return true; return false; }, [0, -3, 76, 25]));
+        paint(RED, (X, Y, x, y) => Y > 16.5 && Y < 22.5 && Z[Math.floor(y) * M + Math.floor(x)] === zCone);
+        paint(HATC, ell(38, 25.2, hs === 'Wide Brim' ? 22 : 17, 2.9));
+        const BY = 19.5;
+        if (badge === 'Crescent') paint(YEL, (X, Y) => disc(38, BY, 3.2)(X, Y) && !disc(39.6, BY - 1, 2.5)(X, Y));
+        else if (badge === 'Star') paint(YEL, star5(38, BY, 4));
+        else if (badge === 'Eye') { paint(WHITE, ell(38, BY, 3.8, 2.5)); paint(BLUE, disc(38, BY, 1.4)); }
+        else if (badge === 'Rune') { paint(YEL, ell(38, BY, 3, 3.3)); paint(RED, any(seg(38, BY - 2, 38, BY + 2, 0.6), seg(38, BY - 0.5, 36.5, BY - 2, 0.6), seg(38, BY - 0.5, 39.5, BY - 2, 0.6)), 1); }
+        else if (badge === 'Buckle') { paint(YEL, (X, Y) => Math.abs(X - 38) < 3.4 && Math.abs(Y - BY) < 2.8); paint(RED, (X, Y) => Math.abs(X - 38) < 1.5 && Math.abs(Y - BY) < 1); }
+        if (hs === 'Star-Spangled') paint(YEL, (X, Y, x, y) => { if (Z[at(Math.floor(x), Math.floor(y))] !== zCone) return false; for (const [a, b] of [[34, 14], [41, 9], [36, 6], [44, 15]]) if (star5(a, b, 2.1)(X, Y)) return true; return false; });
+        if (trinket === 'Feather') { paint(RED, seg(47, 19, 53, 8, 1.9)); paint(WHITE, disc(53, 8, 1.6)); }
+        if (trinket === 'Bell on Tip') paint(YEL, disc(tip[0], tip[1] + 1, 2.6));
+      }
+      if (hood) paint(YEL, disc(38, 48.5, 1.6));
+      // the arm on the staff
+      if (hasStaff) { paint(SLEEVEC, seg(51, 58, 58.5, 54.8, 4.6)); paint(FACEC, disc(SX, 52.5, 3)); }
+      // the familiar on his other shoulder, a little clay critter
+      const spr = (rows, pal, x0, y0) => paint(0, (X, Y) => { const r = rows[Math.floor((Y - y0) / 2)]; if (!r || Y < y0) return false; const ch = X < x0 ? null : r[Math.floor((X - x0) / 2)]; return ch && ch !== '.' ? pal[ch] : false; });
+      const FAM = {
+        Owl: [['b.....b', 'bb...bb', 'bbbbbbb', 'bwwbwwb', 'bwkbkwb', 'bbbybbb', 'blllllb', 'blllllb', '.bbbbb.', '.y...y.'], { b: U('#8a5a2e'), l: U('#e0bc84'), w: YEL, k: K, y: ORANGE }],
+        Toad: [['.yy.yy.', 'ykyyky.', 'ggggggg', 'gdddddg', 'ggggggg', 'gyyyyyg', 'g.g.g.g'], { g: U('#5aa032'), d: U('#3a6a22'), y: YEL, k: K }],
+        Moth: [['k.....k', '.k...k.', 'ww.k.ww', 'wtwkwtw', 'wwwkwww', 'wtwkwtw', '.ww.ww.'], { w: WHITE, t: U('#c8a070'), k: K }],
+        Mouse: [['gg...gg', 'gpg.gpg', 'ggggggg', '.gkgkg.', '.ggggg.', '..gpg..', '.ggggg.'], { g: U('#a0a0aa'), p: PINK, k: K }],
+        'Tiny Dragon': [['r.....r', 'rr.r.rr', 'rrrrrrr', '.ryryr.', '.rkrkr.', '.rrrrr.', '..ooo..', '.r...r.'], { r: RED, y: YEL, k: K, o: ORANGE }],
+        Raven: [['..kkk..', '.kkkkk.', '.kwkkkk', '.kkkkyy', 'kkbkkk.', 'kkbbkk.', '.kkkk..', '..y.y..'], { k: U('#2a2836'), y: YEL, b: U('#4a4a6a'), w: WHITE }],
+        Snail: [['..aaaa..', '.adddda.', 'ada..da.', 'ada.dda.', 'adaada.k', '.aaaa.gk', 'gggggggg'], { a: U('#e89a30'), d: U('#a8601a'), g: U('#c4d070'), k: K }],
+        Wisp: [['...b...', '..bb...', '.bbbb..', 'bbbbbb.', 'blkblkb', 'bbbbbbb', '.bbbbb.'], { b: U('#5ab0ff'), l: U('#e0f4ff'), k: K }],
+        Bat: [['k.......k', 'kk.k.k.kk', 'kkkkkkkkk', '.kkrkrkk.', '..kkkkk..', '..k...k..'], { k: U('#2a2836'), r: RED }],
+      }[familiar[0]];
+      if (FAM) spr(FAM[0], FAM[1], 7, 53 - FAM[0].length * 2);
+      // the trinket, in his other hand or his mouth
+      if (trinket === 'Spellbook') { paint(RED, (X, Y) => X > 21 && X < 31 && Y > 57 && Y < 66); paint(WHITE, (X, Y) => X > 29.6 && X < 31.4 && Y > 58 && Y < 65); paint(YEL, disc(25.5, 61.5, 1.3)); paint(FACEC, disc(31, 62, 2.6)); }
+      if (trinket === 'Potion') { paint(0, (X, Y) => (disc(26, 62.5, 3.8)(X, Y) || seg(26, 56, 26, 59.5, 1.6)(X, Y)) ? (Y < 60.5 ? U('#cfe8f0') : U('#4ab0e0')) : false); paint(STAFFC, seg(26, 54.6, 26, 55.4, 1.4)); paint(FACEC, disc(30.5, 63.5, 2.5)); }
+      if (trinket === 'Long Pipe') { paint(STAFFC, seg(41, 43.5, 49, 46, 1.1)); paint(STAFFC, (X, Y) => X > 48.5 && X < 53.5 && Y > 41.5 && Y < 47); }
+      const O = hasStaff ? orb[1].map(U) : null;
+      const zOrb = hasStaff ? paint(O[1], disc(SX, OY, 5.4)) : -1;
+      // ---- the clay shading: each lump rounded from the distance to its own edge, lit from the top left; a soft shadow
+      // where a lump sits on another and where the wizard stands in front of the backdrop; three takes of it, so it boils ----
+      const DT = new Float32Array(N);
+      for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) {
+        const i = y * M + x, z = Z[i];
+        DT[i] = (x > 0 && Z[i - 1] !== z) || (x < M - 1 && Z[i + 1] !== z) || (y > 0 && Z[i - M] !== z) || (y < M - 1 && Z[i + M] !== z) ? 1 : 99;
+      }
+      const CH = [[1, 0, 1], [0, 1, 1], [1, 1, 1.41], [-1, 1, 1.41]];
+      for (let pass = 0; pass < 2; pass++) for (let s = 0; s < N; s++) {
+        const i = pass ? N - 1 - s : s, x = i % M, y = (i / M) | 0, z = Z[i], d = pass ? 1 : -1;
+        if (DT[i] <= 1) continue;
+        let v = DT[i];
+        for (const [a, b, w] of CH) { const j = at(x + a * d, y + b * d); if (j >= 0 && Z[j] === z && DT[j] + w < v) v = DT[j] + w; }
+        DT[i] = v;
+      }
+      const HQ = new Float32Array(N);
+      for (let i = 0; i < N; i++) HQ[i] = 8 * Math.sqrt(Math.min(DT[i], 8) / 8);
+      const SH3 = [[3, 4], [2, 3], [4, 5]], SH2 = [[1, 1], [2, 2], [1, 2], [2, 1]];
+      const LX = -0.48, LY = -0.62, LZ = 0.62, LL = Math.hypot(LX, LY, LZ);
+      const RID = new Uint16Array(N), SHADE = new Float32Array(N);
+      for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) {
+        const i = y * M + x, z = Z[i];
+        RID[i] = rampOf(C[i]);
+        if (z <= skyTop && z === zSky) {
+          // the backdrop: a smoothed sheet of clay, lighter towards the bottom, the wizard's shadow cast on it
+          let s = 0.5 + y / M * 0.26 + Math.sin(x * 0.31 + y * 0.17) * 0.04 - ((x - 40) ** 2 + (y - 36) ** 2) / 3600 * 0.3;
+          for (const [a, b] of SH3) { const j = at(x - a, y - b); if (j >= 0 && Z[j] > skyTop) { s -= 0.22; break; } }
+          SHADE[i] = s; continue;
+        }
+        const hi = HQ[i], hl = x > 0 ? (Z[i - 1] === z ? HQ[i - 1] : 0) : hi, hr = x < M - 1 ? (Z[i + 1] === z ? HQ[i + 1] : 0) : hi, hu = y > 0 ? (Z[i - M] === z ? HQ[i - M] : 0) : hi, hd2 = y < M - 1 ? (Z[i + M] === z ? HQ[i + M] : 0) : hi;
+        const gx = (hr - hl) * 0.5, gy = (hd2 - hu) * 0.5;
+        const nx = -gx * 0.8, ny = -gy * 0.8, nl = Math.hypot(nx, ny, 1);
+        let s = FL[i] ? 0.6 : (nx * LX + ny * LY + LZ) / nl / LL;
+        // a soft shadow under the lumps that sit on this one
+        for (const [a, b] of SH2) { const j = at(x - a, y - b); if (j >= 0 && Z[j] > z && !FL[j]) { s -= 0.12; break; } }
+        SHADE[i] = s;
+      }
+      const toneOf = s => s < 0.2 ? 0 : s < 0.42 ? 1 : s < 0.74 ? 2 : s < 0.93 ? 3 : 4;
+      const TAKES = [0, 1, 2].map(v => {
+        const B = new Uint32Array(N), T = new Uint8Array(N);
+        for (let y = 0; y < M; y++) for (let x = 0; x < M; x++) {
+          const i = y * M + x, h = (((x * 73856093) ^ (y * 19349663) ^ (v * 83492791)) >>> 0) % 1000 / 1000;
+          const t = toneOf(SHADE[i] + (h - 0.5) * 0.07);
+          T[i] = t; B[i] = RAMPS[RID[i]][t];
+        }
+        // a thumbprint or two pressed into the clay, different in each take
+        for (let k = 0; k < 2; k++) {
+          const q = (((v * 7 + k * 13 + 3) * 2654435761) >>> 0), fx = 14 + q % 52, fy = 54 + (q >>> 8) % 22;
+          for (let y = fy - 5; y <= fy + 5; y++) for (let x = fx - 5; x <= fx + 5; x++) { const i = at(x, y); if (i < 0 || Z[i] !== zRobe) continue; const d = Math.hypot(x - fx, (y - fy) * 1.3); if (d < 5 && Math.abs(d % 2 - 1) < 0.35 && T[i] < 4) B[i] = RAMPS[RID[i]][T[i] + 1]; }
+        }
+        // the blush on his cheeks, the glints in his eyes
+        for (const [a, b] of [[29.6, 38], [30.6, 38], [45.4, 38], [46.4, 38], [30, 38.9], [46, 38.9]]) { const i = at(Math.floor(FX(a)), Math.floor(FY(b))); if (i >= 0 && Z[i] === zFace) B[i] = U('#e07a5a'); }
+        if (EYES !== 'Glowing') for (let k = 0; k < 2; k++) { const i = at(Math.floor(SEX[k] - (k ? 1.4 : 0.2)), Math.floor(SEY - 0.8)); if (i >= 0 && (Z[i] === zEye || Z[i] === zEye + 1)) B[i] = WHITE; }
+        return [B, T];
+      });
+      // the stance: the set as sculpted, or mirrored with the staff in his left hand
+      const flipA = A => { const F = new A.constructor(N); for (let i = 0; i < N; i++) { const x = i % M; F[i] = A[i - x + (lefty ? M - 1 - x : x)]; } return F; };
+      const TK = TAKES.map(([B, T]) => [flipA(B), flipA(T)]), RIDF = flipA(RID);
+      // ---- the toy ----
+      const mx = x => (lefty ? M - 1 - x : x), SSX = FX(SX), SOY = FY(OY);
+      const P = (x, y, col) => { x = Math.floor(x); y = Math.floor(y); if (x >= 0 && y >= 0 && x < M && y < M) OUT[y * M + x] = col; };
+      const PM = (x, y, col) => P(mx(Math.floor(x)), y, col);
+      const FR5 = RAMPS[rampOf(FACEC)];
+      const GD = new Float32Array(N), SQ = [[0, 0], [1, 0], [0, 1], [1, 1]], KS = [0, 1];
+      let grooves = [], cur = null, dents = [], pressT = -1, pressP = null, moved = 0, dragging = false, lastSq = -9, flareAt = -9, nPoke = 0;
+      const tapAt = (q, t) => {
+        if (hasStaff && Math.hypot(q[0] - (mx(Math.floor(SSX)) + 0.5), q[1] - SOY) < 7) { flareAt = t; [0, 2, 4, 7].forEach((k, i) => c.sound.note(lyd3(k + 7), { dur: 0.4, vel: 0.06, wave: 'triangle', at: i * 0.05 })); return; }
+        dents.push([q[0], q[1], t]); nPoke++;
+        if (dents.length > 14) dents.shift();
+        c.sound.hit('noise', 0.03, { cutoff: 700, dur: 0.07 });
+        c.sound.note(lyd3(nPoke % 5), { dur: 0.12, vel: 0.07, wave: 'sine' });
+      };
+      const feel = t => {
+        const ip = c.input, down = ip.inside && ip.down, px0 = (ip.x * S - of) / cel, py0 = (ip.y * S - of) / cel;
+        for (const q0 of ip.taps()) { const q = [(q0.x * S - of) / cel, (q0.y * S - of) / cel]; pressT = t; pressP = q; moved = 0; if (!down) { tapAt(q, t); pressT = -1; } }
+        if (pressT >= 0) {
+          if (down) moved = Math.max(moved, Math.hypot(px0 - pressP[0], py0 - pressP[1]));
+          else { if (!dragging && t - pressT < 0.35 && moved < 1.5) tapAt(pressP, t); pressT = -1; }
+        }
+        // a press that moves, or is held, drags a finger through the clay
+        if (down && pressT >= 0 && !dragging && (moved >= 1.5 || t - pressT >= 0.35)) { dragging = true; cur = { pts: [pressP.slice()], end: -1 }; grooves.push(cur); if (grooves.length > 3) grooves.shift(); }
+        if (dragging) {
+          if (down) {
+            const L = cur.pts[cur.pts.length - 1], d = Math.hypot(px0 - L[0], py0 - L[1]);
+            for (let k = 1; k <= Math.min(40, Math.floor(d / 0.7)) && cur.pts.length < 400; k++) cur.pts.push([L[0] + (px0 - L[0]) * k * 0.7 / d, L[1] + (py0 - L[1]) * k * 0.7 / d]);
+            if (d > 0.3 && t - lastSq > 0.14) { lastSq = t; c.sound.hit('noise', 0.025, { cutoff: 500, dur: 0.12 }); }
+          } else { dragging = false; cur.end = t; cur = null; }
+        }
+        if (grooves.length && grooves[0].end >= 0 && t - grooves[0].end > 2.6) grooves = grooves.filter(s => s.end < 0 || t - s.end <= 2.6);
+        if (dents.length && t - dents[0][2] > 12) dents = dents.filter(s => t - s[2] <= 12);
+      };
+      // a little clay ball, shaded as a sphere
+      const ball = (x0, y0, r, col) => { const R = RAMPS[rampOf(col)]; for (let y = Math.floor(y0 - r); y <= y0 + r; y++) for (let x = Math.floor(x0 - r); x <= x0 + r; x++) { const dx = (x + 0.5 - x0) / r, dy = (y + 0.5 - y0) / r, q = dx * dx + dy * dy; if (q > 1) continue; const s = (dx * LX + dy * LY + Math.sqrt(1 - q) * LZ) / LL; PM(x, y, R[toneOf(s)]); } };
+      function draw(t) {
+        const st = Math.floor(t * 12), take = Math.floor(t * 8) % 3, [TB, TT] = TK[take];
+        OUT.set(TB);
+        const blink = ((t + 1.3) % 4.4) < 0.14;
+        // the eyes: a blink, a wince while you drag, a twinkle or a glow
+        if (blink || dragging) for (const k of KS) {
+          const r = ER(k) * SC + 0.4, ex = SEX[k];
+          for (let y = Math.floor(SEY - r); y <= SEY + r; y++) for (let x = Math.floor(ex - r); x <= ex + r; x++) { const dx = x + 0.5 - ex, dy = y + 0.5 - SEY; if (dx * dx + dy * dy <= r * r) PM(x, y, FR5[dy < -0.5 ? 3 : dy < 1 ? 2 : 1]); }
+          if (dragging) { const d = k ? -1 : 1; for (const [a, b] of [[-d, -1], [0, 0], [d, 0], [-d, 1]]) PM(ex - 0.5 + a, Math.floor(SEY) + b, K); }
+          else for (let dx = -2; dx <= 1; dx++) PM(ex + dx, Math.floor(SEY) + 1, FR5[0]);
+        } else for (const k of KS) {
+          const ex = SEX[k];
+          if (EYES === 'Twinkling' && (st + k * 5) % 14 < 7) { PM(ex - 1, Math.floor(SEY) - 2, WHITE); PM(ex, Math.floor(SEY) - 1, WHITE); PM(ex - 2, Math.floor(SEY) - 1, WHITE); }
+          if (EYES === 'Starry' && st % 10 < 5) PM(ex - 0.2, Math.floor(SEY), WHITE);
+          if (EYES === 'Glowing' && st % 12 < 6) for (let a = 0; a < 8; a++) PM(ex + Math.cos(a * 0.785) * 5, SEY + Math.sin(a * 0.785) * 5, U('#fff4a0'));
+        }
+        // the orb: a soft pulse of its light; a tap on it makes it flare
+        if (hasStaff) {
+          const fl = t - flareAt < 0.9 ? 1 - (t - flareAt) / 0.9 : 0, pulse = (st >> 2) % 2;
+          const rr = 7.6 + pulse * 0.9 + fl * 6;
+          for (let y = Math.floor(SOY - rr - 1); y <= SOY + rr + 1; y++) for (let x = Math.floor(SSX - rr - 1); x <= SSX + rr + 1; x++) { const d = Math.hypot(x + 0.5 - SSX, y + 0.5 - SOY); if (d > 5.4 * SC && d < rr && ((x + y) % 2 === 0 || d < 7.4)) PM(x, y, O[2]); }
+          if (fl > 0.4) ball(SSX, SOY, 5.4 * SC, O[2]);
+        }
+        // the pipe's smoke, clay puffs moved a frame at a time
+        if (trinket === 'Long Pipe') for (let j = 0; j < 3; j++) { const q = (Math.floor(t * 8) / 8 * 0.45 + j / 3) % 1; if (q > 0.85) continue; ball(FX(51 + Math.sin(q * 6 + j) * 1.5 + q * 2), FY(40 - q * 15), (1 + q * 1.6) * SC, GREY); }
+        // spellbound: clay runes going round him
+        if (sigil) for (let k = 0; k < 10; k++) { const a = k / 10 * Math.PI * 2 + Math.floor(t * 8) / 8 * 0.5; ball(39 + Math.cos(a) * 33, 40 + Math.sin(a) * 33, 2, k % 2 ? YEL : U('#b06ad8')); }
+        // the dents and grooves: a depth in the clay, shaded from its slope with the clay's own colours
+        if (dents.length || grooves.length) {
+          GD.fill(0);
+          let x0 = M, y0 = M, x1 = -1, y1 = -1;
+          const press = (px, py, r, depth) => { for (let y = Math.max(0, Math.floor(py - r)); y <= Math.min(M - 1, py + r); y++) for (let x = Math.max(0, Math.floor(px - r)); x <= Math.min(M - 1, px + r); x++) { const d = Math.hypot(x + 0.5 - px, y + 0.5 - py); if (d < r) { const v = depth * (1 - (d / r) ** 2), i = y * M + x; if (v > GD[i]) GD[i] = v; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } } };
+          for (const [px, py, t0] of dents) { const age = t - t0; press(px, py, age < 0.12 ? 2.6 : 4.4, age > 10 ? 4 * (12 - age) / 2 : 4); }
+          for (const s of grooves) { const age = s.end < 0 ? 0 : Math.floor((t - s.end) * 8) / 8, dep = age < 1 ? 3 : 3 * Math.max(0, 1 - (age - 1) / 1.6); if (dep <= 0) continue; for (const [px, py] of s.pts) press(px, py, 3, dep); }
+          for (let y = Math.max(0, y0 - 1); y <= Math.min(M - 1, y1 + 1); y++) for (let x = Math.max(0, x0 - 1); x <= Math.min(M - 1, x1 + 1); x++) {
+            const i = y * M + x;
+            const gx = (x < M - 1 ? GD[i + 1] : 0) - (x > 0 ? GD[i - 1] : 0), gy = (y < M - 1 ? GD[i + M] : 0) - (y > 0 ? GD[i - M] : 0);
+            if (!GD[i] && !gx && !gy) continue;
+            const s = (gx * 1.1 * LX + gy * 1.1 * LY + LZ) / Math.hypot(gx * 1.1, gy * 1.1, 1) / LL;
+            const tt = s < 0.5 ? 0 : s > 0.8 ? 4 : Math.max(0, TT[i] - 1);
+            OUT[i] = RAMPS[RIDF[i]][tt];
+          }
+        }
+        // the fingertip while it drags
+        if (dragging && cur) { const [x, y] = cur.pts[cur.pts.length - 1]; const R = RAMPS[rampOf(U('#e8b08c'))]; for (let yy = Math.floor(y - 4); yy <= y + 1; yy++) for (let xx = Math.floor(x - 1); xx <= x + 5; xx++) { const dx = (xx + 0.5 - x - 2) / 3, dy = (yy + 0.5 - y + 1.5) / 2.6; if (dx * dx + dy * dy <= 1 && yy < y + 0.5) P(xx, yy, R[dy < -0.3 ? 3 : 2]); } }
+      }
+      let last = '';
+      const frame = t => {
+        const key = Math.floor(t * 12) + ':' + (dragging ? 1 : 0) + ':' + grooves.length + ':' + (cur ? cur.pts.length : 0) + ':' + dents.length + ':' + nPoke + ':' + flareAt;
+        if (key === last) return;
+        last = key;
+        draw(t);
+        cx2.putImageData(img, 0, 0);
+        g.imageSmoothingEnabled = false;
+        // whole pixels only: the set is drawn at a whole multiple of its size, in a dark frame
+        if (of > 0) { g.fillStyle = '#120e0a'; g.fillRect(0, 0, S, S); }
+        g.drawImage(can, 0, 0, M, M, of, of, M * cel, M * cel);
+      };
+      frame(0);
+      return t => { feel(t); frame(t); };
+    }
+
+    // ---------- the legendaries: each its own 1/1 on the same 40-cell grid and view, every gradient an ordered dither ----------
+    function legendWizard() {
+      const g = c.ctx;
+      const VW = N + 4, cel = Math.max(1, Math.round(S / VW)), ofs = Math.floor((S - cel * VW) / 2);
+      const small = W * cel <= S, mid = Math.floor((S - W * cel) / 2) + B * cel;
+      const X0 = small ? mid : Math.min(ofs + 2 * cel, B * cel), Y0 = small ? mid : Math.min(ofs + 4 * cel, B * cel);
+      const can = document.createElement('canvas');
+      can.width = can.height = W;
+      const cx2 = can.getContext('2d'), img = cx2.createImageData(W, W), D = img.data;
+      const B4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+      const th = (x, y) => (B4[((y & 3) << 2) | (x & 3)] + 0.5) / 16;
+      const hv = (x, y, k) => { let h = Math.imul(x + 97, 0x9e3779b1) ^ Math.imul(y + 61, 0x85ebca6b) ^ Math.imul(k + 7, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+      const lv = [];
+      for (let i = 0; i < 16; i++) lv.push(xorwow());
+      const INK2 = hex('#0a0610');
+      // a ramp of colours and a dithered pick along it (v 0..1)
+      const rampOf = list => list.map(hex);
+      const dith = (rmp, v, x, y) => { const p = Math.max(0, Math.min(rmp.length - 1.001, v * (rmp.length - 1))), i = Math.floor(p); return rmp[(p - i) > th(x, y) ? i + 1 : i]; };
+      const P = (x, y, rgb) => { x = Math.round(x); y = Math.round(y); const X = x + B, Y = y + B; if (X >= 0 && Y >= 0 && X < W && Y < W) { const k = (Y * W + X) * 4; D[k] = rgb[0]; D[k + 1] = rgb[1]; D[k + 2] = rgb[2]; D[k + 3] = 255; } };
+      const each = f => { for (let y = -B; y < N + B; y++) for (let x = -B; x < N + B; x++) f(x, y); };
+      const home2 = 55 + parseInt(c.hash.slice(-3), 16) % 10, LYD2 = [0, 2, 4, 6, 7, 9, 11];
+      const lyd2 = k => home2 + 12 * Math.floor(k / 7) + LYD2[((k % 7) + 7) % 7];
+      // taps in grid cells (mirrored for a wizard who holds the staff on the left)
+      const tapsNow = () => c.input.taps().map(p => [((lefty ? 1 - p.x : p.x) * S - X0) / cel, (p.y * S - Y0) / cel]);
+      // the pointer in grid cells, mirrored like the picture (only the large view has one)
+      const ptr = () => { const i = c.input; return { x: ((lefty ? 1 - i.x : i.x) * S - X0) / cel, y: (i.y * S - Y0) / cel, in: i.inside, down: i.inside && i.down }; };
+      // a tap that is only a tap: the gallery sends one on every press, so for the toys that also hold or drag, a tap
+      // counts on a short, still release (or a press and release inside one frame)
+      let pressT = -1, pressP = null, pressMoved = 0;
+      const pressNow = t => {
+        const p = ptr(), click = [], down = tapsNow();
+        if (down.length) { if (p.down) { pressT = t; pressP = down[down.length - 1]; pressMoved = 0; } else click.push(...down); }
+        if (pressT >= 0) {
+          if (p.down) pressMoved = Math.max(pressMoved, Math.hypot(p.x - pressP[0] - 0.5, p.y - pressP[1] - 0.5));
+          else { if (t - pressT < 0.35 && pressMoved < 1.6) click.push(pressP); pressT = -1; }
+        }
+        return { down, click };
+      };
+      // the wizard's outline, shared by the fire, the stars and the hedge: 1 hat, 2 brim, 3 face, 4 beard, 5 robe
+      const bendW = bend * 3.2;
+      const shape = (x, y) => {
+        const px = x + 0.5, py = y + 0.5;
+        if (py >= -3 && py < 8.4) {
+          const u = (py + 3) / 11.4, mx = 20 + bendW * (1 - u) * (1 - u);
+          if (Math.abs(px - mx) <= 0.6 + u * 7.4) return 1;
+        }
+        if (((px - 20) / 13.4) ** 2 + ((py - 9.2) / 1.7) ** 2 <= 1) return 2;
+        if (((px - 20) / 5.6) ** 2 + ((py - 14.4) / 5.2) ** 2 <= 1 && py > 10) return 3;
+        if (py >= 16 && py < 34 && Math.abs(px - 20) <= 5.6 - (py - 16) * 0.3) return 4;
+        if (py >= 18.5 && Math.abs(px - 20) <= Math.min(19.5, 7.5 + (py - 18.5) * 1.15)) return 5;
+        return 0;
+      };
+      const SH = new Uint8Array(W * W);
+      each((x, y) => { SH[(y + B) * W + x + B] = shape(x, y); });
+      const S0 = (x, y) => { const X = x + B, Y = y + B; return X >= 0 && Y >= 0 && X < W && Y < W ? SH[Y * W + X] : 0; };
+      const scene = legend === 'Living Flame' ? flameScene() : legend === 'Starweave' ? starScene() : swapScene();
+      let last = -1;
+      const render = t => {
+        scene.feel(t);
+        const q = Math.round(t * 8), key = q + ':' + (scene.extra ? scene.extra(t) : '');
+        if (key === last) return;
+        last = key;
+        scene.draw(q / 8, q);
+        cx2.putImageData(img, 0, 0);
+        g.imageSmoothingEnabled = false;
+        if (lefty) { g.save(); g.translate(S, 0); g.scale(-1, 1); }
+        g.drawImage(can, 0, 0, W, W, X0 - B * cel, Y0 - B * cel, W * cel, W * cel);
+        if (lefty) g.restore();
+      };
+      render(0);
+      return render;
+
+      // ----- Living Flame: a wizard who is nothing but fire, burning against the dark, a blue flame on the staff.
+      // Your pointer is a breath of wind the flames lean away from; hold to pump the bellows, let go for a burst -----
+      function flameScene() {
+        const FIRE = rampOf(['#000000', '#1a0404', '#4a0806', '#8a1408', '#c8300a', '#f0601a', '#ffa030', '#ffe070', '#fffbe0']);
+        const BLUE = rampOf(['#04081a', '#0a2a6a', '#1a5ad0', '#5ab0ff', '#d0f0ff', '#ffffff']);
+        const NIGHT = rampOf(['#030206', '#0a0610', '#140a18', '#22101c']);
+        const heat = new Float32Array(W * W), nxt = new Float32Array(W * W);
+        const sparks = [];
+        for (let i = 0; i < 9; i++) sparks.push([hv(i, 1, 2), hv(i, 2, 2), 0.6 + hv(i, 3, 2)]);
+        let flareUntil = -1, step = 0, wind = null, pump = 0, lastT = 0, burstAt = -9, lean = 0;
+        const burst = [];
+        for (let i = 0; i < 28; i++) burst.push([-Math.PI / 2 + (hv(i, 4, 2) - 0.5) * 2.6, 10 + hv(i, 5, 2) * 22]);
+        // how far the flame leans at a height (the top leans most): it bends away from your pointer
+        const shiftAt = y => Math.round(lean * Math.max(0, Math.min(1, (34 - y) / 34)));
+        // one step of the fire: every cell takes the heat of the cell below (drifting a little side to side) and
+        // cools; the wizard's own shape keeps burning from within
+        const burn = (q, flare) => {
+          for (let Y = 0; Y < W; Y++) for (let X = 0; X < W; X++) {
+            const i = Y * W + X, x = X - B, y = Y - B;
+            const r = hv(X, Y, q);
+            let sx = X + (r < 0.2 ? -1 : r > 0.8 ? 1 : 0), cool = 0;
+            if (wind) {
+              // the wind: near the pointer the heat is carried away from it, and blown cooler
+              const dx = x + 0.5 - wind[0], dy = y + 0.5 - wind[1], d = Math.hypot(dx, dy * 0.7);
+              if (d < 12) { sx -= Math.sign(dx) * (d < 6 ? 2 : 1); cool = Math.max(0, 1 - d / 5) * 0.14; }
+            }
+            const below = Y + 1 < W && sx >= 0 && sx < W ? heat[(Y + 1) * W + sx] : 0;
+            let h = below - 0.035 - hv(X, Y, q + 99) * 0.07 - cool;
+            const SX = X - shiftAt(y), s = SX >= 0 && SX < W ? SH[Y * W + SX] : 0;
+            if (s) {
+              // the body burns hottest in the middle, the hat and robe edges cooler so the shape reads; columns of
+              // it burn hotter by turns, so tongues of flame lick up off the top
+              const core = s === 3 ? 0.78 : s === 4 ? 0.84 : s === 5 ? 0.62 - Math.min(0.3, (y - 18) * 0.012) : s === 2 ? 0.55 : 0.7;
+              h = Math.max(h, core - hv(X, Y, q + 7) * 0.18 + 0.1 * Math.sin(SX * 1.7 + q * 0.35) + flare * 0.2 + pump * 0.22);
+            }
+            nxt[i] = Math.max(0, h);
+          }
+          heat.set(nxt);
+        };
+        for (let k = 0; k < 24; k++) burn(-k - 1, 0);
+        return {
+          extra: t => (wind ? Math.round(wind[0]) + ',' + Math.round(wind[1]) : '') + ':' + Math.round(pump * 8) + ':' + Math.round(lean) + ':' + (t - burstAt < 1.3 ? Math.floor(t * 16) : ''),
+          feel: t => {
+            const dt = Math.max(0, Math.min(0.1, t - lastT)); lastT = t;
+            const p = ptr();
+            tapsNow();
+            wind = p.in ? [p.x, p.y] : null;
+            // the whole flame bends away from the pointer, more the closer it is
+            const want = p.in ? Math.max(-1, Math.min(1, (20 - p.x) / 8)) * 5 * Math.max(0.4, 1 - Math.abs(p.y - 18) / 30) : 0;
+            lean += (want - lean) * Math.min(1, dt * 5);
+            // held down, the bellows pump it hotter and hotter; let go and it bursts
+            if (p.down) {
+              if (pump === 0) c.sound.hit('noise', 0.06, { cutoff: 600, dur: 1.5 });
+              pump = Math.min(1, pump + dt / 1.6);
+            } else if (pump > 0) {
+              if (pump > 0.25) {
+                flareUntil = t + 0.9; burstAt = t;
+                c.sound.hit('noise', 0.2 * pump, { cutoff: 900, dur: 0.9 });
+                c.sound.note(lyd2(-7), { dur: 0.9, vel: 0.18, wave: 'triangle', cutoff: 600 });
+              }
+              pump = 0;
+            }
+          },
+          draw: (t, q) => {
+            const flare = t < flareUntil ? 1 : 0;
+            while (step < q) { step++; burn(step, flare); }
+            // the night behind it, a red glow round the fire, embers drifting up
+            each((x, y) => {
+              const i = (y + B) * W + x + B, h = heat[i];
+              // tongues: a wavering vertical streak pattern rising through the heat
+              if (h > 0.08) { P(x, y, dith(FIRE, Math.min(1, h * (0.9 + 0.17 * Math.sin(x * 1.9 + Math.sin((y + t * 11) * 0.5) * 1.6 + hv(x, 0, 51) * 2))), x, y)); return; }
+              // the flash: a smooth wash of light, white then warm, over the dark
+              if (t - burstAt < 0.16) { P(x, y, t - burstAt < 0.08 ? FIRE[8] : FIRE[6]); return; }
+              const d = Math.hypot(x + 0.5 - 20, (y + 0.5 - 18) * 0.7);
+              P(x, y, dith(NIGHT, Math.max(0, 1 - d / 26) * 1.1 + (y > 34 ? 0.3 : 0), x, y));
+            });
+            // the ground under it scorched and glowing
+            for (let x = -B; x < N + B; x++) for (let y = 37; y < N + B; y++) if (!S0(x, y) && th(x, y) < 0.5 - Math.abs(x - 20) / 50) P(x, y, FIRE[3]);
+            for (const s of sparks) {
+              const u = (t * 0.25 * s[2] + s[0]) % 1, x = Math.round(6 + s[1] * 28 + Math.sin(t * 2 + s[0] * 9) * 2), y = Math.round(36 - u * 42);
+              if (!S0(x, y)) P(x, y, u < 0.6 ? FIRE[7] : FIRE[5]);
+            }
+            // the burst: sparks thrown out from the body when the bellows let go
+            if (t - burstAt < 1.3) {
+              const u = (t - burstAt) / 1.3, rr = 3 + u * 26;
+              // a ring of light rushing outwards
+              each((x, y) => { const d = Math.hypot(x + 0.5 - 20, y + 0.5 - 18); if (Math.abs(d - rr) < 1.3 - u * 0.6 && th(x, y) < 1 - u * 0.7) P(x, y, u < 0.4 ? FIRE[8] : FIRE[6]); });
+              // and a fountain of sparks, up and out, falling back
+              for (const [a, r] of burst) { const x = 20 + Math.cos(a) * r * u, y = 14 + Math.sin(a) * r * u + u * u * 14; P(x, y, u < 0.5 ? FIRE[8] : u < 0.8 ? FIRE[7] : FIRE[5]); P(x, y + 1, FIRE[5]); }
+            }
+            // a face in the fire: two white-hot eyes and a dark mouth that flickers (squeezed shut against the wind)
+            const blink = ((t + 0.5) % 4.1) < 0.15, fx = shiftAt(14), squint = wind && Math.hypot(wind[0] - 19, wind[1] - 14) < 9;
+            for (const ex of [16, 22]) {
+              for (let y = 12; y <= 14; y++) for (let x = ex - 1; x <= ex + 2; x++) if (!((y === 12 || y === 14) && (x === ex - 1 || x === ex + 2))) P(x + fx, y, FIRE[1]);
+              if (squint) { P(ex + fx, 13, FIRE[6]); P(ex + 1 + fx, 13, FIRE[6]); }
+              else if (!blink) { P(ex + fx, 13, FIRE[8]); P(ex + 1 + fx, 13, FIRE[8]); }
+            }
+            const mo = Math.floor(t * 4) % 3, fm = shiftAt(17);
+            for (let x = 18; x <= 22; x++) P(x + fm, 17, FIRE[1]);
+            for (let x = 19; x <= 21; x++) P(x + fm, 18, mo ? FIRE[1] : FIRE[2]);
+            // the staff: charred wood, crowned with a cold blue flame
+            for (let y = 6; y < N + B; y++) P(34, y, y % 3 ? hex('#1a1010') : hex('#2e1c14'));
+            for (let y = -3; y < 7; y++) for (let x = 30; x < 39; x++) {
+              const fx = x + 0.5 - 34 - Math.sin(t * 5 + y) * 0.5 * (6 - y) / 6, fy = y + 0.5 - 5;
+              const v = 1 - Math.hypot(fx * 1.1, fy * (fy < 0 ? 0.4 : 1.1)) / 3.8 + Math.sin(t * 9 + y) * 0.08 + pump * 0.2;
+              if (v > 0.05) P(x, y, dith(BLUE, Math.min(1, v * 1.2), x, y));
+            }
+          },
+        };
+      }
+
+      // ----- Starweave: the wizard is a hole cut in the evening, and through it the whole night sky turns.
+      // Drag across the robe to set new stars and join them into a constellation of your own; let go and it shines, then flies -----
+      function starScene() {
+        const DUSK = rampOf(['#170a2a', '#3a1640', '#6a2a5a', '#b04a5a', '#ea8a5a', '#ffc890']);
+        const NEB = lv[0] < 0.5 ? rampOf(['#03031a', '#0c0c3a', '#24186a', '#52288a', '#9a4aa8', '#f0a0d8']) : rampOf(['#02081a', '#06203a', '#0e4a6a', '#1a7a8a', '#4ac0b0', '#c0fff0']);
+        const SILVER = rampOf(['#4a4e80', '#7a80b8', '#c4ccf0', '#ffffff']);
+        const MOONC = rampOf(['#8a7a40', '#e8d890', '#fffbe0']);
+        const stars = [];
+        for (let i = 0; i < 46; i++) stars.push([hv(i, 1, 4) * W, hv(i, 2, 4) * W, hv(i, 3, 4), i % 3 === 0 ? 1.6 : 0.8]);
+        // two constellations stitched across the robe
+        const CON = [[[8, 24], [11, 22], [14, 25], [12, 29], [16, 31]], [[26, 23], [29, 26], [33, 25], [31, 30]]];
+        let shootAt = -9, setAt = -9, drawing = false;
+        const nodes = [];
+        const sky = (x, y) => { const k = S0(Math.floor(x), Math.floor(y)); return k === 1 || k === 2 || k === 5; };
+        return {
+          extra: t => nodes.length + ':' + (drawing ? Math.floor(t * 16) : '') + ':' + (t - setAt < 4 ? Math.floor(t * 12) : ''),
+          feel: t => {
+            const p = ptr();
+            for (const [x, y] of pressNow(t).click) {
+              if (sky(x, y) || x < -2 || y < -4 || x >= N + 2 || y >= N || t - shootAt < 0.8) continue;
+              // a tap on the evening: a shooting star
+              shootAt = t;
+              [11, 9, 7, 4].forEach((k, i) => c.sound.note(lyd2(k + 7), { dur: 0.5, vel: 0.06, wave: 'sine', at: 0.05 + i * 0.09 }));
+            }
+            if (p.down && sky(p.x, p.y)) {
+              // dragging over the night: a new star wherever the stroke has gone far enough from the last
+              if (!drawing) { drawing = true; if (t - setAt > 2.5) nodes.length = 0; }
+              const l = nodes[nodes.length - 1];
+              if (nodes.length < 12 && (!l || Math.hypot(p.x - l[0], p.y - l[1]) > 3.2)) {
+                nodes.push([Math.floor(p.x), Math.floor(p.y)]);
+                c.sound.note(lyd2(14 - Math.round(p.y / 4)), { dur: 0.7, vel: 0.07, wave: 'sine', pan: p.x / N - 0.5 });
+              }
+            } else if (drawing && !p.down) {
+              // let go: the new constellation shines
+              drawing = false;
+              if (nodes.length > 1) { setAt = t; nodes.forEach((n, i) => c.sound.note(lyd2(7 + i), { dur: 1.2, vel: 0.05, wave: 'sine', at: i * 0.07 })); }
+              else nodes.length = 0;
+            }
+            if (!drawing && nodes.length && t - setAt > 3.6) nodes.length = 0;
+          },
+          draw: (t, q) => {
+            const drift = t * 0.6;
+            const shoot = (t - shootAt) < 0.9 ? (t - shootAt) / 0.9 : (((t + 3) % 5.5) < 0.9 ? ((t + 3) % 5.5) / 0.9 : -1);
+            each((x, y) => {
+              const s = S0(x, y);
+              if (!s) {
+                // the evening outside: a dusk gradient, a few soft clouds
+                let v = 0.05 + (y + B) / (W - 1) * 0.95;
+                v += Math.max(0, Math.sin(x * 0.2 + y * 0.9 + t * 0.15) - 0.75) * 0.6;
+                P(x, y, dith(DUSK, v, x, y));
+                return;
+              }
+              if (s === 3) { P(x, y, (x * 7 + y * 5) % 23 === 0 ? hex('#2a2a5a') : th(x, y) < 0.15 ? hex('#0a0a24') : hex('#05051a')); return; }
+              if (s === 4) {
+                // a beard of starlight, combed into strands
+                const v = 0.55 + 0.35 * Math.sin(x * 1.7 + Math.floor(y / 3)) + (y > 28 ? -0.3 : 0) + Math.sin(t * 2 + y * 0.6 + x) * 0.12;
+                P(x, y, dith(SILVER, Math.max(0, Math.min(1, v)), x, y));
+                return;
+              }
+              // the night: a nebula drifting through the cut-out, deep and slow
+              const u = x - drift, nv = 0.12 + 0.3 * (Math.sin(u * 0.21 + y * 0.13) + Math.sin(u * 0.09 - y * 0.27 + 1.3) + 0.6 * Math.sin((u + y) * 0.33)) * 0.5 + 0.2;
+              P(x, y, dith(NEB, Math.max(0, Math.min(1, nv)), x, y));
+            });
+            // stars in the cut-out, drifting at two depths, twinkling
+            for (const [sx, sy, ph, sp] of stars) {
+              const x = Math.floor(((sx - drift * sp) % W + W) % W) - B, y = Math.floor(sy) - B, s = S0(x, y);
+              if (!s || s === 3 || s === 4) continue;
+              const tw = Math.sin(t * 2.3 + ph * 20);
+              P(x, y, tw > 0.3 ? hex('#ffffff') : hex('#b8c0f0'));
+              if (sp > 1 && tw > 0.8) for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (S0(x + a, y + b) === 5 || S0(x + a, y + b) === 1) P(x + a, y + b, hex('#8a90d0'));
+            }
+            // the constellations, their stars lighting one after another
+            CON.forEach((pts, k) => pts.forEach(([x, y], i) => {
+              if (i) { const [a, b] = pts[i - 1]; for (let f = 0.25; f < 1; f += 0.25) { const lx = Math.round(a + (x - a) * f), ly = Math.round(b + (y - b) * f); if (S0(lx, ly) === 5 && (lx + ly) % 2) P(lx, ly, hex('#3a4a8a')); } }
+              if (S0(x, y) === 5) P(x, y, (Math.floor(t * 2) + i + k) % pts.length === 0 ? hex('#fff6c0') : hex('#d0d8ff'));
+            }));
+            // your constellation: its stars joined by faint lines, shining once it's set, then streaking away
+            const age = t - setAt, gone = !drawing && age > 2.4 ? Math.min(1, (age - 2.4) / 1.2) : 0;
+            nodes.forEach(([x, y], i) => {
+              if (i && !gone) { const [a, b] = nodes[i - 1], n = Math.max(1, Math.round(Math.hypot(x - a, y - b))); for (let k = 1; k < n; k++) { const lx = Math.round(a + (x - a) * k / n), ly = Math.round(b + (y - b) * k / n); if (sky(lx, ly) && (k % 2 || !drawing)) P(lx, ly, !drawing && age < 2.4 ? hex('#8ac8ff') : hex('#4a6ab0')); } }
+              const nx = x + gone * (14 + i * 2), ny = y - gone * (9 + i);
+              if (gone) for (let k = 1; k < 4; k++) P(nx - k, ny + k * 0.6, SILVER[3 - k]);
+              const tw = !drawing && age < 2.4 && (Math.floor(t * 6) + i) % 3 === 0;
+              P(nx, ny, hex('#ffffff'));
+              if (tw || (drawing && i === nodes.length - 1)) for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P(nx + a, ny + b, hex('#c8e0ff'));
+            });
+            // a shooting star across the robe now and then (and whenever the viewer taps the evening)
+            if (shoot >= 0) for (let k = 0; k < 5; k++) { const x = Math.round(4 + shoot * 30 - k), y = Math.round(20 + shoot * 12 - k * 0.4); if (S0(x, y) === 5) P(x, y, k ? SILVER[3 - Math.min(3, k)] : hex('#ffffff')); }
+            // a gold band round the hat, a rim of evening light along the shoulders
+            for (let x = -B; x < N + B; x++) for (let y = -B; y < N + B; y++) {
+              const s = S0(x, y);
+              if (s === 1 && S0(x, y + 1) === 2 && (x + q) % 4) P(x, y, hex('#ffd860'));
+              if ((s === 5 || s === 1 || s === 2) && !S0(x, y - 1)) P(x, y, hex('#e8a8a0'));
+            }
+            // the eyes: two stars in the shadow under the brim
+            const blink = ((t + 0.8) % 4.6) < 0.15, tw = Math.floor(t * 3) % 2;
+            for (const ex of [17, 23]) {
+              if (blink) { P(ex, 14, SILVER[1]); continue; }
+              P(ex, 14, hex('#ffffff'));
+              if (tw) { P(ex - 1, 14, SILVER[1]); P(ex + 1, 14, SILVER[1]); P(ex, 13, SILVER[1]); P(ex, 15, SILVER[1]); }
+            }
+            // the staff: silver, a crescent moon on its head
+            if (orb[0] !== 'No Staff') {
+              for (let y = 8; y < N + B; y++) P(34, y, y % 4 ? SILVER[1] : SILVER[2]);
+              for (let y = -1; y < 8; y++) for (let x = 30; x < 39; x++) {
+                const d = Math.hypot(x + 0.5 - 34, y + 0.5 - 3.5), d2 = Math.hypot(x + 0.5 - 35.6, y + 0.5 - 2.6);
+                if (d < 3.8 && d2 > 3.1) P(x, y, dith(MOONC, 1 - d / 5 + 0.2, x, y));
+              }
+            }
+          },
+        };
+      }
+
+      // ----- Swapped: the familiar has taken over: hat, robe, beard and all, out in a mushroom ring by moonlight,
+      // the wizard riding tiny on its shoulder. Drag the hat off its head and drop it on the tiny wizard -----
+      function swapScene() {
+        const FOREST = rampOf(['#03080e', '#08182a', '#10283a', '#1e4458']);
+        const GLOW = rampOf(['#0a2a3a', '#1a7a9a', '#4ad8e8', '#d0ffff']);
+        const ROBE = ramp(robes[1]), HAIR = ramp(hairCol[1]), HIDE = skin, TINY = realSkin;
+        const sparks = [];
+        for (let i = 0; i < 7; i++) sparks.push([hv(i, 1, 8) * 6.28, 9 + hv(i, 2, 8) * 6, 0.5 + hv(i, 3, 8)]);
+        let swapUntil = -1, wave = -1, held = null, backFrom = null, backAt = -9, tinyAt = -9;
+        let hatOff = [0, 0];
+        const TINY_HAT = [10, -1.5], ON_TINY = 3;
+        const hb0 = creature === 'Mouse' ? 9 : creature === 'Toad' ? 6.8 : 7.6;
+        // is a cell on the hat (cone or brim), with the hat moved by (ox, oy)?
+        const onHat = (x, y, ox, oy, hb) => {
+          const px = x + 0.5 - ox, py = y + 0.5 - oy;
+          if (py < hb - 12 || py > hb + 1.4) return 0;
+          const u = (py - (hb - 12)) / 12, mx = 20 + bendW * (1 - u) * (1 - u);
+          if (py <= hb && Math.abs(px - mx) <= 0.5 + u * 6.4) return Math.abs(py - hb + 1) < 0.6 ? 3 : 1;
+          return ((px - 20) / 11) ** 2 + ((py - hb - 0.4) / 1.3) ** 2 <= 1 ? 2 : 0;
+        };
+        const callOf = at => {
+          if (creature === 'Toad') [0, 0.16].forEach(d => c.sound.note(lyd2(-12), { dur: 0.11, vel: 0.16, wave: 'triangle', cutoff: 500, at: at + d }));
+          else if (creature === 'Mouse') [14, 16, 14].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.05, vel: 0.1, wave: 'sine', at: at + i * 0.06 }));
+          else [0, 0.22].forEach(d => c.sound.note(lyd2(-3), { dur: 0.16, vel: 0.12, wave: 'sawtooth', cutoff: 1400, at: at + d }));
+        };
+        // the creature's head: 1 hide, 2 the paler bits (belly, inner ear, beak), 3 eye white, 4 dark
+        const head = (x, y) => {
+          const px = x + 0.5, py = y + 0.5;
+          if (creature === 'Toad') {
+            // a broad flat toad's head with two great eye domes on top
+            if (((px - 14.2) / 3.4) ** 2 + ((py - 10.2) / 3.2) ** 2 <= 1 || ((px - 25.8) / 3.4) ** 2 + ((py - 10.2) / 3.2) ** 2 <= 1) return 1;
+            if (((px - 20) / 10.4) ** 2 + ((py - 15.6) / 5.6) ** 2 <= 1) return py > 18.2 ? 2 : 1;
+          } else if (creature === 'Mouse') {
+            // big round ears, pink inside, and a round head
+            const ear = (cx2, cy2, r) => ((px - cx2) / r) ** 2 + ((py - cy2) / r) ** 2 <= 1;
+            if (ear(11.2, 8.4, 4.8) || ear(28.8, 8.4, 4.8)) return ear(11.2, 8.4, 3.1) || ear(28.8, 8.4, 3.1) ? 2 : 1;
+            if (((px - 20) / 7.4) ** 2 + ((py - 15) / 6.6) ** 2 <= 1) return 1;
+          } else {
+            // a raven's round black head with a ruff of feathers
+            if (((px - 20) / 7.6) ** 2 + ((py - 13.6) / 7.2) ** 2 <= 1) return 1;
+            if (py > 17 && py < 22 && Math.abs(px - 20) < 8.6 - (py - 17) * 0.6 && (Math.floor(px) % 2 === 0)) return 1;
+          }
+          return 0;
+        };
+        return {
+          extra: t => (t < swapUntil ? 1 : 0) + (t < wave ? 2 : 0) + ':' + (held || t - backAt < 0.7 || t - tinyAt < ON_TINY + 0.5 || c.input.inside ? Math.floor(t * 16) : ''),
+          feel: t => {
+            const p = ptr();
+            for (const [x, y] of tapsNow()) {
+              if (x < -2 || y < -4 || x >= N + 2 || y >= N) continue;
+              if (!held && t - tinyAt > ON_TINY && t - backAt > 0.7 && onHat(Math.floor(x), Math.floor(y), hatOff[0], hatOff[1], hb0)) {
+                // you take hold of the hat
+                held = [x - hatOff[0], y - hatOff[1]];
+                c.sound.hit('noise', 0.08, { cutoff: 2600, dur: 0.15 }); callOf(0.05);
+              } else if (Math.hypot(x - 30, y - 13) < 4 && t - tinyAt > ON_TINY) {
+                wave = t + 1.2;
+                [4, 2, 0].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.1, vel: 0.14, wave: 'triangle', cutoff: 1600, at: i * 0.12 }));
+              }
+            }
+            if (held) {
+              hatOff = [p.x - held[0], p.y - held[1]];
+              if (!p.down) {
+                held = null;
+                if (Math.hypot(p.x - 30, p.y - 12) < 6) {
+                  // dropped on the tiny wizard: it lands over him, sparkling, the wizard's again for a moment
+                  tinyAt = t; hatOff = TINY_HAT.slice();
+                  c.sound.hit('noise', 0.14, { cutoff: 2600, dur: 0.3 });
+                  [0, 4, 7, 11, 14].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.3, vel: 0.1, wave: 'triangle', cutoff: 1800, at: 0.1 + i * 0.1 }));
+                } else { backFrom = hatOff.slice(); backAt = t; }
+              }
+            }
+            if (tinyAt > 0 && t - tinyAt > ON_TINY && t - tinyAt < ON_TINY + 0.1) { backFrom = hatOff.slice(); backAt = t; tinyAt = -9; swapUntil = t + 1.1; c.sound.hit('noise', 0.14, { cutoff: 2600, dur: 0.3 }); callOf(0.2); }
+            if (!held && t - backAt < 0.7) { const u = Math.min(1, (t - backAt) / 0.6); hatOff = [backFrom[0] * (1 - u), backFrom[1] * (1 - u)]; }
+            else if (!held && tinyAt < 0 && t - backAt >= 0.7) hatOff = [0, 0];
+          },
+          draw: (t, q) => {
+            const down = t < swapUntil ? 1 : 0, bare = Math.hypot(hatOff[0], hatOff[1]) > 2, onTiny = t - tinyAt < ON_TINY;
+            // the clearing: dark trees all round, moonlight, a ring of glowing mushrooms on the moss
+            each((x, y) => {
+              let col = dith(FOREST, 0.8 - (y + B) / W * 0.45 + Math.max(0, 0.5 - Math.hypot(x - 20, y + 6) / 30), x, y);
+              const trunk = (x + 64) % 13 < 3 && (Math.abs(x - 20) > 13);
+              if (trunk && y < 32) col = FOREST[0];
+              if (y >= 32) col = dith(rampOf(['#04100a', '#0c2a16', '#1a4a22']), 0.35 + hv(x, y, 3) * 0.4, x, y);
+              P(x, y, col);
+            });
+            for (const [mx, my, k] of [[1, 33, 0], [5, 35, 1], [10, 37, 0], [30, 37, 1], [35, 35, 0], [39, 33, 1], [-2, 31, 1], [42, 31, 0]]) {
+              const glow = 0.5 + 0.5 * Math.sin(t * 1.4 + mx), cap = k ? GLOW : rampOf(['#2a0a3a', '#7a2aaa', '#d07aff', '#ffe0ff']);
+              for (let y = my - 5; y < my + 3; y++) for (let x = mx - 5; x < mx + 6; x++) { const d = Math.hypot(x - mx, (y - my) * 1.3); if (d < 4.5 && th(x, y) < (4.5 - d) / 6 * glow) P(x, y, cap[0]); }
+              P(mx, my, hex('#d8d0c0')); P(mx, my + 1, hex('#b8b0a0'));
+              P(mx - 1, my - 1, cap[1]); P(mx, my - 1, cap[2]); P(mx + 1, my - 1, cap[1]); P(mx, my - 2, cap[3]);
+            }
+            // the robe, wide on its shoulders, a star clasp
+            each((x, y) => {
+              if (y < 19) return;
+              const px = x + 0.5 - 20, half = Math.min(17, 7 + (y - 19) * 1.3);
+              if (Math.abs(px) > half) return;
+              P(x, y, dith(ROBE, 0.5 + (-px * 0.03) - (y - 19) * 0.01, x, y));
+            });
+            P(20, 21, hex('#ffe27a')); P(19, 22, hex('#d09a24')); P(21, 22, hex('#d09a24'));
+            // the creature's head under the wizard's hat
+            each((x, y) => {
+              const k = head(x, y - down);
+              if (!k) return;
+              const lit = 0.55 + (20 - x) * 0.02 - (y - 12) * 0.02 + (!head(x - 1, y - down) || !head(x, y - 1 - down) ? 0.35 : 0);
+              P(x, y, k === 2 ? HIDE[2] : dith(HIDE, Math.max(0, Math.min(1, lit)), x, y));
+            });
+            const Y = down;
+            if (bare && !onTiny) {
+              // the hat's gone: it gapes up after it
+              for (const ex of creature === 'Toad' ? [15, 25] : creature === 'Mouse' ? [17, 23] : [15, 23]) { P(ex, 11 + Y, hex('#ffffff')); P(ex + 1, 11 + Y, hex('#ffffff')); P(ex, 12 + Y, hex('#ffffff')); P(ex + 1, 12 + Y, INK2); }
+              for (let x = 18; x <= 21; x++) P(x, 17 + Y, INK2); P(19, 18 + Y, INK2); P(20, 18 + Y, INK2);
+            } else if (creature === 'Toad') {
+              // golden eyes with a bar of a pupil, a wide toad's grin, warts
+              for (const ex of [14, 25]) { rows4(['.yyy.', 'yyyyy', 'kkkkk', 'yyyyy', '.yyy.'], ex - 2, 8 + Y, { y: hex('#ffd040'), k: hex('#100808') }); P(ex - 1, 8 + Y, hex('#fff4b0')); }
+              for (let x = 11; x <= 29; x++) P(x, 18 + Y + (x < 13 || x > 27 ? -1 : 0), INK2);
+              P(18, 14 + Y, HIDE[0]); P(22, 14 + Y, HIDE[0]);
+              for (const [a, b] of [[12, 14], [27, 15], [16, 12], [24, 12], [13, 16], [26, 13]]) P(a, b + Y, HIDE[2]);
+            } else if (creature === 'Mouse') {
+              // big black shining eyes, a pink nose, buck teeth, long whiskers
+              for (const ex of [16, 23]) { P(ex, 12 + Y, INK2); P(ex + 1, 12 + Y, INK2); P(ex, 13 + Y, INK2); P(ex + 1, 13 + Y, INK2); P(ex, 12 + Y, hex('#ffffff')); }
+              P(19, 16 + Y, hex('#ff7aa0')); P(20, 16 + Y, hex('#ff7aa0')); P(19, 17 + Y, hex('#d05a7a')); P(20, 17 + Y, hex('#d05a7a'));
+              P(19, 18 + Y, hex('#ffffff')); P(20, 18 + Y, hex('#ffffff'));
+              for (const sd of [-1, 1]) for (const dy of [-1, 0, 1]) for (let k = 0; k < 5; k++) P(20 + sd * (3 + k) - (sd < 0 ? 1 : 0), 17 + Y + dy + (k > 2 ? dy : 0), hex('#f4eef4'));
+            } else {
+              // white-ringed eyes and a great grey beak
+              for (const ex of [14, 24]) { rows4(['.ww.', 'wyyw', 'wykw', '.ww.'], ex - 1, 10 + Y, { w: hex('#e8e8f0'), y: hex('#ffe070'), k: INK2 }); }
+              rows4(['kkkkkkk', 'kGGGGgk', '.kGggk.', '.kGggk.', '..kGk..', '..kgk..', '...k...'], 17, 13 + Y, { k: INK2, g: hex('#4a4a5a'), G: hex('#a8a8b8') });
+              for (const [a, b] of [[16, 6], [17, 5], [18, 6], [21, 6], [22, 5], [14, 9], [26, 9], [13, 13], [27, 13]]) P(a, b + Y, hex('#4a5a9a'));
+            }
+            // the beard it has put on, the hat it wears
+            each((x, y) => {
+              const py = y + 0.5 - Y, px = x + 0.5 - 20, top = creature === 'Toad' ? 19.5 : 20;
+              if (py >= top && py < top + 9 && Math.abs(px) <= 4.4 - (py - top) * 0.45) P(x, y, dith(HAIR, 0.6 + Math.sin(x * 1.9) * 0.3 - (py - top) * 0.03, x, y));
+            });
+            // the string that holds the false beard on
+            for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) P(20 + sd * (4 + k), (creature === 'Toad' ? 19 : 19) + Y - Math.round(k * 0.8), hex('#d8ccb0'));
+            // the wizard, tiny, on its shoulder: hat, face, white beard, an arm up when it waves
+            const tw = t < wave && Math.floor(t * 6) % 2;
+            rows4(['...y...', '..ggy..', '..ggg..', '.ggggg.', 'yyyyyyy', '.fsfsf.', '.fbbbf.', '..bbb..', '.rrbrr.', '.rrrrr.', 'rrrrrrr'], 27, 8, { y: hex('#ffe27a'), g: hex('#3a8aff'), r: hex('#e8e0f0'), f: TINY[2], s: INK2, b: hex('#ffffff') });
+            P(27 - (tw ? 1 : 0), 17 - (tw ? 3 : 0), TINY[2]); P(26 - (tw ? 1 : 0), 18 - (tw ? 3 : 1), TINY[1]);
+            // spell sparks circling
+            for (const [a, r, sp] of sparks) { const an = a + t * sp; P(20 + Math.cos(an) * (r + 6), 22 + Math.sin(an) * r * 0.6, Math.sin(t * 3 + a) > 0 ? GLOW[3] : GLOW[2]); }
+            if (down) for (let k = 0; k < 8; k++) P(20 + Math.cos(k + t * 4) * (5 + (t * 6 % 3)), 4 + Math.sin(k * 1.7) * 2, hex('#c8c8d0'));
+            // the hat: on its head, in your hand, or swamping the tiny wizard
+            const pp = ptr(), hover = !held && !bare && pp.in && onHat(Math.floor(pp.x), Math.floor(pp.y), hatOff[0], hatOff[1], hb0);
+            const hx = hatOff[0] + (hover ? (Math.floor(t * 8) % 2 ? 1 : -1) : 0), hy = hatOff[1] + (bare || onTiny ? 0 : down), hb = hb0;
+            each((x, y) => {
+              const k = onHat(x, y, hx, hy, hb);
+              if (!k) return;
+              const u = (y + 0.5 - hy - (hb - 12)) / 12, mx = 20 + hx + bendW * (1 - u) * (1 - u);
+              P(x, y, k === 3 ? hex('#d09a24') : dith(ROBE, k === 2 ? 0.3 : 0.55 - (x + 0.5 - mx) * 0.05, x, y));
+            });
+            // a star glinting on the hat band now and then (all the time while you hover on it)
+            if (hover || (t % 2.2) < 0.25) { const gx = Math.round(20 + hx + 2), gy = Math.round(hb + hy - 1); P(gx, gy, hex('#ffffff')); P(gx - 1, gy, hex('#fff0a0')); P(gx + 1, gy, hex('#fff0a0')); P(gx, gy - 1, hex('#fff0a0')); P(gx, gy + 1, hex('#fff0a0')); }
+            if (onTiny) for (let k = 0; k < 6; k++) { const a = t * 5 + k * 1.05; P(30 + Math.cos(a) * 6, 6 + Math.sin(a) * 3, k % 2 ? GLOW[3] : hex('#ffe27a')); }
+          },
+        };
+        function rows4(map, x0, y0, pal) { map.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') P(x0 + i, y0 + j, pal[r[i]]); }); }
+      }
+    }
+    // (the legendaries end here)
     const HEAD = { Long: [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 4, 3], Round: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 6, 5, 4, 3], Gaunt: [6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4, 3, 2],
       Broad: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6, 5, 4], Heart: [7, 7, 7, 7, 7, 7, 7, 6, 6, 6, 5, 5, 4, 3, 2, 1] }[swapped ? { Toad: 'Broad', Mouse: 'Heart', Raven: 'Round' }[creature] : faceShape];
 

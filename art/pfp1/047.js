@@ -9,7 +9,7 @@ Proto.add({
   num: 47,
   name: 'Wobble Folk',
   fam: 'Faces & People',
-  recipe: 'Each hash is a new margin doodle in pixels: a marker head and shoulders coloured in with banded highlighter cells, on notebook, graph, kraft, napkin or sticky-note paper, its line gently boiling. About one in 200 has a gold star from the teacher; about one in 360 is legendary: drawn in neon gel, cut out as a holo sticker, or hopping in a flipbook. Paper, pen, highlighters, age, head shape, skin wash, eyes, brows, nose, mouth, ears, hair, hat, outfit, face extras, what it holds, its pose and the margin doodles all vary.',
+  recipe: 'Each hash is a new margin doodle in pixels: a marker head and shoulders coloured in with banded highlighter cells, on notebook, graph, kraft, napkin or sticky-note paper, its line gently boiling. About one in 200 has a gold star from the teacher; about one in 360 is legendary: bent in neon tube on a brick wall, die-cut as a holo-foil sticker, or tumbling as an acrobat round a Victorian zoetrope. Paper, pen, highlighters, age, head shape, skin wash, eyes, brows, nose, mouth, ears, hair, hat, outfit, face extras, what it holds, its pose and the margin doodles all vary.',
   interactive: 'Tap the face to make it react. Tap or drag on the paper to doodle.',
   music: true,
   fps: 24,
@@ -158,6 +158,8 @@ Proto.add({
     const lr = mul(), legend = lr < 0.0008 ? 'Neon' : lr < 0.0016 ? 'Holo Sticker' : lr < 0.0024 ? 'Flipbook' : null;
     const starOwned = mul() < 0.005;
     const neonRGB = [[255, 74, 178], [70, 236, 255], [178, 255, 72]][Math.floor(mul() * 3)];
+    // a neon sign is bent from two tubes: the head in the rolled colour, the body in a second one
+    const neon2 = legend === 'Neon' ? [[255, 150, 40], [150, 110, 255], [255, 74, 178], [70, 236, 255], [178, 255, 72]].filter(q => q.join() !== neonRGB.join())[Math.floor(mul() * 4)] : null;
 
     // how the body is coloured in: highlighter bands, or a ballpoint-and-highlighter scribble, or only the accents
     let colouring = ownPick('colouring', [['Bands', 30], ['Scribble', 20], ['Zigzag', 16], ['Scrubbed', 14], ['Accents only', 20]]);
@@ -499,7 +501,17 @@ Proto.add({
       P0.fill(pack(PB));
       const row = (y, v) => { if (y >= 0 && y < N) for (let x = 0; x < N; x++) P0[y * N + x] = v; };
       const col = (x, v) => { if (x >= 0 && x < N) for (let y = 0; y < N; y++) P0[y * N + x] = v; };
-      if (legend === 'Neon') { /* a night card: nothing on it but the line */ }
+      if (legend === 'Neon') {
+        // a brick wall at night: courses of four cells (three of brick, one of mortar), each brick its own shade,
+        // darker toward the corners
+        const BR = [[46, 30, 36], [53, 34, 40], [41, 27, 33], [58, 37, 42]], MORT = [22, 17, 22];
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const row = y >> 2, off = (row & 1) ? 4 : 0, col = (x + off) >> 3, mort = (y & 3) === 3 || ((x + off) & 7) === 7;
+          let h = Math.imul(col * 7919 + row * 104729 + 17, 0x27d4eb2d); h ^= h >>> 15;
+          const c3 = mort ? MORT : BR[(h >>> 0) % 4], v = 1 - 0.4 * Math.max(0, Math.hypot(x - 31.5, y - 31.5) / 44 - 0.35), lift = !mort && (y & 3) === 0 ? 7 : 0;
+          P0[y * N + x] = pack(c3.map(q => Math.round(q * v + lift)));
+        }
+      }
       else if (paper === 'Notebook') { const rl = tone([90, 140, 210], 0.42); for (let y = 6; y < N; y += 4) row(y, rl); col(7, tone([220, 70, 80], 0.6)); }
       else if (paper === 'Graph') { const gl = tone([80, 160, 150], 0.09); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (x % 4 === 1 || y % 4 === 1) P0[y * N + x] = gl; }
       else if (paper.includes('ticky')) {
@@ -521,8 +533,9 @@ Proto.add({
       }
       // paper tooth: a few cells a shade off, from a coordinate hash
       const toothV = dark ? tone([255, 255, 255], 0.06) : paper === 'Kraft' ? tone([70, 45, 15], 0.16) : tone([90, 70, 30], 0.06);
-      for (let i = 0; i < NN; i++) { let q = Math.imul(i + 3, 0x85ebca6b) ^ 0x3c6ef372; q = Math.imul(q ^ (q >>> 13), 0xc2b2ae35); q ^= q >>> 16; if (((q >>> 0) & 1023) < (paper === 'Kraft' ? 70 : 30)) P0[i] = toothV; }
-      if (margin === 'Coffee ring') {
+      if (legend !== 'Neon') for (let i = 0; i < NN; i++) { let q = Math.imul(i + 3, 0x85ebca6b) ^ 0x3c6ef372; q = Math.imul(q ^ (q >>> 13), 0xc2b2ae35); q ^= q >>> 16; if (((q >>> 0) & 1023) < (paper === 'Kraft' ? 70 : 30)) P0[i] = toothV; }
+      if (legend === 'Neon') { /* the wall takes no stains, tape or smudges */ }
+      else if (margin === 'Coffee ring') {
         const r = 150 + mr() * 40, cx = mside > 0 ? 830 : 170, cy = 820 + mr() * 60, rim = tone([130, 80, 30], 0.32), stain = tone([150, 100, 40], 0.1);
         for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) {
           const ux = (x + 0.5) / CU - cx, uy = (y + 0.5) / CU - cy, d = Math.hypot(ux, uy / 0.96), a = Math.atan2(uy, ux);
@@ -664,7 +677,7 @@ Proto.add({
         inPoly(op.o, (x, y) => {
           if (tg && tg[y * N + x] === 1) return;
           const band = bandOf(x, y, op.a);
-          if (legend === 'Neon') { if (band) setCell(b, tg, x, y, hiTones(op.col)[2], 2); return; }   // on the night card the colour glows in thin bands
+          if (legend === 'Neon') return;   // a neon sign is all tube: no colouring in
           if (st === 'Scribble') { const d = ((x - y) % 4 + 4) % 4; if (d > 1) return; setCell(b, tg, x, y, d ? pale : full, 2); return; }   // diagonal back-and-forth strokes, the paper showing between
           if (st === 'Zigzag') { const d = ((y + Math.abs(((x % 6) + 6) % 6 - 3)) % 4 + 4) % 4; if (d > 1) return; setCell(b, tg, x, y, d ? pale : full, 2); return; }
           if (st === 'Scrubbed') { const row = Math.floor(y / 5), u = ((x + (row & 1) * 2) % 5 + 5) % 5, v = y % 5, ringC = (u === 0 || u === 4) ? v > 0 && v < 4 : v === 0 || v === 4; setCell(b, tg, x, y, ringC ? full : pale, 2); return; }   // little scrubbed circles
@@ -689,10 +702,76 @@ Proto.add({
         pl.forEach((q, i) => runOp(b, tg, { t: 'ink', pts: dens(q), w: lw * (i ? 0.62 : 0.85), id: 7020 + i }, k));
       }
       if (propAt) for (const sd of [-1, 1]) { const a = k * 1.05, bl = ring(propAt[0] + sd * Math.cos(a) * 40, propAt[1] + sd * Math.sin(a) * 6, 40 * Math.abs(Math.cos(a)) + 8, 11, 12); runOp(b, tg, { t: 'hi', o: bl, col: propCol, a: 0.3, gap: 10 }, k); runOp(b, tg, { t: 'ink', pts: dens(bl), w: lw * 0.6, id: 7010 + sd }, k); }
-      // neon: every line cell throws a dim glow onto the card around it
-      if (legend === 'Neon') { const glow = pack(blend(PB, neonRGB, 0.26)); for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) { const i = y * N + x; if (tg[i] || ((x + y) & 1)) continue; if ((x > 0 && tg[i - 1] === 1) || (x < N - 1 && tg[i + 1] === 1) || (y > 0 && tg[i - N] === 1) || (y < N - 1 && tg[i + N] === 1)) b[i] = glow; } }
       takes.push(b); tags.push(tg);
     }
+    // the neon sign: each take bent into glass tubes (a pale-hot core) that light the bricks around them, the head's
+    // tube in one colour and the body's in another; the body's tube also has a dead take, for when it stutters
+    const unpack = v => [v & 255, (v >>> 8) & 255, (v >>> 16) & 255];
+    const tubeOf = q => pack(blend(q, [255, 255, 255], 0.45)), GLOWK = [0.5, 0.22, 0.1];
+    const headCells = new Uint8Array(NN);
+    if (legend === 'Neon') inPoly(rim.map(tiltP), (x, y) => { headCells[y * N + x] = 1; });
+    const inHeadCell = (x, y) => headCells[y * N + x] === 1;
+    const neonTakes = [], chinRow = Math.floor((chin + 12) * CU);
+    const bloom = (b, src, d0) => {
+      // light from every lit tube cell, three cells out: a saturated ring, then dithered falloff, onto the bricks
+      const dist = new Uint8Array(NN).fill(9), col = new Array(NN), q = [];
+      for (let i = 0; i < NN; i++) if (src[i]) { dist[i] = 0; col[i] = src[i]; q.push(i); }
+      for (let h = 0; h < q.length; h++) {
+        const i = q[h], x = i % N, d = dist[i] + 1; if (d > 3) continue;
+        for (const j of [x > 0 ? i - 1 : -1, x < N - 1 ? i + 1 : -1, i - N, i + N]) if (j >= 0 && j < NN && dist[j] > d) { dist[j] = d; col[j] = col[i]; q.push(j); }
+      }
+      for (let i = 0; i < NN; i++) {
+        const d = dist[i]; if (!d || d > 3 || (d0 && d0[i])) continue;
+        const x = i % N, y = (i - x) / N; if (d === 2 && ((x + y) & 1)) continue; if (d === 3 && ((x & 1) || (y & 1))) continue;
+        if (d > 1 && inHeadCell(x, y)) continue;   // the face stays dark between its tubes, so it reads
+        b[i] = pack(blend(unpack(b[i]), col[i], GLOWK[d - 1]));
+      }
+    };
+    // the sign is bent from separate tubes (every connected run of line on the first take is one), each switched on
+    // and off by itself: per take, the wall with every tube dead, and each tube's own glass and glow, laid ready
+    const tubeLab = new Int16Array(NN), tubes = [], DEAD = c3 => pack(blend(c3, [40, 30, 40], 0.8));
+    if (legend === 'Neon') {
+      const t0 = tags[0], lab = new Int16Array(NN).fill(-1);
+      for (let i = 0; i < NN; i++) if (t0[i] === 1 && lab[i] < 0) {
+        const q = [i], id = tubes.length; lab[i] = id; let sy = 0;
+        for (let h = 0; h < q.length; h++) { const j = q[h], x = j % N, y = (j - x) / N; sy += y; for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) { const xx = x + u, yy = y + v, jj = yy * N + xx; if (xx >= 0 && yy >= 0 && xx < N && yy < N && t0[jj] === 1 && lab[jj] < 0 && (yy >= chinRow) === (y >= chinRow)) { lab[jj] = id; q.push(jj); } } }
+        tubes.push({ n: q.length, row: sy / q.length });
+      }
+      // the label reaches three cells out from each tube, so the other takes (and a finger) find their tube
+      const dist = new Uint8Array(NN).fill(9), q = [];
+      for (let i = 0; i < NN; i++) if (lab[i] >= 0) { dist[i] = 0; q.push(i); }
+      for (let h = 0; h < q.length; h++) { const i = q[h], x = i % N, d = dist[i] + 1; if (d > 4) continue; for (const j of [x > 0 ? i - 1 : -1, x < N - 1 ? i + 1 : -1, i - N, i + N]) if (j >= 0 && j < NN && dist[j] > d) { dist[j] = d; lab[j] = lab[i]; q.push(j); } }
+      tubeLab.set(lab);
+      tubes.forEach(tb => { tb.col = tb.row >= chinRow ? neon2 : neonRGB; });
+      for (let k = 0; k < 3; k++) {
+        const tg = tags[k], base = takes[k].slice(), per = tubes.map(() => ({ glass: [], glow: [] }));
+        for (let i = 0; i < NN; i++) if (tg[i] === 1) { const id = tubeLab[i] >= 0 ? tubeLab[i] : 0, c3 = Math.floor(i / N) >= chinRow ? neon2 : neonRGB; base[i] = DEAD(c3); per[id].glass.push(i, base[i] === SOFT ? pack(blend(c3, [30, 20, 30], 0.35)) : takes[k][i] === SOFT ? pack(blend(c3, [30, 20, 30], 0.35)) : tubeOf(c3)); }
+        const tube = new Uint8Array(NN); for (let i = 0; i < NN; i++) if (tg[i] === 1) tube[i] = 1;
+        per.forEach((pt, id) => {
+          if (!pt.glass.length) return;
+          const b = base.slice(), src = new Array(NN).fill(null);
+          for (let j = 0; j < pt.glass.length; j += 2) src[pt.glass[j]] = Math.floor(pt.glass[j] / N) >= chinRow ? neon2 : neonRGB;
+          bloom(b, src, tube);
+          for (let i = 0; i < NN; i++) if (b[i] !== base[i]) pt.glow.push(i, b[i]);
+          pt.glass = Int32Array.from(pt.glass); pt.glow = Int32Array.from(pt.glow);
+        });
+        neonTakes.push({ base, per });
+      }
+    }
+    // tube state: lit, and when it was last switched (a tube coming on stutters before it holds)
+    const tubeOn = tubes.map(() => 1), tubeAt = tubes.map(() => -9);
+    let headTube = -1, powerAt = -9, holdAt = -1, lastDown = false, cable = [];
+    if (legend === 'Neon') {
+      const top = rim.map(tiltP).reduce((a, p) => p[1] < a[1] ? p : a), ti = Math.floor(top[1] * CU) * N + Math.floor(top[0] * CU);
+      headTube = tubeLab[ti] >= 0 ? tubeLab[ti] : tubeLab[Math.min(NN - 1, ti + N)];
+      // the cable from the transformer below the sign up to the lowest tube, and clips holding the glass off the wall
+      let low = -1; for (let i = NN - 1; i >= 0; i--) if (tags[0][i] === 1) { low = i; break; }
+      if (low >= 0) { const lx = low % N, ly = (low - lx) / N, cx = lx < N / 2 ? lx + 3 : lx - 3; for (let y = ly + 1; y < N; y++) cable.push(y * N + cx); }
+    }
+    // the face is drawn live: its tube cells get the same treatment, in a box round the head only
+    let headBox = null;
+    if (legend === 'Neon') { let x0 = N, y0 = N, x1 = 0, y1 = 0; for (const p of rim.map(tiltP)) { x0 = Math.min(x0, Math.floor(p[0] * CU)); x1 = Math.max(x1, Math.floor(p[0] * CU)); y0 = Math.min(y0, Math.floor(p[1] * CU)); y1 = Math.max(y1, Math.floor(p[1] * CU)); } headBox = [Math.max(1, x0), Math.max(1, y0), Math.min(N - 2, x1), Math.min(N - 2, y1)]; }
+    const NEONTUBE = legend === 'Neon' ? tubeOf(neonRGB) : 0, CABLE = pack([14, 12, 16]);
 
     // ---------- the face: drawn live, since it blinks and reacts ----------
     // eyes are set by hand, cell by cell ('#' line, 'w' paper glint, 'y' and 'p' highlighter)
@@ -851,6 +930,243 @@ Proto.add({
 
     // ---------- the legendary and coveted extras ----------
     const off = document.createElement('canvas'); off.width = off.height = N;
+    // ---------- the zoetrope's own 128 x 128 bitmap ----------
+    const boff = legend === 'Flipbook' ? document.createElement('canvas') : null;
+    if (boff) boff.width = boff.height = 128;
+    const bctx = boff && boff.getContext('2d'), bimg = boff && bctx.createImageData(128, 128), B32 = boff ? new Uint32Array(bimg.data.buffer) : null;
+    // ---------- the zoetrope: a Victorian drum seen from the front, its hand-tinted strip glimpsed through the slits ----------
+    const ZW = boff ? new Uint32Array(128 * 128) : null, SEP = pack([74, 42, 20]), PARCH = pack([198, 174, 128]), PARCH2 = pack([178, 154, 110]), DARK = pack([26, 14, 10]);
+    const DRUM = pack([96, 30, 22]), DRUM2 = pack([66, 20, 16]), DRUMD = pack([40, 12, 10]), GOLDP = pack([210, 168, 80]), GOLDD = pack([150, 110, 44]), HOLE = pack([14, 8, 6]);
+    const BRASS = pack([226, 186, 96]), BRASSD = pack([140, 100, 40]), STARC = pack([250, 220, 110]);
+    const tintC = new Map();
+    const zTint = v => { let q = tintC.get(v); if (q === undefined) { const r = v & 255, g = (v >>> 8) & 255, b = (v >>> 16) & 255; q = pack([Math.round(r * 0.78 + 234 * 0.22), Math.round(g * 0.74 + 217 * 0.26), Math.round(b * 0.62 + 176 * 0.38)]); tintC.set(v, q); } return q; };
+    const ZY0 = 33, ZY1 = 104;
+    let COSA = 0, COSB = 0, SIL = null, silN = -1, silAt = -9, zHead = 0, zBody = 0, chinR = 0;
+    const CAP = { T: '111010010010010', A: '010101111101101', D: '110101101101110', '-': '000000111000000', '!': '010010010000010' };
+    // the strip's figure, worked out once from the doodle: its outline closed up and its holes filled into one solid
+    // silhouette (stray marks off it dropped), a flat wash for the head and one for the body from the doodle's own colours
+    const silOf = () => {
+      const m0 = new Uint8Array(NN), m1 = new Uint8Array(NN); SIL = new Uint8Array(NN);
+      for (let i = 0; i < NN; i++) m0[i] = GT[i] ? 1 : 0;
+      // a 3 x 3 dilation (want 1) or erosion (want 0), done as two one-cell passes (the page's edge counts as empty)
+      const mt = new Uint8Array(NN);
+      const morph = (a, b, want) => {
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x, l = x > 0 ? a[i - 1] : 0, r = x < N - 1 ? a[i + 1] : 0; mt[i] = want ? (l | a[i] | r) : (l & a[i] & r); }
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x, u = y > 0 ? mt[i - N] : 0, d = y < N - 1 ? mt[i + N] : 0; b[i] = want ? (u | mt[i] | d) : (u & mt[i] & d); }
+      };
+      // the figure is the connected piece of the drawing with most of itself down the middle of the page (marks that
+      // don't touch it, and a frame drawn round the page, are dropped); its line's
+      // little gaps are then closed so its holes can be filled
+      const lab = new Int32Array(NN).fill(-1), st = []; let best = -1, bestN = 0;
+      for (let i = 0; i < NN; i++) if (m0[i] && lab[i] < 0) {
+        let n = 0; st.push(i); lab[i] = i;
+        while (st.length) { const q = st.pop(), x = q % N; if (Math.abs(x + 0.5 - hx * CU) < 16) n++; for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) { const xx = x + u, r = q + v * N + u; if ((u || v) && xx >= 0 && xx < N && r >= 0 && r < NN && m0[r] && lab[r] < 0) { lab[r] = i; st.push(r); } } }
+        if (n > bestN) { bestN = n; best = i; }
+      }
+      for (let i = 0; i < NN; i++) m0[i] = lab[i] === best ? 1 : 0;
+      morph(m0, m1, true); morph(m1, m0, false);
+      for (let i = 0; i < NN; i++) lab[i] = m0[i] ? best : -1;
+      const out = new Uint8Array(NN);
+      for (let x = 0; x < N; x++) for (const y of [0, N - 1]) { const q = y * N + x; if (lab[q] !== best && !out[q]) { out[q] = 1; st.push(q); } }
+      for (let y = 0; y < N; y++) for (const x of [0, N - 1]) { const q = y * N + x; if (lab[q] !== best && !out[q]) { out[q] = 1; st.push(q); } }
+      while (st.length) { const q = st.pop(), x = q % N; for (const r of [x > 0 ? q - 1 : -1, x < N - 1 ? q + 1 : -1, q - N, q + N]) if (r >= 0 && r < NN && !out[r] && lab[r] !== best) { out[r] = 1; st.push(r); } }
+      for (let i = 0; i < NN; i++) SIL[i] = out[i] ? 0 : 1;
+      // the neck: the narrowest row of the silhouette between the top of the head and the shoulders
+      let top = 0; while (top < N - 1 && !SIL.subarray(top * N, top * N + N).some(v => v)) top++;
+      const hgt = N - top; let bw = N + 1; chinR = Math.min(N - 1, top + Math.round(hgt * 0.6));
+      for (let y = top + Math.round(hgt * 0.35); y < top + Math.round(hgt * 0.8); y++) { let w = 0; for (let x = 0; x < N; x++) w += SIL[y * N + x]; if (w > 0 && w < bw) { bw = w; chinR = y; } }
+      const avg = (lo, hi, dflt) => { let r = 0, g = 0, b = 0, n = 0; for (let i = lo * N; i < hi * N; i++) if (SIL[i] && (GT[i] === 2 || GT[i] === 3)) { const v = G[i]; r += v & 255; g += (v >>> 8) & 255; b += (v >>> 16) & 255; n++; } return n > 12 ? zTint(pack([Math.round(r / n), Math.round(g / n), Math.round(b / n)])) : dflt; };
+      zHead = avg(0, chinR, pack([246, 228, 200])); zBody = avg(chinR, N, pack([224, 184, 96]));
+      {
+        // the costume's colour: the doodle's own body colour, made bright and strong (a plain red if it has none)
+        let r = 0, g = 0, b = 0, n = 0; for (let i = chinR * N; i < NN; i++) if (SIL[i] && GT[i] === 2) { const v = G[i]; r += v & 255; g += (v >>> 8) & 255; b += (v >>> 16) & 255; n++; }
+        let c3 = n > 12 ? [r / n, g / n, b / n] : [220, 50, 40];
+        const mx = Math.max(...c3), mn = Math.min(...c3);
+        if (mx - mn < 24) c3 = [220, 50, 40];
+        else { const v = 235, sat = 0.8; c3 = c3.map(q => v * (1 - sat * (mx - q) / (mx - mn))); }
+        COSA = pack(c3.map(q => Math.round(Math.max(0, Math.min(255, q))))); COSB = pack([252, 248, 236]);
+      }
+    };
+    // ---------- the zoetrope's acrobat: the doodle's own head (hair, hat, face and all) on a jointed tumbler ----------
+    // a pose: [lean, left arm (shoulder, elbow), right arm, left leg (hip, knee), right leg, turn of the whole body,
+    // lift off the ground]; angles from straight down, positive toward the right
+    const FIGP = [
+      [0, 0.3, 0, -0.3, 0, 0.12, 0, -0.12, 0, 0, 0],            // stand
+      [0.55, -1.1, 0.4, -0.8, 0.4, 2.0, -2.5, 1.7, -2.4, 0, 0],  // crouch, arms swung back
+      [0.15, 2.9, 0, 2.6, 0, -0.25, 0.15, 0.3, 0.35, 0, 9],      // leap, arms flung up
+      [0.3, 1.3, -0.5, 1.1, -0.4, 1.7, -2.1, 1.5, -2.0, 0.9, 18], // tuck
+      [0.3, 1.3, -0.5, 1.1, -0.4, 1.7, -2.1, 1.5, -2.0, 2.3, 21], // tumbling
+      [0.3, 1.3, -0.5, 1.1, -0.4, 1.7, -2.1, 1.5, -2.0, 3.7, 18], // upside down
+      [0.3, 1.3, -0.5, 1.1, -0.4, 1.7, -2.1, 1.5, -2.0, 5.0, 12], // round again
+      [0, 2.7, 0, -2.7, 0, 0.2, 0, -0.2, 0, 6.0, 4],             // opening out
+      [0.6, 1.4, 0, 1.7, 0, 1.9, -2.3, 1.6, -2.1, 0, 0],         // landing, knees deep
+      [0.2, 1.4, 0, -1.4, 0, 0.6, -0.9, 0.3, -0.7, 0, 0],        // rising, arms out
+      [0, 2.5, 0, -2.5, 0, 0.32, 0, -0.32, 0, 0, 0],             // ta-da
+      [0.8, -0.3, 0, -0.2, 0, 0.1, 0, -0.1, 0, 0, 0]],           // a bow
+      PUNCHP = [0, 2.6, -0.3, -2.6, 0.3, 0.38, 0, -0.38, 0, 0, 3];
+    const acroCache = new Map();
+    let hsOf = -1, hcX = 0, hcY = 0, hHalf = 8;
+    // the doodle's head: its size and centre, so it can sit on the tumbler's neck
+    const acroHead = () => {
+      let top = 0; while (top < chinR && !SIL.subarray(top * N, top * N + N).some(v => v)) top++;
+      let sx = 0, sy = 0, n = 0, lo = N, hi = 0;
+      for (let y = top; y < chinR; y++) for (let x = 0; x < N; x++) if (SIL[y * N + x]) { sx += x + 0.5; sy += y + 0.5; n++; lo = Math.min(lo, x); hi = Math.max(hi, x); }
+      hcX = n ? sx / n : N / 2; hcY = n ? sy / n : N / 3;
+      hsOf = 20 / Math.max(10, chinR - top, (hi - lo + 1) * 0.85); hHalf = Math.max(chinR - hcY, hcY - top) * hsOf;
+    };
+    // a pose laid out: the limbs as segments, the torso, and where the head sits and how it's turned
+    const acroLay = (pose, big) => {
+      const key = pose.join(',') + ':' + big + ':' + Math.round(hsOf * 50) + ':' + chinR + ':' + Math.round(hcY) + ':' + Math.round(hHalf); let L = acroCache.get(key); if (L) return L;
+      if (acroCache.size > 120) acroCache.clear();
+      const [lean, a1, b1, a2, b2, l1, k1, l2, k2, turn, lift] = pose, sc = big * 1.3;
+      const P = (o, a, len) => [o[0] + Math.sin(a) * len * sc, o[1] + Math.cos(a) * len * sc];
+      const hip = [0, 0], neck = P(hip, Math.PI - lean, 10), sh = P(neck, -lean, 1.5);
+      const segs = [];
+      for (const [a, b] of [[a1, b1], [a2, b2]]) { const e = P(sh, a - lean, 8), h = P(e, a - lean + b, 7.5); segs.push([sh, e], [e, h]); }
+      for (const [a, b] of [[l1, k1], [l2, k2]]) { const kn = P(hip, a - lean, 9), f = P(kn, a - lean + b, 9); segs.push([hip, kn], [kn, f]); }
+      const hd = P(neck, Math.PI - lean, (chinR - hcY) * hsOf * sc - 1);
+      // turn it all about the middle of the torso, then stand it on the ground (or lift it off)
+      const mid = [(hip[0] + neck[0]) / 2, (hip[1] + neck[1]) / 2], cs = Math.cos(turn), sn = Math.sin(turn);
+      const R = p => [mid[0] + (p[0] - mid[0]) * cs - (p[1] - mid[1]) * sn, mid[1] + (p[0] - mid[0]) * sn + (p[1] - mid[1]) * cs];
+      const S2 = segs.map(([p, q]) => [R(p), R(q)]), T = [R(hip), R(neck)], H = R(hd);
+      let bot = -1e9; for (const [p, q] of S2) bot = Math.max(bot, p[1], q[1]); bot = Math.max(bot, H[1] + hHalf * sc, T[0][1], T[1][1]);
+      const dy = ZY1 - 3 - lift - bot - 2, dx = -mid[0], mv = p => [p[0] + dx, p[1] + dy];
+      L = { key, segs: S2.map(([p, q]) => [mv(p), mv(q)]), torso: T.map(mv), head: mv(H), rot: turn - lean, sc };
+      acroCache.set(key, L); return L;
+    };
+    const segD = (x, y, a, b) => { const vx = b[0] - a[0], vy = b[1] - a[1], l2 = vx * vx + vy * vy || 1, u = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / l2)); return Math.hypot(x - a[0] - vx * u, y - a[1] - vy * u); };
+    // one frame drawn into the window: cream paper, the limbs in bold sepia, the torso in the doodle's body wash with a
+    // sepia outline, and the doodle's head (its own colours and lines) on top; side frames narrowed and shaded
+    // the body's shape for a pose in a slit (torso fill, outline and limbs) is worked out once and kept; only the
+    // head, which is the doodle's own and boils with it, is drawn fresh each frame, and only over its own patch
+    const bodyCache = new Map(), paleC = new Map();
+    // a pale version of a colour (half way to white), so the face reads light against the costume and the strip
+    const palePk = (r, g, b) => { const key = (r >> 3) << 10 | (g >> 3) << 5 | (b >> 3); let v = paleC.get(key); if (v === undefined) { v = pack([Math.round(255 - (255 - (r >> 3) * 8) * 0.45), Math.round(255 - (255 - (g >> 3) * 8) * 0.45), Math.round(255 - (255 - (b >> 3) * 8) * 0.45)]); paleC.set(key, v); } return v; };
+    const bodyOf = (L, cx, x0, x1, kx) => {
+      const key = L.key + ':' + x0; let m = bodyCache.get(key); if (m) return m;
+      m = new Uint8Array((x1 - x0 + 1) * (ZY1 - ZY0 + 1));
+      // each part painted over only its own patch: the torso (a wash inside, an outline round it), then the limbs on top
+      // codes: 1 and 4 the costume's stripes, 5 a limb, 2 the dark outline round every part
+      const W = x1 - x0 + 1, part = (p, q, r, inner, striped) => {
+        const X0 = Math.max(x0, Math.floor(cx + (Math.min(p[0], q[0]) - r) * kx)), X1 = Math.min(x1, Math.ceil(cx + (Math.max(p[0], q[0]) + r) * kx)), Y0 = Math.max(ZY0, Math.floor(Math.min(p[1], q[1]) - r)), Y1 = Math.min(ZY1, Math.ceil(Math.max(p[1], q[1]) + r));
+        const vx = q[0] - p[0], vy = q[1] - p[1], vl = Math.hypot(vx, vy) || 1;
+        for (let Y = Y0; Y <= Y1; Y++) for (let X = X0; X <= X1; X++) {
+          const lx = (X + 0.5 - cx) / kx, ly = Y + 0.5, dd = segD(lx, ly, p, q); if (dd >= r) continue;
+          const o = (Y - ZY0) * W + X - x0;
+          if (dd >= inner) { m[o] = 2; continue; }
+          m[o] = striped ? (Math.floor(((lx - p[0]) * vx + (ly - p[1]) * vy) / vl / (3.2 * L.sc)) & 1 ? 4 : 1) : 5;
+        }
+      };
+      part(L.torso[0], L.torso[1], 6.2 * L.sc, 4.8 * L.sc, true);
+      for (const [p, q] of L.segs) part(p, q, 2.6 * L.sc, 1.4 * L.sc, false);   // the limbs, over the torso, each outlined
+      if (bodyCache.size > 120) bodyCache.clear();
+      bodyCache.set(key, m); return m;
+    };
+    const acrobat = (pose, cx, x0, x1, kx, side, big) => {
+      const L = acroLay(pose, big), m = bodyOf(L, cx, x0, x1, kx), w = x1 - x0 + 1;
+      for (let Y = ZY0; Y <= ZY1; Y++) for (let X = x0; X <= x1; X++) { const c5 = m[(Y - ZY0) * w + X - x0]; B32[Y * 128 + X] = c5 === 1 || c5 === 5 ? COSA : c5 === 4 ? COSB : c5 === 2 ? DARK : side && ((X + Y) & 1) ? PARCH2 : PARCH; }
+      // the head: the doodle's own, turned with the body
+      const hs = hsOf * L.sc, cr = Math.cos(-L.rot), sr = Math.sin(-L.rot), ins = q => q >= 0 && SIL[q] === 1 && Math.floor(q / N) < chinR;
+      const cell = (x, y) => { const c3 = Math.floor(x), r3 = Math.floor(y); return c3 >= 0 && r3 >= 0 && c3 < N && r3 < N ? r3 * N + c3 : -1; };
+      const rr0 = hHalf * L.sc * 1.5 + 3, X0 = Math.max(x0, Math.floor(cx + (L.head[0] - rr0) * kx)), X1 = Math.min(x1, Math.ceil(cx + (L.head[0] + rr0) * kx)), Y0 = Math.max(ZY0, Math.floor(L.head[1] - rr0)), Y1 = Math.min(ZY1, Math.ceil(L.head[1] + rr0)), d = 1.4 / hs;
+      for (let Y = Y0; Y <= Y1; Y++) for (let X = X0; X <= X1; X++) {
+        const hx2 = (X + 0.5 - cx) / kx - L.head[0], hy2 = Y + 0.5 - L.head[1], sx = hcX + (hx2 * cr - hy2 * sr) / hs, sy = hcY + (hx2 * sr + hy2 * cr) / hs, q = cell(sx, sy);
+        if (!ins(q)) continue;
+        let v;
+        if (!ins(cell(sx - d, sy)) || !ins(cell(sx + d, sy)) || !ins(cell(sx, sy - d)) || !ins(cell(sx, sy + d))) v = DARK;
+        else if (GT[q] === 1 || GT[cell(sx + 0.6, sy)] === 1 || GT[cell(sx, sy + 0.6)] === 1) v = DARK;
+        else if (GT[q] === 2 || GT[q] === 3) { let rr = 0, gg = 0, bb = 0, nn = 0; for (const q2 of [q, q + 1, q + N, q + N + 1]) if (q2 < NN && GT[q2] === GT[q]) { const c5 = G[q2]; rr += c5 & 255; gg += (c5 >>> 8) & 255; bb += (c5 >>> 16) & 255; nn++; } v = palePk(rr / nn, gg / nn, bb / nn); }   // the head's colours, pale
+        else v = palePk(250, 238, 222);
+        B32[Y * 128 + X] = v;
+      }
+    };
+    const zBase = () => {
+      // the room and the drum, laid once: a dark papered wall, a walnut table, the drum's lacquered side with gold
+      // pinstripes, its rims and the dark mouth at the top
+      for (let Y = 0; Y < 128; Y++) for (let X = 0; X < 128; X++) {
+        let v = ((X + Y) % 10 === 0 || (X - Y + 200) % 10 === 0) ? pack([30, 44, 36]) : pack([20, 30, 25]);
+        if (Y >= 117) v = Y === 117 ? pack([110, 66, 40]) : (Y + (X >> 3)) % 5 === 0 ? pack([62, 36, 22]) : pack([74, 44, 26]);
+        const ex = (X - 63.5) / 61;
+        if (Math.abs(ex) <= 1) {
+          const sq = Math.sqrt(1 - ex * ex), yt = 12 - 6 * sq, yb = 110 + 5 * sq;
+          if (Y >= yt && Y <= yb) { const shade = Math.abs(ex); v = shade > 0.88 ? DRUMD : shade > 0.65 ? DRUM2 : DRUM; if (Y === 108) v = shade > 0.85 ? GOLDD : GOLDP; if (Y > yb - 2) v = DRUMD; }
+          const it = (X - 63.5) / 56; if (Math.abs(it) <= 1 && Math.abs(Y - 12) <= 4 * Math.sqrt(1 - it * it)) v = HOLE;
+          if (Y < 19 && Math.abs(Y - (12 + 6 * sq)) < 0.9) v = GOLDP;
+          if (Y < 12 && Math.abs(Y - (12 - 6 * sq)) < 0.9) v = GOLDD;
+        }
+        if (Y >= 114 && Y <= 116 && X > 14 && X < 114) v = pack([22, 14, 10]);   // its shadow on the table
+        ZW[Y * 128 + X] = v;
+      }
+      // the window where the strip shows, framed in a gold bead
+      for (let X = 8; X <= 119; X++) { ZW[(ZY0 - 2) * 128 + X] = GOLDP; ZW[(ZY0 - 1) * 128 + X] = GOLDD; ZW[(ZY1 + 1) * 128 + X] = GOLDD; ZW[(ZY1 + 2) * 128 + X] = GOLDP; }
+    };
+    const zoe = t => {
+      if (!ZW[0]) zBase();
+      // (worked out again whenever the drawing's inked area changes, as while the doodle is still being drawn)
+      let inked = 0; for (let i = 0; i < NN; i++) if (GT[i]) inked++;
+      if (!SIL || (inked !== silN && t - silAt > 0.25)) { silOf(); silN = inked; silAt = t; hsOf = -1; }
+      B32.set(ZW);
+      // the strip seen through three slits at once: in each a frame of the acrobat (the middle one whole, the two
+      // either side narrowed and shaded as the drum curves away), each a frame on from the last, so all three tumble
+      // in turn; the drum's dark wall between the slits
+      const punch = t - punchAt < 1.4, fr0 = ((Math.floor(drumA) % 12) + 12) % 12;
+      if (hsOf < 0) acroHead();
+      for (const [cx, x0, x1, k, j] of [[63.5, 41, 86, 1, 0], [22.5, 9, 36, 0.62, -1], [104.5, 91, 118, 0.62, 1]]) {
+        const pose = punch ? (j ? FIGP[(10 + j + 12) % 12] : PUNCHP) : FIGP[(fr0 + j + 12) % 12];
+        acrobat(pose, cx, x0, x1, k, j !== 0, punch && !j ? 1.15 : 1);
+      }
+      for (const [x0, x1] of [[37, 40], [87, 90]]) for (let Y = ZY0; Y <= ZY1; Y++) for (let X = x0; X <= x1; X++) B32[Y * 128 + X] = X === x0 || X === x1 ? DRUMD : HOLE;
+      // the next slit sweeping across as the drum turns: a dark bar running over the frames (still while the punchline holds)
+      if (!punch) { const X0 = Math.round(118 - ((drumA % 1) + 1) % 1 * 110); for (let X = X0 - 1; X <= X0 + 1; X++) if (X >= 9 && X <= 118) for (let Y = ZY0; Y <= ZY1; Y++) B32[Y * 128 + X] = X === X0 ? HOLE : DRUMD; }
+      // the punchline card: "TA-DA!" on a little card at the foot of the frame
+      if (punch) {
+        const str = 'TA-DA!', w = str.length * 8 - 2, x0 = 64 - (w >> 1), y0 = ZY1 - 13;
+        for (let Y = y0 - 3; Y <= y0 + 12; Y++) for (let X = x0 - 4; X <= x0 + w + 3; X++) B32[Y * 128 + X] = Y === y0 - 3 || Y === y0 + 12 || X === x0 - 4 || X === x0 + w + 3 ? SEP : pack([252, 246, 228]);
+        for (let d = 0; d < str.length; d++) { const g = CAP[str[d]]; for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (g[j * 3 + i] === '1') for (let v = 0; v < 2; v++) for (let u = 0; u < 2; u++) B32[(y0 + j * 2 + v) * 128 + x0 + d * 8 + i * 2 + u] = pack([176, 40, 32]); }
+      }
+      // the punchline: gold stars burst round the acrobat
+      if (punch) {
+        const k = t - punchAt, hx2 = 64, hy2 = ZY0 + 26;
+        for (let q = 0; q < 8; q++) {
+          const a = q / 8 * 6.283 + 0.3, r = 14 + Math.min(1, k * 3) * 10, sx = Math.round(hx2 + Math.cos(a) * r * 1.7), sy = Math.round(hy2 + Math.sin(a) * r * 0.9), sz = (q & 1 ? 3 : 5) - (k > 1.1 ? 1 : 0);
+          for (let pass = 0; pass < 2; pass++) for (let v = -sz - 1; v <= sz + 1; v++) for (let u = -sz - 1; u <= sz + 1; u++) {
+            const m = Math.abs(u) + Math.abs(v) * 2.2, m2 = Math.abs(v) + Math.abs(u) * 2.2, inS = Math.min(m, m2) <= sz, X = sx + u, Y = sy + v;
+            if (X <= 8 || X >= 119 || Y <= ZY0 || Y >= ZY1) continue;
+            if (pass === 0 && Math.min(m, m2) <= sz + 1.6) B32[Y * 128 + X] = SEP;
+            if (pass === 1 && inS) B32[Y * 128 + X] = Math.abs(u) + Math.abs(v) < 2 ? pack([255, 250, 220]) : STARC;
+          }
+        }
+      }
+      // the animator's own sketch, propped against the drum: the doodle just as it was drawn (its pose, what it holds,
+      // its margin doodle, its paper and pen), small, on a card with a shadow
+      {
+        const CX0 = 2, CY0 = 91, CW = 30;
+        for (let Y = CY0 + 2; Y <= CY0 + CW + 1; Y++) for (let X = CX0 + 2; X <= CX0 + CW + 1; X++) B32[Y * 128 + X] = pack([24, 14, 10]);
+        for (let Y = CY0; Y < CY0 + CW; Y++) for (let X = CX0; X < CX0 + CW; X++) {
+          const n = Y * 128 + X, u = X - CX0 - 1, v = Y - CY0 - 1;
+          if (u < 0 || v < 0 || u >= CW - 2 || v >= CW - 2) { B32[n] = SEP; continue; }
+          const c0 = Math.floor(u * N / (CW - 2)), c1 = Math.floor((u + 1) * N / (CW - 2)), r0 = Math.floor(v * N / (CW - 2)), r1 = Math.floor((v + 1) * N / (CW - 2));
+          let ln = -1, fl = -1;
+          for (let r = r0; r < r1; r++) for (let c3 = c0; c3 < c1; c3++) { const i = r * N + c3; if (GT[i] === 1) ln = i; else if (GT[i] && fl < 0) fl = i; }
+          B32[n] = ln >= 0 ? G[ln] : fl >= 0 ? G[fl] : G[r0 * N + c0];
+        }
+        for (const [u, v] of [[0, 0], [1, 0], [0, 1], [1, 1]]) B32[(CY0 + 1 + v) * 128 + CX0 + 14 + u] = pack([200, 40, 40]);   // its pin
+      }
+      // a coveted gold star, pinned to the wallpaper
+      if (starOwned) STAR.forEach((r, j) => { for (let i = 0; i < 7; i++) { const ch = r[i]; if (ch !== '.') for (let v = 0; v < 2; v++) for (let u = 0; u < 2; u++) B32[(3 + j * 2 + v) * 128 + 3 + i * 2 + u] = starMap[ch]; } });
+      // the drum's band of viewing slits above the window, running round as it turns (a twelfth of a turn a frame)
+      const rot = drumA / 12 * 6.283;
+      for (let q = 0; q < 24; q++) {
+        const th = q / 24 * 6.283 + rot, cs = Math.cos(th); if (cs < 0.08) continue;
+        const xc = 63.5 + Math.sin(th) * 60, w = 2.6 * cs;
+        for (let X = Math.round(xc - w / 2); X <= Math.round(xc + w / 2); X++) for (let Y = 16 + Math.round((1 - cs) * 3); Y <= 28; Y++) if (X >= 0 && X < 128) B32[Y * 128 + X] = Y > 26 ? DRUMD : HOLE;
+      }
+      // the brass crank on the drum's side turns with it
+      const ca = drumA * 0.5;
+      for (let k = 0; k < 7; k++) { const X = Math.round(124 + Math.cos(ca) * k * 0.4), Y = Math.round(66 + Math.sin(ca) * k); if (Y >= 0 && Y < 128 && X < 128) B32[Y * 128 + Math.min(127, X)] = k < 6 ? BRASSD : BRASS; }
+      for (let v = -2; v <= 2; v++) for (let u = -1; u <= 1; u++) B32[(66 + v) * 128 + 123 + u] = Math.abs(v) + Math.abs(u) < 3 ? BRASS : BRASSD;
+    };;
+    if (boff) zBase();   // the room and the drum are laid at set-up
     const octx = off.getContext('2d'), img = octx.createImageData(N, N), F = new Uint32Array(img.data.buffer), FT = new Uint8Array(NN);
     const userTone = hiTones(userHi), hiMask = new Uint8Array(NN);
     const pivotRot = p => [pivot[0] + (p[0] - pivot[0]) * tc - (p[1] - pivot[1]) * ts, pivot[1] + (p[0] - pivot[0]) * ts + (p[1] - pivot[1]) * tc];
@@ -859,9 +1175,16 @@ Proto.add({
     if (legend === 'Holo Sticker') {
       cut = new Uint8Array(NN);
       const t0 = tags[0], grow = (src, r) => { const o = new Uint8Array(NN); for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) { if (!src[y * N + x]) continue; for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const xx = x + i, yy = y + j; if (xx >= 0 && yy >= 0 && xx < N && yy < N && Math.abs(i) + Math.abs(j) <= r + 1) o[yy * N + xx] = 1; } } return o; };
-      const body = grow(t0, 2), shade = new Uint8Array(NN);
-      for (let y = 1; y < N; y++) for (let x = 1; x < N; x++) if (body[(y - 1) * N + x - 1] && !body[y * N + x]) shade[y * N + x] = 1;
-      for (let i = 0; i < NN; i++) cut[i] = shade[i] ? 3 : body[i] && !t0[i] ? 2 : t0[i] ? 1 : 0;
+      // the die-cut: the drawing grown two cells, its holes filled (a sticker is one solid piece), a white border
+      // two cells deep round the outside, foil everywhere inside it, and a soft two-step shadow where it lifts
+      const body = grow(t0, 2), shade = new Uint8Array(NN), out = new Uint8Array(NN), q = [];
+      for (let i = 0; i < NN; i++) { const x = i % N, y = (i - x) / N; if (!body[i] && (x === 0 || y === 0 || x === N - 1 || y === N - 1)) { out[i] = 1; q.push(i); } }
+      for (let h = 0; h < q.length; h++) { const i = q[h], x = i % N; for (const j of [x > 0 ? i - 1 : -1, x < N - 1 ? i + 1 : -1, i - N, i + N]) if (j >= 0 && j < NN && !out[j] && !body[j]) { out[j] = 1; q.push(j); } }
+      const dOut = new Uint8Array(NN).fill(9), q2 = [];
+      for (let i = 0; i < NN; i++) if (out[i]) { dOut[i] = 0; q2.push(i); }
+      for (let h = 0; h < q2.length; h++) { const i = q2[h], x = i % N, d = dOut[i] + 1; if (d > 3) continue; for (const j of [x > 0 ? i - 1 : -1, x < N - 1 ? i + 1 : -1, i - N, i + N]) if (j >= 0 && j < NN && dOut[j] > d) { dOut[j] = d; q2.push(j); } }
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x; if (!out[i]) continue; if ((x > 0 && y > 0 && !out[i - N - 1]) || (x > 1 && y > 1 && !out[i - 2 * N - 2] && ((x + y) & 1))) shade[i] = 1; }
+      for (let i = 0; i < NN; i++) cut[i] = shade[i] ? 3 : out[i] ? 0 : !t0[i] && dOut[i] <= 2 ? 2 : t0[i] ? 1 : 4;
     }
     // the face stays plain ink on the sticker: no foil from the brows down inside the head
     const faceMask = new Uint8Array(NN);
@@ -872,27 +1195,58 @@ Proto.add({
     const HOLO = [[255, 120, 200], [255, 220, 110], [140, 255, 170], [110, 210, 255], [190, 150, 255], [255, 255, 255]].map(q => pack(blend(PB, q, 0.8)));
     const HOLOEDGE = [[255, 120, 200], [255, 220, 110], [140, 255, 170], [110, 210, 255], [190, 150, 255], [255, 255, 255]].map(q => pack(blend([252, 252, 248], q, 0.55)));
     const WHITE = pack([252, 252, 248]), SHADOW = pack(blend(PB, [0, 0, 0], 0.22));
+    // the foil is metallic: saturated prism colours with a darker steel band between them (the paper inside the cut a
+    // shade paler than the coloured-in parts)
+    const PRISM = [[240, 84, 186], [252, 196, 72], [84, 226, 160], [64, 186, 246], [150, 112, 246], [176, 186, 206]];
+    const HOLOX = PRISM.map(q => pack(q)), HOLOP = PRISM.map(q => pack(blend(q, [240, 242, 248], 0.62)));
+    const BACK = pack([238, 236, 230]), BACKL = pack([224, 222, 216]), BACKE = pack([210, 208, 202]), BACKF = pack([196, 194, 188]), PEELSH = pack(blend(PB, [0, 0, 0], 0.18));
+    const CUTLINE = pack(blend(PB, [120, 120, 140], 0.5));
+    const SILVER = pack([226, 229, 236]), SILVERHI = pack([248, 250, 255]), SPARKLE = pack([255, 255, 255]);
+    // each cell's place in the prism: diagonal bands, rippled, so the colours run in waves across the foil
+    const holoBase = new Int16Array(NN), glitter = new Uint8Array(NN);
+    const stars = [], foilAt = [], cutAt = [];
+    if (cut) for (let i = 0; i < NN; i++) { const x = i % N; if (cut[i]) foilAt.push(i); if ((!cut[i] || cut[i] === 3) && ((x > 0 && cut[i - 1] === 2) || (x < N - 1 && cut[i + 1] === 2) || (i >= N && cut[i - N] === 2) || (i < NN - N && cut[i + N] === 2))) cutAt.push(i); }
+    if (cut) { const inner = []; for (let i = 0; i < NN; i++) if (cut[i] === 4 && !faceMask[i]) inner.push(i); for (let k = 0; k < 3 && inner.length; k++) { const i = inner[Math.floor(own('holo-star-' + k) * inner.length)]; stars.push([i % N, Math.floor(i / N), k / 3]); } }
+    if (cut) for (let i = 0; i < NN; i++) { const x = i % N, y = (i - x) / N; holoBase[i] = Math.floor((x + y) / 3 + Math.sin((x - y) * 0.3) * 1.6 + 60); let h = Math.imul(i * 2654435761, 0x85ebca6b); h ^= h >>> 13; if (((h >>> 0) & 63) < 3) glitter[i] = 1 + ((h >>> 8) % 8); }
     // the gold star: a teacher's foil star stuck in the corner, opposite the margin doodles
     const STAR = ['...#...', '..#Y#..', '###yy##', '#yyyyy#', '.#yyy#.', '.#y#y#.', '.##.##.'], STAR_EDGE = ['...#...', '...#...', '..#y#..', '..#y#..', '..#y#..', '..#y#..', '..#.#..'];
     const starAt = [mside > 0 ? 6 : N - 7, held !== 'Nothing' && mside < 0 ? N - 9 : 6];
     const starMap = { '#': pack([150, 100, 20]), y: pack([238, 186, 52]), Y: pack([255, 236, 150]) };
-    let spinAt = -9, hopAt = -9, buzzAt = -9;
-    // pixel digits, 3 x 5, for the flipbook's page number
-    const DIG = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001010010', '111101111101111', '111101111001111'];
+    let spinAt = -9, buzzAt = -9, punchAt = -9, flung = false, lastT = 0, peel = null, slapAt = -9, scrub = null, press0 = null, drumA = -1.5, drumV = 2.5, drumPeak = 0, drumHold = -9;
+    const G = new Uint32Array(NN), GT = new Uint8Array(NN);
 
     return (t) => {
       const inp = c.input;
       for (const press of inp.taps()) {
         const cx = Math.floor(press.x * N), cy = Math.floor(press.y * N);
         if (starOwned && Math.abs(cx - starAt[0]) <= 4 && Math.abs(cy - starAt[1]) <= 4) { spinAt = t; c.sound.note(deg(7) + 12, { dur: 0.3, vel: 0.16, wave: 'sine' }); c.sound.note(deg(9) + 12, { dur: 0.5, vel: 0.14, wave: 'sine', at: 0.12 }); c.sound.note(deg(12) + 12, { dur: 0.7, vel: 0.1, wave: 'triangle', at: 0.24, cutoff: 3000 }); continue; }
+        if (legend === 'Neon') continue;   // the sign acts on a short, still release instead (so a hold doesn't also switch a tube)
+        if (legend === 'Neon-tap') {
+          // a tap on a tube switches it, with a clack and the hum of the transformer
+          const id = tubeLab[Math.min(N - 1, cy) * N + Math.min(N - 1, cx)];
+          if (id >= 0) { tubeOn[id] ^= 1; tubeAt[id] = tubeOn[id] ? t : -9; c.sound.hit('click', 0.25); c.sound.note(hum - (tubeOn[id] ? 12 : 24), { dur: tubeOn[id] ? 0.4 : 0.15, vel: 0.1, wave: 'square', cutoff: 600 }); }
+          else if (inHead(press.x * 1000, press.y * 1000)) tap(press.x, press.y, t);
+          continue;
+        }
+        if (legend === 'Holo Sticker' && !inHead(press.x * 1000, press.y * 1000)) continue;   // a press off the face starts a peel instead
+        if (legend === 'Flipbook') continue;   // a press on the zoetrope turns its drum (below), it doesn't startle the doodle
         tap(press.x, press.y, t);
-        if (legend === 'Flipbook') { hopAt = t; for (let i = 0; i < 4; i++) c.sound.hit('click', 0.08 + i * 0.02); }
-        if (legend === 'Neon') { buzzAt = t; c.sound.note(hum - 24, { dur: 0.5, vel: 0.12, wave: 'square', cutoff: 500 }); }
-        if (legend === 'Holo Sticker') [0, 2, 4, 7].forEach((d, i) => c.sound.note(deg(d + 7), { dur: 0.25, vel: 0.1, wave: 'sine', at: i * 0.06 }));
       }
-      penMove(t);
+      if (!legend) penMove(t);
       const k = seq[Math.floor(t * 4) % 4];
-      F.set(takes[k]); FT.set(tags[k]);
+      if (legend === 'Neon') {
+        // a tube is lit if it's switched on; one coming on (or the whole sign after the power cycles) stutters first;
+        // and every so often one tube on its own hiccups
+        F.set(neonTakes[k].base); FT.set(tags[k]);
+        const sick = tubes.length ? Math.floor(t / 6.3) * 7919 % tubes.length : -1, hic = [[2.1, 2.16], [2.24, 2.4], [2.47, 2.5]].some(([a, b2]) => (t % 6.3) >= a && (t % 6.3) < b2);
+        for (let id = 0; id < tubes.length; id++) {
+          const since = Math.min(t - tubeAt[id], t - powerAt - id * 0.09 - 0.5), stut = since >= 0 && since < 0.45 && [0, 1, 0, 0, 1, 0, 1, 1, 1][Math.floor(since * 20)] === 0;
+          const lit = tubeOn[id] && !(t - powerAt >= 0 && t - powerAt < 0.5 + id * 0.09) && !stut && !(id === sick && hic && t - powerAt > 3);
+          if (!lit) continue;
+          const pt = neonTakes[k].per[id]; for (let j = 0; j < pt.glow.length; j += 2) F[pt.glow[j]] = pt.glow[j + 1]; for (let j = 0; j < pt.glass.length; j += 2) F[pt.glass[j]] = pt.glass[j + 1];
+        }
+        for (const i of cable) F[i] = CABLE;
+      } else { F.set(takes[k]); FT.set(tags[k]); }
       // the viewer's highlighter goes under the line, never over it
       for (const m of mine) for (let i = 0; i < m.length; i++) {
         const a = m[Math.max(0, i - 1)], b = m[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) * CU * 2));
@@ -900,11 +1254,62 @@ Proto.add({
       }
       for (const m of mine) m.splice(0, Math.max(0, m.length - 2));   // keep only the tail of each stroke: the cells stay painted in hiMask
       for (let i = 0; i < NN; i++) if (hiMask[i] && FT[i] !== 1) F[i] = ((i % N + Math.floor(i / N) * 2) % 6) >= 4 ? userTone[1] : userTone[0];
+      const dtt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
+      if (legend === 'Neon') {
+        if (inp.down && !lastDown) holdAt = t;
+        if (!inp.down) holdAt = -1;
+        if (holdAt >= 0 && t - holdAt > 1) { holdAt = -1; powerAt = t; tubeOn.fill(1); c.sound.hit('noise', 0.12, { cutoff: 400, dur: 0.4 }); tubes.forEach((_, i) => c.sound.hit('click', 0.12, { at: 0.5 + i * 0.09 })); }
+      }
+      if (legend === 'Holo Sticker') {
+        // a press on the sticker (off its face) lifts it there; the flap follows the finger; let go and it slaps back down
+        const px = inp.x * N, py = inp.y * N;
+        if (inp.down && !lastDown) { const i = Math.min(N - 1, Math.floor(py)) * N + Math.min(N - 1, Math.floor(px)); if (cut[i] && cut[i] !== 3 && !faceMask[i]) { peel = { sx: px, sy: py, px, py }; c.sound.hit('noise', 0.08, { cutoff: 3000, dur: 0.15 }); } }
+        if (peel && inp.down) { peel.px = px; peel.py = py; }
+        if (peel && !inp.down && lastDown) { peel.rel = t; peel.fx = peel.px; peel.fy = peel.py; }
+        if (peel && peel.rel !== undefined) { const f = Math.min(1, (t - peel.rel) / 0.3); peel.px = peel.fx + (peel.sx - peel.fx) * f * f; peel.py = peel.fy + (peel.sy - peel.fy) * f * f; if (f >= 1) { peel = null; slapAt = t; c.sound.hit('snare', 0.14); [0, 4, 7].forEach((d, i) => c.sound.note(deg(d + 7), { dur: 0.25, vel: 0.08, wave: 'sine', at: 0.05 + i * 0.05 })); } }
+      }
+      if (legend === 'Flipbook') {
+        // the zoetrope's drum turns slowly by itself; dragging sideways turns it under your finger (a frame every three
+        // cells), a fling sets it spinning and it slows back to its idle turn, landing on the punchline if it was fast;
+        // a short, still tap gives it a push
+        if (inp.down && !lastDown) { scrub = { x0: inp.x * N, a0: drumA, moved: 0, t }; drumHold = -9; }
+        if (scrub && inp.down) { const na = scrub.a0 + (inp.x * N - scrub.x0) / 3; drumV = drumV * 0.5 + (na - drumA) / Math.max(dtt, 1e-3) * 0.5; scrub.moved = Math.max(scrub.moved, Math.abs(inp.x * N - scrub.x0)); if (Math.floor(na) !== Math.floor(drumA)) c.sound.hit('click', 0.06); drumA = na; drumPeak = Math.max(drumPeak, Math.abs(drumV)); }
+        else {
+          if (scrub && !inp.down) { if (scrub.moved < 1.5 && t - scrub.t < 0.45) { drumV += 14; drumPeak = Math.max(drumPeak, Math.abs(drumV)); c.sound.hit('noise', 0.1, { cutoff: 1800, dur: 0.3 }); } else drumV = Math.max(-40, Math.min(40, drumV)); scrub = null; }
+          if (t < drumHold) drumV = 0;
+          else {
+            drumV += (2.5 - drumV) * Math.min(1, dtt * 1.6);
+            const before = Math.floor(drumA); drumA += drumV * dtt; if (Math.abs(drumV) > 5 && Math.floor(drumA) !== before) c.sound.hit('click', 0.04);
+            if (drumPeak > 15 && Math.abs(drumV) < 5) { drumPeak = 0; punchAt = t; drumHold = t + 1.4; drumA = Math.floor(drumA / 12) * 12 + 16.5; [0, 4, 7, 12].forEach((dd, i) => c.sound.note(deg(dd + 5), { dur: 0.2, vel: 0.18, wave: 'triangle', at: i * 0.07 })); c.sound.hit('snare', 0.2); }
+          }
+        }
+      }
+      // a short, still press-and-release is the sign's tap
+      if (legend === 'Neon') {
+        if (inp.down && !lastDown) press0 = { x: inp.x, y: inp.y, t, moved: 0 };
+        if (press0 && inp.down) press0.moved = Math.max(press0.moved, Math.hypot(inp.x - press0.x, inp.y - press0.y) * N);
+        if (press0 && !inp.down) {
+          if (press0.moved < 1.5 && t - press0.t < 0.45) {
+            const cx = Math.floor(press0.x * N), cy = Math.floor(press0.y * N), id = tubeLab[Math.min(N - 1, cy) * N + Math.min(N - 1, cx)];
+            if (id >= 0) { tubeOn[id] ^= 1; tubeAt[id] = tubeOn[id] ? t : -9; c.sound.hit('click', 0.25); c.sound.note(hum - (tubeOn[id] ? 12 : 24), { dur: tubeOn[id] ? 0.4 : 0.15, vel: 0.1, wave: 'square', cutoff: 600 }); }
+            else if (inHead(press0.x * 1000, press0.y * 1000)) tap(press0.x, press0.y, t);
+          }
+          press0 = null;
+        }
+      }
+      lastDown = inp.down;
       if (react && t - reactAt > 1.8) react = null;
       const shut = !react && t > 0.4 && (t + 1.7) % gap < 0.18;
       faceOn = true;
       for (const op of planFor(react || 'base', shut)) runOp(F, FT, op, k, pivotRot);
       faceOn = false;
+      if (headBox) {
+        // the live face, bent in tube too: a pale-hot core and a ring of light round it
+        const [x0, y0, x1, y1] = headBox, G1 = pack(blend(neonRGB, [30, 20, 30], 0.0));
+        const faceLit = headTube < 0 || (tubeOn[headTube] && !(t - powerAt >= 0 && t - powerAt < 0.5 + headTube * 0.09));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * N + x; if (F[i] === INK) F[i] = faceLit ? NEONTUBE : DEAD(neonRGB); }
+        if (faceLit) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = y * N + x; if (FT[i] !== 1 && F[i] !== NEONTUBE && (F[i - 1] === NEONTUBE || F[i + 1] === NEONTUBE || F[i - N] === NEONTUBE || F[i + N] === NEONTUBE)) F[i] = pack(blend(unpack(F[i]), neonRGB, 0.5)); }
+      }
       if (react === 'Song') {
         const f = (t - reactAt) / 1.8, nx0 = mcx - dir * mw * 1.5, ny0 = mouthY - 40 - f * 120;
         if (f < 0.9) runOp(F, FT, { t: 'spr', rows: ['..##', '..#.', '..#.', '###.', '##..'], x: nx0, y: ny0, flip: dir < 0 }, k, pivotRot);
@@ -914,38 +1319,65 @@ Proto.add({
       // legendaries
       const pcx = Math.floor(inp.x * N), pcy = Math.floor(inp.y * N);
       if (legend === 'Neon') {
-        // the gel glows white-hot where the pointer is, and a tap makes the whole line buzz for a moment
-        const hot = pack(blend(neonRGB, [255, 255, 255], 0.65)), buzz = t - buzzAt < 0.5 && Math.floor(t * 16) % 2 === 0;
-        for (let i = 0; i < NN; i++) if (FT[i] === 1) { const x = i % N, y = (i - x) / N; if ((inp.inside && Math.abs(x - pcx) + Math.abs(y - pcy) < 7) || buzz) F[i] = hot; }
+        // the tube under the pointer runs white-hot, so you can see which one a tap will switch; holding the power
+        // button (anywhere, for a second) shows a ring filling round the finger
+        const hot = pack(blend(neonRGB, [255, 255, 255], 0.65)), id0 = inp.inside ? tubeLab[pcy * N + pcx] : -1;
+        if (id0 >= 0 && tubeOn[id0]) { const pt = neonTakes[k].per[id0]; for (let j = 0; j < pt.glass.length; j += 2) F[pt.glass[j]] = hot; }
+        if (holdAt >= 0 && inp.down) { const f = Math.min(1, (t - holdAt - 0.25) / 0.75); if (f > 0) for (let a = 0; a < f * 24; a++) { const x = Math.floor(pcx + 0.5 + Math.cos(a / 24 * 6.283 - 1.57) * 4), y = Math.floor(pcy + 0.5 + Math.sin(a / 24 * 6.283 - 1.57) * 4); if (x >= 0 && y >= 0 && x < N && y < N) F[y * N + x] = hot; } }
       }
       if (cut) {
-        // the holo foil: rainbow bands that slide with the pointer (or drift by themselves)
-        const sh = inp.inside ? pcx * 0.6 + pcy * 0.3 : t * 2.2;
-        for (let i = 0; i < NN; i++) {
-          const x = i % N, y = (i - x) / N, cc = cut[i];
-          if (cc === 3) F[i] = SHADOW;
-          else if (cc === 2 && FT[i] !== 1) F[i] = (((x - y + Math.floor(sh * 2)) % 14) + 14) % 14 < 2 ? HOLOEDGE[(Math.floor((x + y) / 4 + sh) % 6 + 6) % 6] : WHITE;   // a glint runs round the die-cut edge
-          else if (faceMask[i] || FT[i] === 3 || FT[i] === 1) continue;   // face, skin and every line stay as drawn
-          else if (FT[i] === 2 || (cc === 1 && FT[i] !== 0)) F[i] = HOLO[(Math.floor((x + y) / 3 + sh) % 6 + 6) % 6];
+        // the holo foil: prismatic bands that ripple and slide with the pointer (or drift by themselves), a bright sheen
+        // sweeping across now and then, glitter that winks, and a glint running round the die-cut edge
+        const sh = inp.inside ? pcx * 0.6 + pcy * 0.3 : t * 2.2, sweep = ((t * 30) % 150) - 30;
+        for (let n = 0; n < foilAt.length; n++) {
+          const i = foilAt[n], x = i % N, y = (i - x) / N, cc = cut[i];
+          if (cc === 3) { F[i] = SHADOW; continue; }
+          if (cc === 2) { if (FT[i] !== 1) F[i] = (((x - y + Math.floor(sh * 2)) % 14) + 14) % 14 < 2 ? HOLOEDGE[(Math.floor((x + y) / 4 + sh) % 6 + 6) % 6] : WHITE; continue; }
+          if (FT[i] === 1) continue;   // every line stays as drawn
+          const s2 = x + y - sweep, lit = s2 > -3 && s2 < 3 && Math.abs(s2) < 2 + ((x ^ y) & 1);
+          if (faceMask[i] || FT[i] === 3) { F[i] = lit ? SILVERHI : FT[i] === 3 ? F[i] : SILVER; continue; }   // the face is plain silver foil, so it reads
+          const hue = ((holoBase[i] + Math.floor(sh * 1.5)) % 6 + 6) % 6, gl = glitter[i] && ((Math.floor(t * 5) + glitter[i]) % 9 === 0);
+          F[i] = gl || lit ? SPARKLE : FT[i] === 2 ? HOLOX[hue] : HOLOP[hue];
+        }
+        for (let n = 0; n < cutAt.length; n++) F[cutAt[n]] = CUTLINE;
+        if (peel && Math.hypot(peel.px - peel.sx, peel.py - peel.sy) > 0.8) {
+          // the flap: everything of the sticker past the fold (the line halfway from where you pressed to your finger)
+          // lifts off, showing the page under it, and lies folded back on the other side, its white backing up
+          const nx0 = peel.sx - peel.px, ny0 = peel.sy - peel.py, L = Math.hypot(nx0, ny0), nx = nx0 / L, ny = ny0 / L, mx = (peel.sx + peel.px) / 2, my = (peel.sy + peel.py) / 2;
+          G.set(F);
+          for (let i = 0; i < NN; i++) {
+            const x = i % N, y = (i - x) / N, d = (x + 0.5 - mx) * nx + (y + 0.5 - my) * ny;
+            if (d > 0) { if (cut[i] && cut[i] !== 3) F[i] = d < 2 ? PEELSH : P0[i]; continue; }
+            const rx = Math.floor(x + 0.5 - 2 * d * nx), ry = Math.floor(y + 0.5 - 2 * d * ny);
+            if (rx < 0 || ry < 0 || rx >= N || ry >= N) continue;
+            const j = ry * N + rx; if (!cut[j] || cut[j] === 3) continue;
+            F[i] = d > -1 ? BACKF : cut[j] === 2 ? BACKE : (((rx + ry) % 5) === 0 ? BACKL : BACK);
+          }
+        }
+        if (t - slapAt < 0.4) for (let n = 0; n < cutAt.length; n++) if ((cutAt[n] + Math.floor(t * 20)) % 3 === 0) F[cutAt[n]] = SPARKLE;
+        // three big four-point stars wink on the foil, each in its own time
+        for (let s2 = 0; s2 < stars.length; s2++) {
+          const [sx, sy, ph] = stars[s2], a = (t * 0.7 + ph) % 1; if (a > 0.3) continue;
+          const r = a < 0.15 ? 1 + Math.floor(a / 0.05) : Math.max(0, 3 - Math.floor((a - 0.15) / 0.05)), col = (x, y) => { if (x >= 0 && y >= 0 && x < N && y < N && cut[y * N + x] && cut[y * N + x] !== 3 && FT[y * N + x] !== 1) F[y * N + x] = SPARKLE; };
+          col(sx, sy); for (let d = 1; d <= r; d++) { col(sx + d, sy); col(sx - d, sy); col(sx, sy + d); col(sx, sy - d); }
+          if (r >= 2) { col(sx + 1, sy + 1); col(sx - 1, sy - 1); col(sx + 1, sy - 1); col(sx - 1, sy + 1); }
         }
       }
       if (legend === 'Flipbook') {
-        // the doodle hops page by page; a tap makes it jump higher; the page number counts on
-        const page = Math.floor(t * 8), hop = [0, 0, 1, 2, 3, 3, 2, 1][page % 8] + (t - hopAt < 1 ? [2, 4, 5, 5, 4, 2, 1, 0][Math.min(7, Math.floor((t - hopAt) * 8))] : 0);
-        if (hop) { F.copyWithin(0, hop * N); FT.copyWithin(0, hop * N); for (let y = N - hop; y < N; y++) for (let x = 0; x < N; x++) F[y * N + x] = P0[y * N + x]; }
-        const edge = pack(blend(PB, [0, 0, 0], 0.18)), edge2 = pack(blend(PB, [0, 0, 0], 0.32));
-        for (let y = 0; y < N; y++) { F[y * N + N - 1] = edge2; F[y * N + N - 2] = (y & 1) ? edge : F[y * N + N - 2]; }
-        for (let x = 0; x < N; x++) { F[(N - 1) * N + x] = edge2; }
-        const curl = inp.inside && pcx > N - 16 && pcy > N - 16 ? 9 : 4;
-        for (let y = N - curl; y < N - 1; y++) for (let x = N - curl; x < N - 1; x++) if (x + y >= 2 * N - curl - 2) F[y * N + x] = x + y === 2 * N - curl - 2 ? edge2 : pack(blend(PB, [0, 0, 0], 0.08));
-        const num = String(page % 1000 + 1), DIGC = edge2;
-        for (let d = 0; d < num.length; d++) { const g = DIG[+num[d]], ox = N - 6 - (num.length - d) * 4, oy = N - 8; for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (g[j * 3 + i] === '1') F[(oy + j) * N + ox + i] = DIGC; }
+        G.set(F); GT.set(FT);   // the doodle as drawn this frame; the zoetrope takes its head from it
       }
       if (starOwned) {
         const spin = t - spinAt < 0.9 && Math.floor((t - spinAt) * 8) % 2 === 0, rows = spin ? STAR_EDGE : STAR, glint = inp.inside && Math.abs(pcx - starAt[0]) <= 6 && Math.abs(pcy - starAt[1]) <= 6;
         rows.forEach((r, j) => { for (let i = 0; i < 7; i++) { const ch = r[i]; if (ch === '.') continue; const x = starAt[0] - 3 + i, y = starAt[1] - 3 + j; if (x >= 0 && y >= 0 && x < N && y < N) F[y * N + x] = ch === 'Y' || (glint && ch === 'y' && (i + j + Math.floor(t * 6)) % 5 === 0) ? pack([255, 250, 214]) : starMap[ch]; } });
       }
 
+      if (legend === 'Flipbook') {
+        // the flipbook is a Victorian zoetrope, on a finer 128 grid
+        zoe(t);
+        bctx.putImageData(bimg, 0, 0);
+        ctx.resetTransform(); ctx.imageSmoothingEnabled = false; ctx.drawImage(boff, 0, 0, 128, 128, 0, 0, S, S);
+        return;
+      }
       octx.putImageData(img, 0, 0);
       ctx.resetTransform();
       ctx.imageSmoothingEnabled = false;   // nearest cell, never a blur

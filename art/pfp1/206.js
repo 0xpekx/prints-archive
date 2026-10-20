@@ -10,7 +10,7 @@ Proto.add({
   seed: 1,
   interactive: 'Tap it to make it roar. Tap the scene to make its friend hop.',
   music: true,
-  recipe: 'A yeti drawn as an arcade sprite, 32 dots across with a hard black outline, that has exactly two frames, A and B, swapped on a steady beat: arms, mouth, props, friends and the whole scene flip with the same two frames. Fur (every one ragged with tufts), its build (squat, lanky, hunched, cone-headed or crested), face, eyes, mouth, headgear, what it holds, its dance, a little friend, the scene, the beat and the screen it plays on vary; disco fur, halos, mini yetis and inverted screens are rare; about 1 in 390 is a legendary (the Unseen one, nothing but footprints, eyes, a hat and its breath; a Golden Idol on a temple plinth; or the Final Boss with its health bar and a very small hero), and about 1 in 200 carries the coveted Ice Axe, big, over its shoulder on a red strap, with a summit flag planted beside it.',
+  recipe: 'A yeti drawn as an arcade sprite, 32 dots across with a hard black outline, that has exactly two frames, A and B, swapped on a steady beat: arms, mouth, props, friends and the whole scene flip with the same two frames. Fur (every one ragged with tufts), its build (squat, lanky, hunched, cone-headed or crested), face, eyes, mouth, headgear, what it holds, its dance, a little friend, the scene, the beat and the screen it plays on vary; disco fur, halos, mini yetis and inverted screens are rare; about 1 in 390 is a legendary, a screen of its own (the Unseen one, seen only through a thermal camera, a white-hot shape walking the cold night; a Golden Idol seated on a temple altar among treasure; or the Final Boss, a neon synthwave fight, the giant rising behind the horizon over a magenta grid, a very small hero below), and about 1 in 200 carries the coveted Ice Axe, big, over its shoulder on a red strap, with a summit flag planted beside it.',
   make(c) {
     const S = c.size, g = c.ctx;
     // a hash of the hash string for every draw (FNV-1a over the string and a counter)
@@ -428,7 +428,472 @@ Proto.add({
     const oc = off.getContext('2d');
     let lastKey = '', lastBeat = -1, roarAt = -9, facing = facing0, liveUntil = -9, hopAt = -9, legAt = -9, wasIn = false;
     const GOLD = [[58, 32, 8], [122, 74, 16], [192, 138, 32], [240, 200, 64], [255, 244, 176]];
+
+    // ================= the legendaries: each one a screen of its own =================
+    // (only a legendary print ever comes here; everything above draws the collection's yetis.) Still two frames, A and
+    // B, swapped on the beat, on the same 32-dot screen with the same hard black outline, but each its own scene:
+    //   Unseen       a thermal camera at night: only its heat shows; it walks off from the reticle, a hold shows the
+    //                scene to the eye (it isn't there), a tap photographs a smear
+    //   Golden Idol  a seated golden yeti on a temple altar; carry it off and the temple shakes; it flies home
+    //   Final Boss   the last stage, a real fight: dodge the marked slams, tap to strike, combos, K.O. or GAME OVER
+    const legendFrame = LEG ? (() => {
+      const hx2 = h => parseInt(h.slice(1), 16), rgbOf = col => { const v = hx2(col); return [v >> 16, (v >> 8) & 255, v & 255]; };
+      const B2 = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < N && y < N) buf[y * N + x] = col; };
+      const clear = () => { spr.fill(null); mask.fill(0); keep.fill(0); KEEP = 0; };
+      const outline = (col = C.K) => {
+        const o = [];
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x; if (!mask[i] && ((x > 0 && mask[i - 1]) || (x < N - 1 && mask[i + 1]) || (y > 0 && mask[i - N]) || (y < N - 1 && mask[i + N]))) o.push(i); }
+        for (const i of o) { spr[i] = col; mask[i] = 1; }
+      };
+      // shade a fur sprite: the right side and the bottom a step darker, a ragged fringe of tips round its edge
+      const furShade = (F0, F1, F2, x0, x1) => {
+        for (let y = 0; y < N; y++) for (let x = x0; x <= x1; x++) {
+          const i = y * N + x; if (!mask[i] || keep[i]) continue;
+          const edge = (x > 0 && !mask[i - 1]) || (x < N - 1 && !mask[i + 1]) || (y > 0 && !mask[i - N]);
+          if (spr[i] === F0 && x > 16 + (y % 3 === 0 ? 1 : 0) + Math.abs(y - 16) * 0.2) spr[i] = F1;
+          if (edge && (x * 5 + y * 3) % 4 === 0) spr[i] = spr[i] === F0 ? F1 : F2;
+        }
+      };
+      const show = (pick) => {
+        const img = oc.createImageData(N, N), d = img.data;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const col = pick(x, y), v = typeof col === 'string' ? rgbOf(col) : col, rgb = typeof col === 'string' ? recolour(v[0], v[1], v[2]) : col, i = (y * N + x) * 4;
+          d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255;
+        }
+        oc.putImageData(img, 0, 0);
+        g.imageSmoothingEnabled = false;
+        g.drawImage(off, 0, 0, S, S);
+      };
+      let lkey = '', lbeat = -1, lLive = -9, lAt = -9, wasIn3 = false, lhp = 8, lHit = -9, lDead = -9;
+      const beatOf = t => {
+        const ph = beatName === 'Stagger' ? (t % (beat * 2)) / beat : t / beat;
+        return beatName === 'Stagger' ? Math.floor(t / (beat * 2)) * 2 + (ph < 1.3 ? 0 : 1) : Math.floor(ph);
+      };
+      const [F0, F1, F2] = FURS[fur], [S0, S1] = SKIN;
+
+      // a tiny pixel font (3 by 5) for the screens' words and numbers
+      const FONT = { K: '101101110101101', O: '111101101101111', G: '111100101101111', A: '111101111101101', M: '101111111101101', E: '111100110100111', V: '101101101101010', R: '110101110101101', X: '101101010101101', W: '101101111111101', I: '111010010010111', N: '101111111111101', '.': '000000000000010', 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001001001', 8: '111101111101111', 9: '111101111001111' };
+      const text = (put, str, x0, y0, col, sc = 1) => { let x = x0; for (const ch of String(str)) { const gl = FONT[ch]; if (gl) for (let j = 0; j < 5; j++) for (let i = 0; i < 3; i++) if (gl[j * 3 + i] === '1') for (let a = 0; a < sc; a++) for (let b = 0; b < sc; b++) put(x + i * sc + a, y0 + j * sc + b, col); x += 4 * sc; } };
+      // a press: where it went down and when; a short one is a tap, a long one a hold
+      // (a short, still release is a tap: a hold or a drag never fires the tap's action)
+      const press = { down: false, at: -9, x: 0, y: 0, up: -9, wasDown: false, moved: 0, shortUp: false };
+      const trackPress = (inp, t) => {
+        press.shortUp = false;
+        if (inp.down && !press.wasDown) { press.at = t; press.x = inp.x * N; press.y = inp.y * N; press.moved = 0; }
+        if (inp.down) press.moved = Math.max(press.moved, Math.hypot(inp.x * N - press.x, inp.y * N - press.y));
+        if (!inp.down && press.wasDown) { press.up = t; press.shortUp = t - press.at < 0.3 && press.moved < 2; }
+        press.wasDown = inp.down; press.down = inp.down;
+      };
+
+      if (LEG === 'Unseen') {
+        // ---- Unseen: a thermal camera on a cold night. The yeti is only heat: white-hot at its heart, orange and red
+        // to its fur's edge, its breath warm, the prints it leaves glowing and fading, the scene round it in the cold
+        // blues of the camera. It walks the frame and shies from your reticle; hold to look with your own eyes and
+        // there is nothing there but snow and prints; tap to take a photograph, and it is a smear.
+        const TH = ['#06061a', '#120e3a', '#2a0f5e', '#5a1470', '#9a1a5a', '#d8322a', '#f8741a', '#ffc23a', '#fff4a0', '#ffffff'];
+        const heatCol = h => TH[Math.max(0, Math.min(9, Math.round(h * 9)))];
+        let yx = 16 + (facing0 > 0 ? -4 : 4), ydir = facing0, lastT = 0, walked = 0, photoAt = -9, photoX = 16;
+        const prints = [];   // [x, y, t] where its feet came down
+        const HEAT = new Float32Array(N * N);
+        // the yeti, side on, hunched and striding the way it walks (s): a great hump of shoulders, the head low and
+        // forward, long arms swinging down past its knees, short thick legs; returns how far it has bobbed down
+        const YK = 1.32, yy = v => 27.6 - (27.6 - v) * YK;
+        const drawYeti = (X, f, s) => {
+          const sw = f ? 1 : -1, b = f ? 0 : 0.5, xx = d => X + d * YK * s;
+          const Ly = (d0, y0, d1, y1, col, w) => L(xx(d0), yy(y0 + b), xx(d1), yy(y1), col, w * YK), Ey = (d, y, rx, ry, col, bob = b) => E(xx(d), yy(y + bob), rx * YK, ry * YK, col);
+          Ly(-0.2, 14.5, 1 - 1.6 * sw, 23, F1, 2);                                                           // far arm
+          if (f) { Ly(-1.6, 21, -3.2, 26.3, F1, 2.4); Ey(-3.4, 27, 1.5, 0.6, F1, 0); }                       // far leg
+          else { Ly(-1.6, 21, -0.8, 26.3, F1, 2.4); Ey(-0.4, 27, 1.5, 0.6, F1, 0); }
+          Ey(-1, 18.6, 3.2, 3.5, F0);                                                                         // the body
+          Ey(-0.2, 13.8, 3.2, 2.4, F0);                                                                       // the hump
+          Ey(3.6, 15.4, 2, 1.8, F0); P(xx(5.4), yy(16 + b), F0);                                              // the head, low and forward
+          for (const [dx, dy] of [[-2, -2.4], [-0.3, -2.9], [1.4, -2.4]]) P(xx(dx), yy(13.8 + dy + b), F0);   // the crest of fur
+          if (f) { Ly(-0.4, 21, 1, 26.3, F0, 2.4); Ey(1.4, 27, 1.5, 0.6, F0, 0); }                           // near leg
+          else { Ly(-0.4, 21, -0.6, 26.3, F0, 2.4); Ey(-0.2, 27, 1.5, 0.6, F0, 0); }
+          Ly(1.8, 15, 3.6 + 1.6 * sw, 23.4, F2, 1.8);                                                        // near arm, long
+          Ey(3.8 + 1.6 * sw, 24, 1.1, 0.9, F2);                                                              // its hand
+          return b;
+        };
+        // the photograph's picture (14 by 14): the shape where it stood, smeared back along the way it was going, its
+        // two eyes lit; made once when the shutter goes
+        const PHOTO = new Float32Array(14 * 14);
+        const snap = (t) => {
+          clear();
+          const bi = beatOf(t), f = ((bi % 2) + 2) % 2, x0 = yx - 12 + ydir;
+          drawYeti(yx, f, ydir);
+          for (let y = 0; y < 14; y++) for (let x = 0; x < 14; x++) {
+            let v = 0;
+            for (let k = 0; k < 7; k++) {
+              const sx = Math.round(x0 + x * 1.75 + ydir * k * 1.2), sy = Math.round(5 + y * 1.75);
+              if (sx >= 0 && sx < N && sy >= 0 && sy < N && mask[sy * N + sx] && (!k || y % 2 === 0)) v = Math.max(v, k ? 0.6 - k * 0.07 : 1);
+            }
+            PHOTO[y * 14 + x] = v;
+          }
+          const hx = Math.round((yx + 4.2 * YK * ydir - x0) / 1.75), hy = Math.round((yy(15) - 5) / 1.75);
+          for (const d of [0, -ydir]) if (hx + d >= 0 && hx + d < 14) PHOTO[hy * 14 + hx + d] = 2;
+          clear();
+        };
+        return t => {
+          const inp = c.input, dt = Math.min(0.1, Math.max(0, t - lastT));
+          lastT = t;
+          if (inp.inside && !wasIn3) c.sound.note(bass[0] - 12, { dur: 0.6, vel: 0.12, wave: 'triangle', cutoff: 400 });
+          wasIn3 = inp.inside;
+          trackPress(inp, t);
+          inp.taps();
+          if (press.shortUp) {
+            lLive = t + beat * 8;
+            if (t - photoAt > 1.2) { photoAt = t; photoX = yx; snap(t); c.sound.hit('click', 0.5); c.sound.hit('noise', 0.18, { cutoff: 5000, dur: 0.08 }); c.sound.note(bass[1] - 12, { dur: 0.5, vel: 0.16, wave: 'sawtooth', cutoff: 420, at: 0.25 }); }
+          }
+          if (inp.inside) lLive = Math.max(lLive, t + beat * 2);
+          const bi = beatOf(t), f = ((bi % 2) + 2) % 2;
+          if (bi !== lbeat) { lbeat = bi; if (t < lLive) c.sound.note(bass[f] - 12, { dur: beat * 0.5, vel: 0.12, wave: 'triangle', cutoff: 420 }); }
+          // it walks; near the reticle it hurries away from it; at the edges it turns
+          const rx = inp.inside ? inp.x * N : -99, ry = inp.inside ? inp.y * N : -99, near = Math.abs(rx - yx) < 8 && ry > 4 && ry < 30;
+          if (near) ydir = rx < yx ? 1 : -1;
+          const sp = near ? 11 : 2.6;
+          yx += ydir * sp * dt; walked += sp * dt;
+          if (yx > 26) { yx = 26; ydir = -1; } if (yx < 6) { yx = 6; ydir = 1; }
+          if (walked > 2.2) { walked = 0; prints.push([yx + (prints.length % 2 ? 1 : -1), 28 + (prints.length % 2), t]); if (prints.length > 16) prints.shift(); }
+          const look = press.down && t - press.at > 0.3;                   // held: the camera is set aside
+          const photo = t - photoAt < 3.2, flash = t - photoAt < 0.12;
+          // (drawn again only when something visible has moved on)
+          const key = [f, Math.round(yx), ydir, photo, flash, look, prints.length, Math.floor(t * 2), photo ? Math.floor(t * 20) : 0, inp.inside ? Math.round(rx) + ':' + Math.round(ry) : 0].join(',');
+          if (key === lkey) return;
+          lkey = key;
+          // the scene as the camera sees it: cold, its shapes only faintly warmer
+          scenery(f);
+          if (look) {
+            // with your own eyes: snow, night, its prints pressed in; it is not there
+            for (const [px, py] of prints) { B2(px, py, SC[1]); B2(px + 1, py, SC[1]); }
+            show((x, y) => rgbOf(buf[y * N + x]));
+            return;
+          }
+          for (let i = 0; i < N * N; i++) { const v = rgbOf(buf[i]); HEAT[i] = 0.04 + (v[0] * 0.3 + v[1] * 0.59 + v[2] * 0.11) / 255 * 0.22; }
+          // its prints in the snow, warm where its feet came down, cooling off one by one
+          for (const [px, py, pt] of prints) { const h = Math.max(0.12, 0.74 - (t - pt) * 0.045); for (const [dx, dy] of [[0, 0], [1, 0], [0, -1]]) { const i = (Math.round(py) + dy) * N + Math.round(px) + dx; if (i >= 0 && i < N * N) HEAT[i] = Math.max(HEAT[i], dy ? h * 0.6 : h); } }
+          clear();
+          const X = yx, s = ydir, bb = drawYeti(X, f, s);
+          // its heat: white-hot in the chest, hot in the head, cooling to the edge of its fur, a glow just outside it
+          for (let y = 1; y < N - 1; y++) for (let x = 1; x < N - 1; x++) {
+            const i = y * N + x;
+            if (mask[i]) {
+              const edge = !mask[i - 1] || !mask[i + 1] || !mask[i - N] || !mask[i + N];
+              const dc = Math.hypot((x - (X + 0.2 * YK * s)) / 2.2, (y - yy(16.4 + bb)) / 2.4), dh = Math.hypot(x - (X + 3.6 * YK * s), y - yy(15.4 + bb));
+              // (the near arm a step cooler than the body it swings across, with a cool seam where it crosses it)
+              const arm = spr[i] === F2, seam = arm && [i - 1, i + 1, i - N, i + N].some(j => mask[j] && spr[j] === F0);
+              HEAT[i] = edge ? 0.42 : seam ? 0.46 : arm ? 0.64 : spr[i] === F1 ? 0.52 : dh < 1.3 ? 0.88 : Math.max(0.7, 1.04 - dc * 0.13);
+            } else if (mask[i - 1] || mask[i + 1] || mask[i - N] || mask[i + N]) HEAT[i] = Math.max(HEAT[i], 0.26);
+          }
+          for (const ex of [X + 4.2 * YK * s, X + 5.1 * YK * s]) HEAT[Math.round(yy(15 + bb)) * N + Math.round(ex)] = 1;
+          if (f) for (const [bx, by] of [[6, 16], [7, 15], [7.5, 16], [7, 14], [8.5, 15]]) { const i = Math.round(yy(by)) * N + Math.round(X + bx * YK * s); if (i >= 0 && i < N * N) HEAT[i] = Math.max(HEAT[i], 0.56 - (bx - 5.5) * 0.06); }
+          // the camera: its corners, REC, the heat scale, the reticle
+          const CAM = new Map(), H2 = (x, y, col) => { if (x >= 0 && y >= 0 && x < N && y < N) CAM.set(Math.round(y) * N + Math.round(x), col); }, HUD = '#e8ecf0';
+          for (const [cx, cy, sx, sy] of [[1, 1, 1, 1], [30, 1, -1, 1], [1, 30, 1, -1], [30, 30, -1, -1]]) for (let k = 0; k < 4; k++) { H2(cx + k * sx, cy, HUD); H2(cx, cy + k * sy, HUD); }
+          if (!f) { H2(4, 3, '#ff3030'); H2(5, 3, '#ff3030'); H2(4, 4, '#ff3030'); H2(5, 4, '#ff3030'); }
+          for (let k = 0; k < 12; k++) H2(29, 21 - k, heatCol(k / 11));
+          if (inp.inside && !photo) { const qx = Math.round(rx), qy = Math.round(ry); for (const [a, b] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) { H2(qx + a, qy + b, HUD); H2(qx + a - Math.sign(a), qy + b, HUD); H2(qx + a, qy + b - Math.sign(b), HUD); } H2(qx, qy, near ? '#ff3030' : HUD); }
+          // a photograph: a polaroid drops in over the view, and on it, of course, a blurred shape streaking out of shot
+          const POL = new Map();
+          if (photo && !flash) {
+            const u = t - photoAt, PX = 7, PY = 4 + Math.round(-24 * Math.max(0, 1 - u / 0.35) ** 2), dev = Math.min(1, u / 1.1);
+            for (let y = 0; y < 24; y++) for (let x = 0; x < 18; x++) {
+              const gy = PY + y; if (gy < 0 || gy >= N) continue;
+              let col;
+              if (x < 2 || x > 15 || y < 2 || y > 15) col = (x === 0 || x === 17 || y === 0 || y === 23) ? [196, 188, 172] : [244, 240, 228];
+              else {
+                // the print: a dim night, the blurred shape coming up out of the grey as it develops
+                const v = PHOTO[(y - 2) * 14 + (x - 2)], k = Math.min(1, v) * dev;
+                col = v > 1.5 && dev > 0.6 ? [255, 110, 80] : [40 + 200 * k, 36 + 186 * k, 48 + 146 * k];
+              }
+              POL.set(gy * N + PX + x, col);
+            }
+            // a scrawl on the white strip: ?!
+            for (const [x, y] of [[4, 18], [5, 17], [6, 17], [7, 18], [6, 19], [5, 20], [5, 22], [10, 17], [10, 18], [10, 19], [10, 20], [10, 22]]) { const gy = PY + y; if (gy >= 0 && gy < N) POL.set(gy * N + PX + x, [60, 60, 120]); }
+          }
+          show((x, y) => {
+            const i = y * N + x;
+            if (flash) return [255, 255, 255];
+            if (POL.has(i)) return POL.get(i);
+            const cam = CAM.get(i);
+            // (the camera's corners, REC, heat scale and reticle in the shades of the screen it came on)
+            if (cam) { const w = rgbOf(cam); return recolour(w[0], w[1], w[2]); }
+            const v = rgbOf(heatCol(HEAT[i] + ((x * 7 + y * 13 + bi * 5) % 17 === 0 ? 0.06 : 0)));
+            // (the camera is its own screen: its heat colours whatever screen the yeti came on; dimmed under a photo)
+            return photo && !cam ? [v[0] * 0.45, v[1] * 0.45, v[2] * 0.45] : [v[0], v[1], v[2]];
+          });
+        };
+      }
+
+      if (LEG === 'Golden Idol') {
+        // ---- Golden Idol: a seated golden yeti on a temple altar in a shaft of light, torches, heaps of treasure. Take
+        // it off its altar (press on it and drag): the temple shakes harder the further you carry it, dust pours from
+        // the roof, its ruby eyes burn; let go and it flies home to its altar with a gong. Tap the treasure: coins.
+        const STONE = ['#140c08', '#2e2018', '#4a3828', '#6a5a48', '#a8987e'];
+        let ix = 0, iy = 0, held = false, gx0 = 0, gy0 = 0, retAt = -9, rx0 = 0, ry0 = 0, homeAt = -9;
+        const coins = [];
+        const SH = new Float32Array(N * N);
+        const idol = (awake, up) => {
+          clear(); SH.fill(-9);
+          const gpart = (cx, cy, rx, ry, sh0) => {
+            for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry + 1); y++) for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx + 1); x++) {
+              if (x < 0 || y < 0 || x >= N || y >= N) continue;
+              const dx = (x - cx) / (rx + 0.35), dy = (y - cy) / (ry + 0.35), e = dx * dx + dy * dy, i = y * N + x;
+              if (e > 1) continue;
+              spr[i] = F0; mask[i] = 1; keep[i] = 0;
+              SH[i] = e > 0.72 ? -2 : (sh0 || 0) - 0.5 * dx - 0.62 * dy + 0.62 * Math.sqrt(Math.max(0, 1 - e));
+            }
+          };
+          const limb = (ax, ay, bx, by, r) => { const n = Math.ceil(Math.hypot(bx - ax, by - ay) * 2); for (let k = 0; k <= n; k++) gpart(ax + (bx - ax) * k / n, ay + (by - ay) * k / n, r, r); };
+          gpart(16, 23, 8.6, 2.4);
+          for (const s of [-1, 1]) { gpart(16 + s * 6.2, 22.2, 2.4, 1.8); gpart(16 + s * 4, 25, 1.8, 0.9, 0.2); }   // knees, and the soles of its feet
+          gpart(16, 17.4, 5.6, 4.6);
+          for (const s of [-1, 1]) {
+            if (up) { limb(16 + s * 5, 14, 16 + s * 9, 6.5, 1.3); gpart(16 + s * 9.4, 5.6, 1.7, 1.6); }
+            else { limb(16 + s * 5, 14, 16 + s * 6.4, 20, 1.3); gpart(16 + s * 6.4, 20.6, 1.7, 1.4); }
+          }
+          for (const s of [-1, 1]) gpart(16 + s * 5.7, 9, 1.3, 1.6);
+          gpart(16, 9.6, 5.2, 4.5);
+          // the yeti's crest of fur, three spikes, and ragged fur all round its head and shoulders
+          for (const [x, h] of [[14, 2.6], [16, 3.6], [18, 2.6]]) for (let k = 0; k < h; k++) { const i = Math.round(5.2 - k) * N + x; spr[i] = F0; mask[i] = 1; SH[i] = 0.6 - k * 0.1; }
+          for (let y = 5; y < 22; y++) for (const s of [-1, 1]) {
+            let x = 16; while (x > 0 && x < N - 1 && mask[y * N + x]) x += s;
+            if ((y + (s > 0 ? 1 : 0)) % 2 === 0) { const i = y * N + x; spr[i] = F0; mask[i] = 1; SH[i] = s < 0 ? 0.5 : -0.3; }
+          }
+          if (head === 'Crown') for (const x of [12, 14, 16, 18, 20]) gpart(x, 4.6, 0.6, 1.2);
+          if (head === 'Horns') for (const s of [-1, 1]) { gpart(16 + s * 5.6, 5.4, 0.8, 0.8); gpart(16 + s * 6.6, 4, 0.7, 0.9); }
+          KEEP = 4; for (let x = 12; x <= 20; x++) if (x !== 16) P(x, 7.6, F2); KEEP = 0;
+          KEEP = 1;
+          for (const ex of [13.5, 18.5]) { P(ex - 0.5, 9.5, '#e0303a'); P(ex + 0.5, 9.5, awake ? '#ffb0a0' : '#ff8a8a'); P(ex - 0.5, 8.5, '#a01020'); P(ex + 0.5, 8.5, '#e0303a'); }
+          KEEP = 3;
+          for (let x = 13; x <= 19; x++) P(x, 12, '#3a1a06');
+          if (mouth === 'Grin') for (let x = 14; x <= 18; x++) P(x, 12, '#fff4b0'); else { P(13, 13, '#fff4b0'); P(19, 13, '#fff4b0'); if (mouth === 'Snaggle Tooth') P(17, 13, '#fff4b0'); }
+          if (mouth === 'Icicle Beard') for (const x of [14, 16, 18]) P(x, 13, '#fff4b0');
+          KEEP = 0;
+          outline();
+        };
+        const onIdol = (x, y) => x > 7 + ix && x < 25 + ix && y > 1 + iy && y < 26 + iy;
+        return t => {
+          const inp = c.input;
+          if (inp.inside && !wasIn3) c.sound.note(bass[0] + 36, { dur: 0.8, vel: 0.06, wave: 'sine' });
+          wasIn3 = inp.inside;
+          trackPress(inp, t);
+          const px = inp.x * N, py = inp.y * N;
+          // pick it up, carry it, let it go
+          if (inp.down && !held && t - press.at < 0.05 && onIdol(px, py)) { held = true; gx0 = px - ix; gy0 = py - iy; c.sound.note(bass[0] - 12, { dur: 1.2, vel: 0.2, wave: 'sine' }); }
+          if (held && inp.down) { ix = Math.max(-12, Math.min(12, px - gx0)); iy = Math.max(-6, Math.min(7, py - gy0)); }
+          if (held && !inp.down) {
+            held = false;
+            if (Math.abs(ix) < 3 && Math.abs(iy) < 3) { ix = 0; iy = 0; homeAt = t; c.sound.note(bass[0] + 7, { dur: 2, vel: 0.12, wave: 'sine' }); }
+            else { retAt = t; rx0 = ix; ry0 = iy; }
+          }
+          if (retAt > 0 && !held) { const u = Math.min(1, (t - retAt) / 0.7), e = 1 - (1 - u) ** 3; ix = rx0 * (1 - e); iy = ry0 * (1 - e) - Math.sin(u * Math.PI) * 4; if (u >= 1) { retAt = -9; ix = 0; iy = 0; homeAt = t; c.sound.note(bass[0] - 12, { dur: 2.5, vel: 0.22, wave: 'sine' }); c.sound.note(bass[0] + 19, { dur: 1.6, vel: 0.06, wave: 'triangle', at: 0.04 }); } }
+          // the treasure: a tap sends coins up
+          for (const p of inp.taps()) {
+            lLive = t + beat * 8;
+            const tx = p.x * N, ty = p.y * N;
+            if (ty > 21 && (tx < 8 || tx > 23) && !held) { for (let k = 0; k < 7; k++) coins.push([tx, ty, (k - 3) * 4 + (tx < 16 ? 4 : -4), -14 - (k % 3) * 4, t]); c.sound.note(bass[0] + 31, { dur: 0.08, vel: 0.08, wave: 'square', cutoff: 2400 }); c.sound.note(bass[0] + 36, { dur: 0.1, vel: 0.07, wave: 'square', cutoff: 2400, at: 0.07 }); }
+          }
+          while (coins.length && t - coins[0][4] > 1.4) coins.shift();
+          if (inp.inside) lLive = Math.max(lLive, t + beat * 2);
+          const bi = beatOf(t), f = ((bi % 2) + 2) % 2, away = Math.min(1, Math.hypot(ix, iy) / 8), angry = away > 0.15;
+          if (bi !== lbeat) { lbeat = bi; if (t < lLive) c.sound.note(bass[f] + (angry ? -12 : 12), { dur: beat * 0.5, vel: angry ? 0.16 : 0.1, wave: angry ? 'sawtooth' : 'sine', cutoff: 500 }); }
+          const shine = inp.inside && !held ? Math.floor(px) : Math.floor(((t * 0.4) % 1.6) * 40) - 10;
+          const busy = held || retAt > 0 || coins.length || angry || t - homeAt < 0.5;
+          const key = busy ? 'b' + t : [f, shine].join(',');
+          if (key === lkey) return;
+          lkey = key;
+          // the hall shakes with its anger
+          const shx = angry ? (Math.floor(t * 30) % 2 ? 1 : -1) * Math.round(away * 1.4) : 0, shy = angry && Math.floor(t * 23) % 3 === 0 ? 1 : 0;
+          for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+            const X = x - shx, Y = y - shy, mortar = (Y & 3) === 3 || (X + ((Y >> 2) & 1) * 3 + 60) % 6 === 0, inShaft = X > 5 + Y * 0.45 && X < 13 + Y * 0.45 && Y < 26;
+            buf[y * N + x] = mortar ? STONE[0] : inShaft ? STONE[2] : STONE[1];
+            if (inShaft && !mortar && (X * 7 + Y * 13 + f * 5 + 99) % 29 === 0) buf[y * N + x] = '#ffd890';
+          }
+          for (const tx of [3, 28]) { const big = angry ? 1 : 0; B2(tx, 12, '#5a3a20'); B2(tx, 11, '#5a3a20'); B2(tx, 10, f ? '#ffd040' : '#ff7a20'); B2(tx + (f ? 1 : -1), 9, '#ffb030'); B2(tx, 8, f ? '#ff7a20' : '#ffe890'); B2(tx - 1, 10, '#7a3a10'); B2(tx + 1, 10, '#7a3a10'); if (big) { B2(tx, 7, '#ffb030'); B2(tx + (f ? -1 : 1), 6, '#ff7a20'); B2(tx, 5, '#ffe890'); } }
+          for (let y = 24; y < N; y++) for (let x = 0; x < N; x++) {
+            const top = (y === 24 && x > 8 && x < 23) || (y === 26 && x > 5 && x < 26) || y === 28;
+            if (y < 26 && (x < 9 || x > 22)) continue; if (y < 28 && (x < 6 || x > 25)) continue;
+            buf[y * N + x] = top ? STONE[4] : (x % 8 === 0 || y === 30) ? STONE[1] : STONE[3];
+          }
+          // treasure: two heaps of coins with gems winking on the beat
+          for (let y = 23; y < N; y++) for (let x = 0; x < N; x++) {
+            const e = Math.min(((x - 1) / 6.5) ** 2 + ((y - 32) / 7.5) ** 2, ((x - 30) / 6.5) ** 2 + ((y - 32) / 7.5) ** 2);
+            if (e < 1) buf[y * N + x] = e > 0.8 ? '#9a6018' : (x * 3 + y * 5) % 7 === 0 ? '#fff4b0' : (x + y) % 2 ? '#e8b030' : '#c08a20';
+          }
+          [[2, 27, '#e0303a'], [4, 29, '#3ac04a'], [29, 28, '#3a7ae0'], [27, 30, '#e0303a'], [1, 30, '#3a7ae0'], [30, 26, '#3ac04a']].forEach(([x, y, col], k) => { B2(x, y, col); if ((k + f) % 3 === 0) B2(x, y - 1, '#ffffff'); });
+          // dust and grit pouring from the roof while it is away
+          if (angry) for (let k = 0; k < Math.round(away * 14); k++) { const q = (k * 2654435761) >>> 0, x = q % 32, y = ((q >>> 8) % 32 + t * (14 + (k % 5) * 3)) % 26; B2(x, y, k % 3 ? '#a8987e' : '#6a5a48'); }
+          idol(angry, angry && f);
+          show((x, y) => {
+            const sx = x - Math.round(ix) - shx, sy = y - Math.round(iy) - shy, si = sy * N + sx, cs = sx >= 0 && sy >= 0 && sx < N && sy < N ? spr[si] : null;
+            if (cs && keep[si] === 0 && cs !== C.K) {
+              const band = Math.abs(x + y * 0.5 - shine - 8) < 1.4, sh = SH[si];
+              if (sh === -2) return GOLD[band ? 2 : 1];
+              return GOLD[Math.max(1, Math.min(4, Math.round(2.1 + sh * 2.4 + (band ? 1.2 : 0))))];
+            }
+            if (cs === C.K) return [24, 12, 2];
+            if (cs && keep[si] === 4) return GOLD[0];
+            if (cs && keep[si] === 3) return cs === '#3a1a06' ? GOLD[0] : GOLD[4];
+            if (cs && keep[si] === 1 && angry) return cs === '#a01020' ? [255, 80, 60] : [255, 230, 210];
+            if (cs) { const v = rgbOf(cs); return [v[0], v[1], v[2]]; }
+            for (const q of coins) { const u = t - q[4], cx = q[0] + q[2] * u, cy = q[1] + q[3] * u + 22 * u * u; if (Math.round(cx) === x && Math.round(cy) === y) return (x + Math.floor(t * 12)) % 2 ? GOLD[4] : GOLD[2]; }
+            const v = rgbOf(buf[y * N + x]);
+            if (angry && Math.abs(y - 9 - iy) < 2.5 && Math.abs(x - 16 - ix) < 11 && (x + y + f) % 2) return [Math.min(255, v[0] + 90), v[1], v[2]];
+            return [v[0], v[1], v[2]];
+          });
+          // a star glint on the gold, between two places with the beat
+          if (!angry) { const gx = (f ? 12 : 20) + Math.round(ix), gy = (f ? 7 : 15) + Math.round(iy); for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) { g.fillStyle = dx || dy ? '#ffe890' : '#ffffff'; g.fillRect((gx + dx) * S / N, (gy + dy) * S / N, S / N, S / N); } }
+        };
+      }
+
+      {
+      // (in a block of its own, so its names never shadow the ones the other legendaries use)
+      // ---- Final Boss: a neon synthwave boss fight, on its own grid (64 dots across). A striped sun going down behind
+      // the boss on a magenta grid floor running away to the horizon, neon mountains; the boss a giant shadow edged in
+      // neon (its Fur's colour), its eyes glowing, its horns, crown or helm drawn in light. It slams a fist where it marks
+      // the floor every other beat; your hero follows the pointer along the floor (dodge the marks) and every tap is a
+      // leaping strike, quick taps chaining into a combo that hits harder. Empty its bar for a K.O. (it glitches apart
+      // in scanlines); lose your three hearts and it's GAME OVER. Either way it comes back for more.
+      const BG = 64, HZ = 36, NEON = { Abyss: [154, 106, 255], Inferno: [255, 110, 42], Venom: [110, 255, 74], Glacier: [74, 224, 255] }[fur] || [255, 60, 200];
+      const C = {
+        sky: [[11, 3, 32], [22, 5, 52], [38, 8, 74], [64, 12, 98], [104, 18, 112]], sun: [[255, 226, 80], [255, 180, 60], [255, 120, 70], [255, 70, 120], [240, 40, 150]],
+        floor: [18, 2, 30], grid: [255, 42, 212], gridF: [110, 24, 140], mount: [40, 220, 255], body: [20, 6, 38], body2: [30, 10, 52], neon: NEON, neonD: NEON.map(v => v * 0.45 | 0),
+        eye: [255, 40, 40], eyeG: [130, 10, 30], white: [255, 255, 255], hero: [90, 240, 255], heroD: [20, 90, 140], blade: [255, 90, 220], gold: [255, 210, 60], red: [255, 50, 70], dim: [60, 40, 80], ko: [255, 230, 120],
+      };
+      const BMAX = 24, img2 = Object.assign(document.createElement('canvas'), { width: BG, height: BG }), ic = img2.getContext('2d'), id2 = ic.createImageData(BG, BG), PX = new Array(BG * BG);
+      let bhp = BMAX, hero = 31, hp = 3, combo = 0, lastTap = -9, slashAt = -9, hurtAt = -9, koAt = -9, overAt = -9, hitBeat = -1, lastT = 0;
+      const tgt = b => [12, 52, 31][((b * 2654435761) >>> 0) % 3];
+      // the backdrop that never moves: sky bands, stars, the striped sun, the neon mountains
+      const BACK = new Array(BG * BG);
+      for (let y = 0; y < HZ; y++) for (let x = 0; x < BG; x++) {
+        let col = C.sky[Math.min(4, Math.floor(y / 8))];
+        if (y < 18 && ((x * 37 + y * 11) % 53 === 0)) col = C.white;
+        const r = Math.hypot(x - 32, (y - 30) * 1.05);
+        if (r < 19) { const k = Math.max(0, Math.min(4, Math.floor((y - 11) / 5))); const gap = y > 24 && (y - 24) % 4 < 1 + Math.floor((y - 24) / 4); if (!gap) col = C.sun[k]; }
+        const ridge = HZ - 1 - Math.max(0, 9 - Math.abs(((x + 4) % 22) - 11)) * (x < 14 || x > 50 ? 1 : 0.35);
+        if (Math.abs(y - Math.round(ridge)) < 0.6 && (x < 16 || x > 48)) col = C.mount;
+        else if (y > ridge && (x < 16 || x > 48)) col = C.sky[0];
+        BACK[y * BG + x] = col;
+      }
+      const P2 = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < BG && y < BG) PX[y * BG + x] = col; };
+      const ell = (cx, cy, rx, ry, fn) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) fn(x, y); };
+      const BF7 = { K: ['10001', '10010', '10100', '11000', '10100', '10010', '10001'], O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'], '.': ['0', '0', '0', '0', '0', '0', '1'], G: ['01110', '10001', '10000', '10111', '10001', '10001', '01111'], A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'], M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'], E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'], V: ['10001', '10001', '10001', '10001', '01010', '01010', '00100'], R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'], X: ['10001', '01010', '00100', '00100', '00100', '01010', '10001'], 0: ['01110', '10011', '10101', '11001', '10001', '10001', '01110'], 1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'], 2: ['01110', '10001', '00001', '00110', '01000', '10000', '11111'], 3: ['11110', '00001', '00001', '01110', '00001', '00001', '11110'], 4: ['00010', '00110', '01010', '10010', '11111', '00010', '00010'], 5: ['11111', '10000', '11110', '00001', '00001', '10001', '01110'], 6: ['00110', '01000', '10000', '11110', '10001', '10001', '01110'], 7: ['11111', '00001', '00010', '00100', '01000', '01000', '01000'], 8: ['01110', '10001', '10001', '01110', '10001', '10001', '01110'], 9: ['01110', '10001', '10001', '01111', '00001', '00010', '01100'] };
+      // big words with a dark outline round every letter (the neon's halo, in hard dots)
+      const word = (str, x0, y0, col, halo, sc = 1) => {
+        const dots = []; let x = x0;
+        for (const ch of String(str)) { const gl = BF7[ch]; if (!gl) { x += 3 * sc; continue; } gl.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '1') for (let a = 0; a < sc; a++) for (let b = 0; b < sc; b++) dots.push([x + i * sc + a, y0 + j * sc + b]); }); x += (gl[0].length + 1) * sc; }
+        for (const [a, b] of dots) for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) P2(a + dx, b + dy, halo);
+        for (const [a, b] of dots) P2(a, b, col);
+        return x - x0;
+      };
+      return t => {
+        const inp = c.input, dt = Math.min(0.1, Math.max(0, t - lastT));
+        lastT = t;
+        if (inp.inside && !wasIn3) { c.sound.note(bass[0] - 12, { dur: 0.3, vel: 0.14, wave: 'sawtooth', cutoff: 500 }); c.sound.note(bass[0] - 11, { dur: 0.5, vel: 0.14, wave: 'sawtooth', cutoff: 500, at: 0.3 }); }
+        wasIn3 = inp.inside;
+        const ko = t - koAt < 3.2, over = t - overAt < 3.2;
+        if (!ko && koAt > 0 && bhp <= 0) { bhp = BMAX; hp = 3; combo = 0; }
+        if (!over && overAt > 0 && hp <= 0) { bhp = BMAX; hp = 3; combo = 0; }
+        for (const p of inp.taps()) {
+          lLive = t + beat * 10;
+          if (ko || over) continue;
+          combo = t - lastTap < 0.6 ? combo + 1 : 1; lastTap = t; slashAt = t;
+          const dmg = combo >= 6 ? 3 : combo >= 3 ? 2 : 1;
+          bhp = Math.max(0, bhp - dmg);
+          c.sound.hit('snare', 0.3); c.sound.note(bass[0] + 12 + Math.min(12, combo * 2), { dur: 0.12, vel: 0.14, wave: 'square', cutoff: 1400 });
+          if (bhp <= 0) { koAt = t; [79, 76, 72, 67, 64, 60, 55].forEach((m, i) => c.sound.note(m, { dur: 0.1, vel: 0.15, wave: 'square', cutoff: 2000, at: 0.1 + i * 0.09 })); c.sound.hit('noise', 0.3, { cutoff: 800, dur: 0.8, at: 0.1 }); }
+        }
+        if (inp.inside) { lLive = Math.max(lLive, t + beat * 2); const want = Math.max(4, Math.min(59, inp.x * BG)); hero += Math.sign(want - hero) * Math.min(Math.abs(want - hero), 52 * dt); }
+        const bi = beatOf(t), f = ((bi % 2) + 2) % 2, fighting = t < lLive && !ko && !over;
+        const mark = f === 1 ? tgt(bi) : -1, slam = f === 0 ? tgt(bi - 1) : -1;
+        if (bi !== lbeat) {
+          lbeat = bi;
+          if (t < lLive) c.sound.note(bass[f] - 12, { dur: beat * 0.5, vel: 0.18, wave: 'square', cutoff: 500 });
+          if (f === 0 && fighting && hitBeat !== bi && Math.abs(hero - slam) < 9 && t - hurtAt > 0.8) {
+            hitBeat = bi; hurtAt = t; hp--; hero = Math.max(4, Math.min(59, hero + (hero < slam ? -10 : 10)));
+            c.sound.hit('kick', 0.9); c.sound.note(bass[0] - 24, { dur: 0.3, vel: 0.2, wave: 'sawtooth', cutoff: 300 });
+            if (hp <= 0) { overAt = t; [60, 58, 55, 51, 48].forEach((m, i) => c.sound.note(m, { dur: 0.25, vel: 0.15, wave: 'square', cutoff: 1200, at: i * 0.22 })); }
+          }
+        }
+        const hitF = t - slashAt < 0.1 && !ko, lunge = t - slashAt < 0.28, dying = ko ? Math.min(1, (t - koAt) / 1.2) : -1, hurt = t - hurtAt < 0.6;
+        const shake = f === 0 && (t / beat) % 1 < 0.2 ? 1 : 0, scroll = Math.floor(((t / beat) % 1) * 8);
+        const key = [f, Math.round(hero), bhp, hp, combo, hitF, lunge, ko ? Math.floor(t * 12) : 0, over, hurt ? Math.floor(t * 16) % 2 : 0, shake, scroll, combo >= 2 && t - lastTap < 0.9, Math.floor(t * 3) % 2].join(',');
+        if (key === lkey) return;
+        lkey = key;
+        // the backdrop, and the floor: a magenta grid running to the horizon, its cross lines coming toward you
+        for (let i = 0; i < HZ * BG; i++) PX[i] = BACK[i];
+        for (let i = HZ * BG; i < BG * BG; i++) PX[i] = C.floor;
+        for (let x = 0; x < BG; x++) PX[HZ * BG + x] = C.grid;
+        for (let k = 0; k < 12; k++) { const y = Math.round(HZ + 30 * 1.4 / (11 - k - scroll / 8 + 1.4)); if (y > HZ + 1 && y < BG) for (let x = 0; x < BG; x++) PX[y * BG + x] = y - HZ > 9 ? C.grid : C.gridF; }
+        for (let j = -9; j <= 9; j++) for (let y = HZ + 1; y < BG; y++) { if (9 * (y - HZ) / 28 < 2.6 && j % 3) continue; const x = Math.round(32 + j * 9 * (y - HZ) / 28); if (x >= 0 && x < BG) PX[y * BG + x] = y - HZ > 9 ? C.grid : C.gridF; }
+        // the floor marked where the next fist falls: a neon ring, pulsing
+        if (mark >= 0 && !ko && !over) for (let a = 0; a < 40; a++) { const x = mark + Math.cos(a / 40 * 6.283) * 9, y = 52 + Math.sin(a / 40 * 6.283) * 3; P2(x, y, (a + bi) % 2 ? C.red : C.gold); }
+        // the boss: a great dark shape (shoulders and head) edged in neon, a second line of it inside
+        const hy = f ? 22 : 24, dz = dying;
+        const SH = new Uint8Array(BG * BG);
+        const mk = (x, y) => { if (x >= 0 && y >= 0 && x < BG && y < BG) SH[y * BG + x] = 1; };
+        // (it rises from behind the horizon; its arms reach out over the floor to its fists)
+        ell(32, HZ + 2, 30, 13, (x, y) => { if (y <= HZ) mk(x, y); }); ell(32, hy, 14, 12.5, mk);
+        // the fists: both up on B, one falling on the mark on A
+        const fists = [];
+        for (const s of [-1, 1]) {
+          const aimed = slam >= 0 && (slam === 31 || (s < 0) === (slam < 32));
+          if (f) fists.push([32 + s * 25, 16]);
+          else if (aimed) fists.push([slam === 31 ? 32 + s * 7 : slam, 49]);
+          else fists.push([32 + s * 26, 40]);
+        }
+        for (const [fx, fy] of fists) { const s = fx < 32 ? -1 : 1, sx = 32 + s * 20, sy = HZ - 6, n = Math.ceil(Math.hypot(fx - sx, fy - sy)); for (let k = 0; k <= n; k++) ell(sx + (fx - sx) * k / n, sy + (fy - sy) * k / n, 3.2, 3.2, mk); ell(fx, fy, 6, 5.5, mk); }
+        if (head === 'Horns') for (const s of [-1, 1]) for (let k = 0; k < 12; k++) { const x = 32 + s * (11 + k * 0.7), y = hy - 6 - k * 1.1 + (k > 8 ? (k - 8) * 0.8 : 0); ell(x, y, 2.2 - k * 0.12, 2.2 - k * 0.12, mk); }
+        if (head === 'Viking Helm') { ell(32, hy - 7, 14, 7, mk); for (const s of [-1, 1]) for (let k = 0; k < 8; k++) ell(32 + s * (14 + k * 0.6), hy - 8 - k, 1.6, 1.6, mk); }
+        if (head === 'Crown') for (let x = 22; x <= 42; x++) for (let y = hy - 16; y <= hy - 10; y++) if (y >= hy - 12 || (x - 22) % 5 < 2) mk(x, y);
+        for (let y = 0; y < BG; y++) for (let x = 0; x < BG; x++) {
+          const i = y * BG + x; if (!SH[i]) continue;
+          // K.O.: it glitches out of existence, row by row shifting and breaking up
+          if (dz >= 0 && ((y * 7 + Math.floor(t * 20) * 3) % 10) / 10 < dz) continue;
+          const e1 = !SH[i - 1] || !SH[i + 1] || !SH[i - BG] || !SH[i + BG];
+          const e2 = !e1 && (!SH[i - 2] || !SH[i + 2] || !SH[i - 2 * BG] || !SH[i + 2 * BG]);
+          const sx = dz > 0 ? x + (((y * 13) % 7) - 3) * Math.round(dz * 3) : x;
+          P2(sx, y, e1 ? (hitF ? C.white : C.neon) : e2 ? (hitF ? C.neon : C.neonD) : hitF ? C.blade : (y % 2 ? C.body : C.body2));
+        }
+        // the crown in gold light, the helm's band; its eyes, burning; its mouth (Mouth)
+        if (dz < 0.5) {
+          if (head === 'Crown') { for (let x = 22; x <= 42; x++) P2(x, hy - 12, C.gold); for (const x of [23, 28, 33, 38, 42]) P2(x, hy - 16, C.gold); }
+          if (head === 'Viking Helm') for (let x = 18; x <= 46; x++) P2(x, hy - 3, C.neon);
+          for (const s of [-1, 1]) {
+            const ex = 32 + s * 6;
+            for (let k = -3; k <= 3; k++) { P2(ex + k, hy - 1 + Math.abs(k) * (s * k > 0 ? 0.4 : -0.1), C.eye); P2(ex + k, hy - 2 + Math.abs(k) * 0.4, C.eyeG); }
+            P2(ex, hy - 1, C.white);
+          }
+          const my = hy + 6;
+          if (mouth === 'Grin') { for (let x = 24; x <= 40; x++) P2(x, my + (Math.abs(x - 32) > 5 ? -1 : 0), C.neon); for (let x = 25; x <= 39; x += 2) P2(x, my + 1, C.white); }
+          else if (mouth === 'Icicle Beard') { for (let x = 26; x <= 38; x++) P2(x, my, C.neon); for (const [x, l] of [[26, 3], [29, 5], [32, 4], [35, 5], [38, 3]]) for (let k = 1; k <= l; k++) P2(x, my + k, k === l ? C.white : C.mount); }
+          else { for (let x = 26 - (f ? 1 : 0); x <= 38 + (f ? 1 : 0); x++) P2(x, my + (f && Math.abs(x - 32) < 5 ? 1 : 0), C.neon); P2(27, my + 1, C.white); P2(27, my + 2, C.white); P2(37, my + 1, C.white); P2(37, my + 2, C.white); if (mouth === 'Snaggle Tooth') { P2(34, my + 1, C.white); P2(34, my + 2, C.white); P2(34, my + 3, C.white); } }
+        }
+        // the hero on the floor where you are: leaping to strike with a pink blade, blinking after a hit
+        const hx = Math.round(hero), hb = lunge ? 45 : 54;
+        if (!(hurt && Math.floor(t * 16) % 2) && !over) {
+          for (const [dx, dy, col] of [[0, -6, C.hero], [1, -6, C.hero], [0, -5, C.white], [1, -5, C.hero], [-1, -4, C.hero], [0, -4, C.hero], [1, -4, C.hero], [2, -4, C.hero], [0, -3, C.hero], [1, -3, C.hero], [0, -2, C.heroD], [1, -2, C.heroD], [0, -1, C.heroD], [1, -1, C.heroD], [-1, 0, C.heroD], [2, 0, C.heroD]]) P2(hx + dx, hb + dy, col);
+          if (lunge) { for (let k = 0; k < 10; k++) { const a = -1.2 + k * 0.17, r = 8; P2(hx + 1 + Math.cos(a) * r, hb - 4 + Math.sin(a) * r, k % 3 ? C.blade : C.white); P2(hx + 1 + Math.cos(a) * (r - 1), hb - 4 + Math.sin(a) * (r - 1), C.blade); } }
+          else for (let k = 1; k < 6; k++) P2(hx + 3, hb - 3 - k, k === 5 ? C.white : C.blade);
+        }
+        // its health bar, the combo, your hearts; K.O. or GAME OVER
+        for (let x = 21; x <= 61; x++) { P2(x, 57, C.neon); P2(x, 61, C.neon); }
+        for (let y = 57; y <= 61; y++) { P2(21, y, C.neon); P2(61, y, C.neon); }
+        for (let x = 22; x <= 60; x++) for (let y = 58; y <= 60; y++) P2(x, y, (x - 22) / 39 < bhp / BMAX ? (y === 58 ? C.gold : C.red) : C.body);
+        for (let k = 0; k < 3; k++) { const x0 = 3 + k * 6, col = k < hp ? C.blade : C.dim; for (const [dx, dy] of [[0, 0], [1, 0], [3, 0], [4, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [1, 2], [2, 2], [3, 2], [2, 3]]) P2(x0 + dx, 59 + dy - 1, col); }
+        if (combo >= 2 && t - lastTap < 0.9 && !ko) word('X' + Math.min(99, combo), 44, 2, C.gold, C.body);
+        if (ko && t - koAt > 0.5) word('K.O', 12, 20, Math.floor(t * 6) % 2 ? C.ko : C.white, C.blade, 3);
+        if (over) { for (let i = 0; i < BG * BG; i++) { const p = PX[i]; PX[i] = [p[0] * 0.35 | 0, p[1] * 0.2 | 0, p[2] * 0.4 | 0]; } word('GAME', 9, 18, C.red, C.body, 2); word('OVER', 9, 36, C.red, C.body, 2); }
+        const d = id2.data;
+        for (let y = 0; y < BG; y++) for (let x = 0; x < BG; x++) { const p = PX[y * BG + Math.max(0, Math.min(BG - 1, x - (shake && !ko ? 1 : 0)))], j = (y * BG + x) * 4; d[j] = p[0]; d[j + 1] = p[1]; d[j + 2] = p[2]; d[j + 3] = 255; }
+        ic.putImageData(id2, 0, 0);
+        g.imageSmoothingEnabled = false;
+        g.drawImage(img2, 0, 0, S, S);
+      };
+      }
+    })() : null;
     function frame(t) {
+      if (legendFrame) return legendFrame(t);
       const inp = c.input;
       t0 = t;
       if (LEG && inp.inside && !wasIn) {

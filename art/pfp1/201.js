@@ -806,6 +806,467 @@ Proto.add({
       }
     }
 
+    // ---------- the legendaries, redrawn each in a style of its own (the machine's attribute clash left behind) ----------
+    // the Lantern as candlelight in the manner of Georges de La Tour (one flame, eight warm colours, deep black), the Sun
+    // Scarab as an Art Deco poster, the Clockwork as a pinball table seen from above. Each draws into its own
+    // small bitmap, shown hard-edged. Every listed trait shows: Border as a fine line round the picture, Paper and
+    // Companion in the picture, and all of them named whole, one at a time, on a plaque in the picture's own manner.
+    const LR = 96;
+    let lb = null;
+    const ABGR = h => (0xff000000 | ((h & 255) << 16) | (h & 0xff00) | ((h >> 16) & 255)) >>> 0;
+    const hexOf = k => { const c3 = RGB(k, 1); return (c3[0] << 16) | (c3[1] << 8) | c3[2]; };
+    const BAY = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+    const bay = (x, y) => BAY[(x & 3) + ((y & 3) << 2)];
+    const F3 = {};
+    "A.#.#.#####.##.#|B##.#.###.#.###.|C.###..#..#...##|D##.#.##.##.###.|E####..##.#..###|F####..##.#..#..|G.###..#.##.#.##|H#.##.#####.##.#|I###.#..#..#.###|J..#..#..##.#.#.|K#.##.###.#.##.#|L#..#..#..#..###|M#.########.##.#|N##.#.##.##.##.#|O.#.#.##.##.#.#.|P##.#.###.#..#..|Q.#.#.##.###..##|R##.#.###.#.##.#|S.###...#...###.|T###.#..#..#..#.|U#.##.##.##.####|V#.##.##.##.#.#.|W#.##.########.#|X#.##.#.#.#.##.#|Y#.##.#.#..#..#.|Z###..#.#.#..###|0####.##.##.####|1.#.##..#..#.###|2##...#.#.#..###|3##...#.#...###.|4#.##.####..#..#|5####..##...###.|6.###..####.####|7###..#.#..#..#.|8####.#####.####|9####.####..###.|:....#.....#....|..............#.|-......###......|/..#..#.#.#..#..|&.#.#.#.#.#.#.##|'.#..#..........|!.#..#..#.....#.".split('|').forEach(e => { F3[e[0]] = e.slice(1); });
+    const lpx = (x, y, c) => { x |= 0; y |= 0; if (x >= 0 && y >= 0 && x < LR && y < LR) lb.d[y * LR + x] = c; };
+    const lrect = (x0, y0, x1, y1, c) => { for (let y = Math.max(0, y0 | 0); y <= Math.min(LR - 1, y1); y++) for (let x = Math.max(0, x0 | 0); x <= Math.min(LR - 1, x1); x++) lb.d[y * LR + x] = c; };
+    const lline = (x0, y0, x1, y1, c) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) || 1; for (let k = 0; k <= n; k++) lpx(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), c); };
+    const ltext3 = (str, x, y, c) => { str = String(str).toUpperCase(); for (let i = 0; i < str.length; i++) { const gl = F3[str[i]]; if (!gl) continue; for (let r = 0; r < 5; r++) for (let q = 0; q < 3; q++) if (gl[r * 3 + q] === '#') lpx(x + i * 4 + q, y + r, c); } };
+    const lcentre = (str, cx, y, c) => { str = String(str).toUpperCase(); ltext3(str, Math.round(cx - (str.length * 4 - 1) / 2), y, c); };
+    const LT = [['SHELL', (dim ? 'DIM ' : '') + shellName], ['MARKS', marks], ['HORNS', horns === 'Short' ? 'Feelers' : horns], ['EYES', eyes], ['MOUTH', mouth], ['EXTRA', extra], ['PAPER', NAMES[paperK] + ' ' + paperName], ['BORDER', NAMES[borderK]], ['BUILD', build], ['POSE', pose === 'Sun' ? 'Holding the Sun' : pose], ['HOLDING', held], ['COMPANION', String(companion)], ['SCREEN', screen], ['HEAD', head]];
+    // the trait being named now: whole, a new one every few seconds (never typed out letter by letter)
+    const ltrait = t => { const [k, v] = LT[Math.floor(t / 2.8) % LT.length]; return (k + ' ' + v).toUpperCase(); };
+    const paperMark = (x, y) => {
+      if (paperName === 'Stripes') return y % 8 < 1;
+      if (paperName === 'Checker') return ((x >> 3) + (y >> 3)) % 2 === 1 && (x + y) % 3 === 0;
+      if (paperName === 'Rain') return (x + y * 2) % 13 === 0 && y % 9 < 4;
+      if (paperName === 'Bricks') { const o = (y >> 2) % 2 ? 4 : 0; return y % 6 === 5 || ((x + o) % 10 === 9 && y % 6 < 5); }
+      if (paperName === 'Waves') return (y + Math.round(Math.sin(x * 0.5) * 1.6)) % 7 === 0;
+      if (paperName === 'Diamonds') return Math.abs((x % 10) - 5) + Math.abs((y % 10) - 5) === 5;
+      if (paperName === 'Polka') return (x + ((y / 7 | 0) % 2) * 3) % 7 === 0 && y % 7 === 0;
+      if (paperName === 'Zigzag') return y % 9 === Math.abs((x % 8) - 4) + 2;
+      if (paperName === 'Hearts') return (x % 10 === 3 || x % 10 === 5) && y % 10 === 2 || (x % 10 >= 3 && x % 10 <= 5 && y % 10 === 3) || (x % 10 === 4 && y % 10 === 4);
+      if (paperName === 'Stars' || paperName === 'Moon') return ((x * 7 + y * 13) % 97) === 0 || ((x * 11 + y * 5) % 131) === 0;
+      return false;
+    };
+    // the Border: a fine line of its colour round the picture; outside it a dark edge, where a Tape Load screen runs its
+    // loading stripes slowly round and a Multicolour screen its colours (never flashing the whole frame); the Lantern keeps
+    // to its dark: no line at all, or on a Tape Load screen a 1 px warm-brown frame with one brighter dash going round
+    function lframe(t, line) {
+      const bc = ABGR(hexOf(borderK)), k = ABGR(0x050403), per = 4 * (LR - 1);
+      for (let i = 0; i < per; i++) {
+        const x = i < LR ? i : i < 2 * LR - 1 ? LR - 1 : i < 3 * LR - 2 ? LR - 1 - (i - 2 * LR + 2) : 0, y = i < LR ? 0 : i < 2 * LR - 1 ? i - LR + 1 : i < 3 * LR - 2 ? LR - 1 : LR - 1 - (i - 3 * LR + 3);
+        const q = Math.floor((i + t * 12) / 4);
+        if (LEG === 'Lantern') { lpx(x, y, screen === 'Tape Load' ? (Math.abs(i - (t * 30) % per) < 10 ? WARM[4] : WARM[2]) : WARM[0]); continue; }
+        lpx(x, y, screen === 'Tape Load' ? ABGR((hexOf(q % 2 ? 2 : 5) >> 1) & 0x7f7f7f) : screen === 'Multicolour' ? ABGR(hexOf(1 + q % 7)) : screen === 'Inverse' ? ABGR(0xf0f0f0) : k);
+      }
+      if (line) for (let i = 1; i < LR - 1; i++) { lpx(i, 1, bc); lpx(i, LR - 2, bc); lpx(1, i, bc); lpx(LR - 2, i, bc); }
+    }
+    // the Screen: a Glitch tears a line now and then, an Inverse screen blinks inverted for an instant every few seconds
+    function lscreen(t) {
+      const d = lb.d;
+      if (screen === 'Glitch' && (t % 3.5) < 0.12) { const y0 = 10 + (Math.floor(t / 3.5) * 29) % 70; for (let y = y0; y < y0 + 2; y++) { const row = d.slice(y * LR, y * LR + LR); for (let x = 2; x < LR - 2; x++) d[y * LR + x] = row[Math.max(2, Math.min(LR - 3, x - 3))]; } }
+      if (screen === 'Inverse' && (t % 7) > 6.88) for (let y = 2; y < LR - 2; y++) for (let x = 2; x < LR - 2; x++) { const i = y * LR + x; d[i] = (d[i] ^ 0x00ffffff) >>> 0; }
+    }
+    function lpresent() {
+      lb.g.putImageData(lb.id, 0, 0);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(lb.can, 0, 0, LR, LR, 0, 0, S, S);
+    }
+    // ---------- the toys' state ----------
+    const ln = { x: 48, y: 50, carry: false, flying: false, landAt: -9, trail: [], trailAt: 0, vx: 0, seen: null };
+    const sc = { rot: 0, vel: 0, prevA: null, beatAt: -9 };
+    const pb = { x: 48, y: 82.3, vx: 0, vy: 0, wind: 0, ang: null, acc: 0, keyA: 0, run: 0, score: 0, lit: [0, 0, 0], hitAt: [-9, -9, -9], slAt: [-9, -9], jackAt: -9, scoreAt: -9, lostAt: 0, heading: -Math.PI / 2, touched: false, demoAt: -9 };
+    let llast = 0, lpress = null;
+    function legendFrame(t, inp) {
+      if (!lb) { const can = document.createElement('canvas'); can.width = can.height = LR; const g2 = can.getContext('2d'), id = g2.createImageData(LR, LR); lb = { can, g: g2, id, d: new Uint32Array(id.data.buffer) }; }
+      const dt = Math.min(0.1, Math.max(0, t - llast)); llast = t;
+      // a tap counts on a short, still release (every press reports one); holds and drags are the toys
+      const taps = [];
+      for (const tp of inp.taps()) { if (inp.down) lpress = { x: tp.x, y: tp.y, at: t, moved: 0, lx: tp.x, ly: tp.y }; else taps.push(tp); }
+      if (lpress) { if (inp.down && inp.inside) { lpress.moved += Math.hypot(inp.x - lpress.lx, inp.y - lpress.ly); lpress.lx = inp.x; lpress.ly = inp.y; } else { if (t - lpress.at < 0.35 && lpress.moved < 0.04) taps.push({ x: lpress.x, y: lpress.y }); lpress = null; } }
+      const dn = inp.inside && inp.down, px = inp.x * LR, py = inp.y * LR;
+      if (LEG === 'Lantern') candle(t, dt, dn, px, py, inp);
+      else if (LEG === 'Sun Scarab') deco(t, dt, dn, px, py, taps, inp);
+      else pinball(t, dt, dn, px, py, taps, inp);
+      lscreen(t);
+      lframe(t, LEG === 'Sun Scarab');
+      lpresent();
+    }
+    // ---------- the Lantern: candlelight, after Georges de La Tour ----------
+    // one flame, the beetle's own glowing body, in deep black; everything else exists only where its light falls, in eight
+    // warm colours stepped from black to the white of the flame. Carry it, and its light finds what is hidden in the dark.
+    const WARM = [0x030201, 0x170a04, 0x321608, 0x55260c, 0x823c12, 0xb45c1a, 0xe0922e, 0xfacc6c, 0xfff6dc].map(ABGR);
+    function candle(t, dt, dn, px, py, inp) {
+      const d = lb.d;
+      if (dn && !ln.carry && inp.inside) { ln.carry = true; for (const dg of [0, 4, 7]) c.sound.note(tone(dg) + 12, { dur: 0.6, vel: 0.08, wave: 'triangle', attack: 0.1 }); }
+      if (ln.carry && !dn) { ln.carry = false; for (let i = 0; i < 4; i++) c.sound.note(tone(7 - i * 2) + 12, { dur: 0.08, vel: 0.08, wave: 'square', cutoff: 3000, at: i * 0.08 }); }
+      const tx = ln.carry ? Math.max(12, Math.min(84, px)) : 48, ty = ln.carry ? Math.max(16, Math.min(74, py)) : 50, k = Math.min(1, dt * (ln.carry ? 9 : 3));
+      ln.x += (tx - ln.x) * k; ln.y += (ty - ln.y) * k;
+      const away = Math.hypot(ln.x - 48, ln.y - 50);
+      if (away > 2) ln.flying = true;
+      if (ln.flying && t - ln.trailAt > 0.1) { ln.trailAt = t; ln.trail.push([ln.x, ln.y, t]); if (ln.trail.length > 16) ln.trail.shift(); }
+      if (ln.flying && !ln.carry && away < 0.8) { ln.flying = false; ln.landAt = t; ln.x = 48; ln.y = 50; c.sound.note(tone(0), { dur: 0.08, vel: 0.12, wave: 'square', cutoff: 1500 }); }
+      ln.trail = ln.trail.filter(q => t - q[2] < 2.6);
+      const fly = ln.flying || ln.carry, s = fly ? Math.max(0.66, 1 - 0.34 * Math.min(1, away / 6)) : 1;
+      const land = t - ln.landAt < 0.6 ? Math.sin((t - ln.landAt) / 0.6 * Math.PI * 2) * 2 : 0;
+      const lx = ln.x, ly = ln.y + (fly ? Math.sin(t * 9) * 0.6 : land);
+      const flick = 1 + Math.sin(t * 7.3) * 0.04 + Math.sin(t * 11.9) * 0.03 + (ln.carry ? 0.12 : 0);
+      // what is hidden in the dark, and how much light each thing gives back, worked out once: a twig with hanging leaves,
+      // a dead leaf with a moth asleep on it, mushrooms, pebbles on the earth, a spider's web in the corner, and the wall
+      // behind patterned with its paper
+      if (!ln.seen) {
+        const A = ln.seen = new Float32Array(LR * LR);
+        ln.L = new Float32Array(LR * LR); ln.mask = new Uint8Array(LR * LR);
+        const put = (x, y, a) => { x = Math.round(x); y = Math.round(y); if (x >= 2 && y >= 2 && x < LR - 2 && y < LR - 2) A[y * LR + x] = a; };
+        const blob = (cx, cy, rx, ry, a, rot = 0) => { const m = Math.ceil(Math.max(rx, ry)); for (let y = Math.floor(cy) - m; y <= cy + m; y++) for (let x = Math.floor(cx) - m; x <= cx + m; x++) { const dx = x - cx, dy = y - cy, u = (dx * Math.cos(rot) + dy * Math.sin(rot)) / rx, v = (-dx * Math.sin(rot) + dy * Math.cos(rot)) / ry; if (u * u + v * v <= 1) put(x, y, typeof a === 'function' ? a(u, v) : a); } };
+        for (let y = 2; y < 78; y++) for (let x = 2; x < LR - 2; x++) A[y * LR + x] = paperMark(x, y) ? 0.19 : 0.1;
+        for (let y = 78; y < 81; y++) for (let x = 2; x < LR - 2; x++) A[y * LR + x] = (x * 5 + y * 3) % 7 === 0 ? 0.55 : 0.34;
+        for (let x = 2; x < LR - 2; x++) { const y = 12 + Math.sin(x * 0.09 + boxTune[1]) * 2.5; put(x, y - 1, 0.95); put(x, y, 0.7); put(x, y + 1, 0.5); }
+        for (const [x0, rot] of [[12, 1.1], [27, 1.9], [69, 1.3], [85, 2.0]]) { const y0 = 13 + Math.sin(x0 * 0.09 + boxTune[1]) * 2.5; blob(x0 + Math.cos(rot) * 6, y0 + Math.sin(rot) * 6, 6.5, 2.6, (u, v) => Math.abs(v) < 0.22 ? 1 : v < 0 ? 0.85 : 0.6, rot); }
+        blob(19, 72, 8, 3.6, (u, v) => Math.abs(v + u * 0.25) < 0.16 ? 1 : 0.62, -0.25);
+        blob(18, 69, 3.6, 2, (u, v) => Math.abs(u) < 0.22 ? 0.35 : ((Math.floor((u + 1) * 3) % 2) ? 1 : 0.75), 0);
+        for (const [mx, top, mr] of [[72, 64, 5], [80, 69, 3.4], [66, 71, 2.6]]) { for (let y = top; y < 79; y++) { put(mx, y, 0.85); put(mx + 1, y, 0.6); } blob(mx + 0.5, top, mr, mr * 0.62, (u, v) => v < -0.2 ? 1 : 0.7); }
+        for (const [a, b2] of [[36, 79], [48, 80], [57, 79]]) blob(a, b2, 3, 1.5, 0.75);
+        for (let k2 = 0; k2 < 7; k2++) { const a = k2 / 6 * Math.PI / 2; for (let r = 1; r < 24; r++) put(2 + Math.cos(a) * r, 2 + Math.sin(a) * r, 0.9); }
+        for (const r of [7, 13, 19]) for (let k2 = 0; k2 <= 24; k2++) { const a = k2 / 24 * Math.PI / 2; put(2 + Math.cos(a) * r, 2 + Math.sin(a) * r, 0.85); }
+      }
+      // the light: a pool round the flame, and a slowly fading glow over every place it has just been carried through
+      const A = ln.seen, L = ln.L;
+      // (the two falloffs looked up by squared distance, worked out once)
+      if (!ln.F1) { ln.F1 = new Float32Array(24000); ln.F2 = new Float32Array(24000); for (let k = 0; k < 24000; k++) { ln.F1[k] = 1.9 / (1 + k / 420); ln.F2[k] = 0.3 / (1 + k / 90); } }
+      const F1 = ln.F1, F2 = ln.F2;
+      for (let y = 2; y < LR - 2; y++) { const dy = (y - ly) * 1.1, dy2 = dy * dy; for (let x = 2; x < LR - 2; x++) { const dx = x - lx; L[y * LR + x] = flick * F1[(dx * dx + dy2) | 0]; } }
+      for (const [qx, qy, qt] of ln.trail) {
+        const f = 1 - (t - qt) / 2.6;
+        for (let y = Math.max(2, Math.floor(qy - 16)); y < Math.min(LR - 2, qy + 16); y++) for (let x = Math.max(2, Math.floor(qx - 16)); x < Math.min(LR - 2, qx + 16); x++) { const dd = (x - qx) ** 2 + (y - qy) ** 2; if (dd < 256) L[y * LR + x] += 0.95 * f / (1 + dd / 70); }
+      }
+      for (let y = 2; y < LR - 2; y++) { const dy = (y - ly) * 1.1, dy2 = dy * dy; for (let x = 2; x < LR - 2; x++) {
+        const i = y * LR + x, dx = x - lx, v = L[i] * A[i] + F2[(dx * dx + dy2) | 0];
+        d[i] = WARM[Math.max(0, Math.min(7, Math.floor(v * 8 + bay(x, y) * 0.8 - 0.4)))];
+      } }
+      // the beetle: a dark shape against its own light, rimmed where the light catches it; hanging by its legs, or flying
+      const M = ln.mask; M.fill(0);
+      const fillE = (cx, cy, rx, ry) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1 && x >= 0 && y >= 0 && x < LR && y < LR) M[y * LR + x] = 1; };
+      const HRX = { Wide: 7, Narrow: 4.2, Shovel: 6 }[head] || 5.5;
+      fillE(lx, ly - 23 * s, HRX * s, 4.3 * s); fillE(lx, ly - 14.5 * s, 8.8 * s, 4.8 * s);
+      if (head === 'Shovel') for (let x = -6; x <= 6; x++) for (let y = 0; y < 2; y++) { const xx = Math.round(lx + x * s), yy = Math.round(ly - 27.5 * s - y); if (xx >= 0 && yy >= 0) M[yy * LR + xx] = 1; }
+      if (head === 'Horned Plate') for (let k = 0; k < 4; k++) for (let x = -3 + k; x <= 3 - k; x++) { const xx = Math.round(lx + x * s), yy = Math.round(ly - 27 * s - k); if (xx >= 0 && yy >= 0) M[yy * LR + xx] = 1; }
+      if (!fly) for (const sx of [-1, 1]) lline(48 + sx * 6, 34 + land, 48 + sx * 9, 13, WARM[2]);
+      else { const up = Math.floor(t * 16) % 2; for (const sx of [-1, 1]) for (let k2 = 3; k2 < 14; k2++) if ((k2 + up) % 2) lpx(lx + sx * (7 * s + k2), ly - 15 * s - (up ? k2 * 0.6 : k2 * 0.15), WARM[4]); }
+      { const hx = lx, hy = ly - 23 * s - (head === 'Horned Plate' ? 3 : head === 'Shovel' ? 1 : 0), H4 = WARM[4], arc = (pts) => { for (let k = 1; k < pts.length; k++) lline(hx + pts[k - 1][0] * s, hy + pts[k - 1][1] * s, hx + pts[k][0] * s, hy + pts[k][1] * s, H4); };
+        if (horns === 'Rhino Horn') arc([[0, -4], [0.5, -7], [2, -10], [3.5, -11]]);
+        else if (horns === 'Hercules') { arc([[0, -4], [0, -8], [1, -12], [3, -14]]); arc([[-2, -4], [-3, -6]]); }
+        else if (horns === 'Stag Jaws') for (const sx of [-1, 1]) arc([[sx * 2, -3.5], [sx * 4.5, -7], [sx * 4, -10], [sx * 2, -11]]);
+        else if (horns === 'Twin Horns') for (const sx of [-1, 1]) arc([[sx * 2, -3.5], [sx * 3, -8], [sx * 3, -10]]);
+        else for (const sx of [-1, 1]) { arc([[sx * 2, -3.5], [sx * 4, -6.5]]); lpx(hx + sx * 5 * s, hy - 6.5 * s, H4); } }
+      { const tx0 = ly - 14.5 * s, A4 = WARM[4], arm = (sx, ex, ey, fx2, fy2) => { lline(lx + sx * 8 * s, tx0, lx + sx * ex * s, tx0 + ey * s, A4); lline(lx + sx * ex * s, tx0 + ey * s, lx + sx * fx2 * s, tx0 + fy2 * s, A4); };
+        const wv = Math.sin(t * 7) * 2.5;
+        if (pose === 'Arms Up') for (const sx of [-1, 1]) arm(sx, 12, -6, 13, -14);
+        else if (pose === 'Waving') { arm(1, 12, -3, 14 + wv * 0.5, -10 + Math.abs(wv)); }
+        else if (pose === 'Flexing') for (const sx of [-1, 1]) arm(sx, 13, 1, 12, -6);
+        if (held !== 'Nothing') { const sx = boxTune[3] % 2 ? 1 : -1; arm(sx, 12, -2, 12, -6); const ix = lx + sx * 12 * s, iy = tx0 - 8 * s; for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= 4.5) lpx(ix + x, iy + y, x + y < -1 ? WARM[7] : WARM[5]); } }
+      for (let y = Math.max(2, Math.floor(ly - 30)); y < Math.min(LR - 2, ly); y++) for (let x = Math.max(2, Math.floor(lx - 12)); x < Math.min(LR - 2, lx + 12); x++) {
+        const i = y * LR + x; if (!M[i]) continue;
+        d[i] = !M[i + LR] ? WARM[6] : (!M[i - 1] || !M[i + 1]) ? WARM[4] : !M[i - LR] ? WARM[3] : WARM[1];
+      }
+      for (const sx of [-1, 1]) lpx(lx + sx * 2.4 * s, ly - 23 * s, WARM[8]);
+      { const mx = lx, my = ly - 21 * s, M5 = WARM[5];
+        if (mouth === 'Grin') { lpx(mx - 1.5 * s, my, M5); lpx(mx, my + 1, M5); lpx(mx + 1.5 * s, my, M5); }
+        else if (mouth === 'Fangs') { lpx(mx - 1, my, M5); lpx(mx + 1, my, M5); lpx(mx - 1, my + 1, M5); lpx(mx + 1, my + 1, M5); }
+        else if (mouth === 'Tongue') { lpx(mx, my, WARM[6]); lpx(mx, my + 1, WARM[6]); }
+        else if (mouth === 'Pincers') for (const sx of [-1, 1]) { lpx(mx + sx * 2, my, M5); lpx(mx + sx, my + 1, M5); }
+        else if (mouth === 'Whistle') { lpx(mx, my, M5); lpx(mx + 1, my, M5); lpx(mx, my + 1, M5); lpx(mx + 1, my + 1, M5); } }
+      // its body, the flame itself: white at the heart, ribbed, warm at the rim (rounder on a Dome, longer on a Slender)
+      const BRX = { Dome: 12, Slender: 9 }[build] || 10.5, BRY = { Dome: 11, Slender: 12.5 }[build] || 11.5;
+      for (let y = -14; y <= 14; y++) for (let x = -13; x <= 13; x++) {
+        const u = x / (BRX * s), v = y / (BRY * s), r2 = u * u + v * v; if (r2 > 1) continue;
+        const rib = Math.round(y / s + 40) % 5 === 4;
+        lpx(lx + x, ly + y, rib ? (r2 < 0.45 ? WARM[6] : WARM[4]) : r2 < 0.17 * flick ? WARM[8] : r2 < 0.45 ? WARM[7] : r2 < 0.78 ? WARM[6] : WARM[5]);
+      }
+      // its fireflies: sparks of the same light about it (streaming behind when it is carried)
+      for (let k2 = 0; k2 < flies.length; k2++) {
+        const f = flies[k2], a = f[0] + t * f[1];
+        let x = lx + Math.cos(a) * (f[2] + 8), y = ly + Math.sin(a * 1.3) * f[2] * 0.8;
+        if (fly) { const q = ln.trail[Math.max(0, ln.trail.length - 2 - k2 * 2)] || [lx, ly]; x = q[0] + Math.cos(a * 2) * 3; y = q[1] + Math.sin(a * 2) * 3; }
+        if (Math.sin(t * 3 + k2 * 2) > -0.2) lpx(x, y, screen === 'Multicolour' ? ABGR(hexOf(1 + (k2 + Math.floor(t * 2)) % 7)) : WARM[7]);
+      }
+      // (no writing: every trait is in the scene, from its horns, head, mouth, build and pose to the paper on the wall)
+    }
+    // ---------- the Sun Scarab: an Art Deco poster, Egyptian revival ----------
+    // a great sunburst in jade and ink behind a gold sun, the lapis scarab holding it up on outspread banded wings, stepped
+    // pyramids and a stepped dais, a stepped frame in its Border colour; flat bold colour and gold that catches the light.
+    // Turn the sunburst with a finger like a dial; tap and the scarab beats its wings.
+    const DECO = { INK: 0x0e1626, JADE: 0x135a52, JADE2: 0x1a7064, GOLD: 0xf0b838, GOLDL: 0xffe08a, GOLDD: 0xa86c14, CORAL: 0xe8603c, CREAM: 0xf6e8c4, LAPIS: 0x1f46b0, LAPISL: 0x4c7ae6, LAPISD: 0x122a70, TURQ: 0x2cc0b2, BLACK: 0x07070c };
+    function deco(t, dt, dn, px, py, taps, inp) {
+      const d = lb.d, C = {}; for (const k in DECO) C[k] = ABGR(DECO[k]);
+      const SX = 48, SY = 31, NR = 20, STEP = Math.PI * 2 / NR;
+      if (!sc.ang) {
+        sc.ang = new Float32Array(LR * LR); sc.rad = new Float32Array(LR * LR);
+        for (let y = 0; y < LR; y++) for (let x = 0; x < LR; x++) { sc.ang[y * LR + x] = Math.atan2(y - SY, x - SX); sc.rad[y * LR + x] = Math.hypot(x - SX, y - SY); }
+      }
+      // the dial: press and turn round the sun and the sunburst turns with the finger, a click per ray; let go and it coasts
+      for (const tp of taps) { sc.beatAt = t; for (let k = 0; k < 4; k++) c.sound.note(tone([0, 4, 7, 12][k]) + 12, { at: k * 0.06, dur: 0.25, vel: 0.1, wave: 'triangle' }); }
+      if (dn) {
+        const a = Math.atan2(py - SY, px - SX);
+        if (sc.prevA !== null && Math.hypot(px - SX, py - SY) > 4) { let da = a - sc.prevA; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da -= -2 * Math.PI; if (Math.abs(da) < 1) { sc.rot += da; sc.vel = sc.vel * 0.6 + (dt ? da / dt : 0) * 0.4; } }
+        sc.prevA = a;
+      } else { sc.prevA = null; sc.rot += sc.vel * dt; sc.vel *= Math.max(0, 1 - dt * 1.8); if (Math.abs(sc.vel) < 0.05) sc.vel = 0; }
+      const rayNow = Math.floor(sc.rot / STEP);
+      if (rayNow !== sc.ray) { if (sc.ray !== undefined && (dn || sc.vel)) c.sound.note(tone(7) + 24, { dur: 0.02, vel: 0.08, wave: 'square', cutoff: 3500 }); sc.ray = rayNow; }
+      // the sunburst: rays in ink and jade (its paper's pattern a scatter of jade dots on the ink)
+      const A = sc.ang, Rr = sc.rad, rot = sc.rot;
+      for (let i = 0; i < LR * LR; i++) {
+        let q = (A[i] - rot) / STEP; q = Math.floor(q) & 1;
+        d[i] = q ? C.JADE : C.INK;
+      }
+      for (let y = 2; y < LR - 2; y++) for (let x = 2; x < LR - 2; x++) if (paperMark(x, y)) { const i = y * LR + x; if (d[i] === C.INK) d[i] = C.JADE2; }
+      // the wings' beat: folded in and spread again
+      const bt = t - sc.beatAt, fold = bt < 0.7 ? Math.sin(bt / 0.7 * Math.PI) * 0.75 : 0;
+      const key = Math.round(fold * 40);
+      if (!sc.layer || sc.layerKey !== key) { sc.layerKey = key; decoLayer(C, fold); }
+      const Lr = sc.layer, gm = sc.gold;
+      for (let i = 0; i < LR * LR; i++) if (Lr[i]) d[i] = Lr[i];
+      // the gold catches the light: a bright band sweeping across it every few seconds
+      const g = ((t % 4) / 2.2) * 200 - 20;
+      if (g < 180) for (let y = 0; y < LR; y++) for (let x = 0; x < LR; x++) { const i = y * LR + x; if (gm[i] && Math.abs(x + y - g) < 2.5) d[i] = Math.abs(x + y - g) < 1 ? C.CREAM : C.GOLDL; }
+      // gold sparks off the sun when its wings beat
+      if (bt < 1) for (let k = 0; k < 12; k++) { const a = k / 12 * 6.283 + rot, r = 18 + bt * 30; if (r < 46) { lpx(SX + Math.cos(a) * r, SY + Math.sin(a) * r, C.GOLDL); lpx(SX + Math.cos(a) * (r - 1), SY + Math.sin(a) * (r - 1), C.GOLD); } }
+      // its companion, a small black insect flying round the sun
+      if (companion !== 'None') { const a = t * 0.9, x = SX + Math.cos(a) * 24, y = SY + Math.sin(a) * 13, fl = Math.floor(t * 10) % 2; for (const [a2, b2] of [[0, 0], [1, 0], [0, 1], [1, 1], [-1, fl ? -1 : 0], [2, fl ? -1 : 0]]) lpx(x + a2, y + b2, companion === 'Firefly' && a2 === 0 && b2 === 1 ? C.GOLDL : C.BLACK); }
+    }
+    // the still part of the poster (frame, pyramids, dais, wings, scarab, sun), drawn once and again only while the wings beat
+    function decoLayer(C, fold) {
+      const L = sc.layer || (sc.layer = new Uint32Array(LR * LR)), GM = sc.gold || (sc.gold = new Uint8Array(LR * LR));
+      L.fill(0); GM.fill(0);
+      const put = (x, y, c2) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LR && y < LR) { L[y * LR + x] = c2; GM[y * LR + x] = c2 === C.GOLD || c2 === C.GOLDD ? 1 : 0; } };
+      const rect = (x0, y0, x1, y1, c2) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, c2); };
+      const disc = (cx, cy, r, c2) => { for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if ((x - cx) ** 2 + (y - cy) ** 2 <= r * r) put(x, y, c2); };
+      const ell = (cx, cy, rx, ry, c2) => { for (let y = Math.floor(cy - ry); y <= cy + ry; y++) for (let x = Math.floor(cx - rx); x <= cx + rx; x++) if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1) put(x, y, c2); };
+      const line = (x0, y0, x1, y1, c2, w = 1) => { const n = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) || 1; for (let k = 0; k <= n; k++) for (let q = 0; q < w; q++) put(x0 + (x1 - x0) * k / n + q, y0 + (y1 - y0) * k / n, c2); };
+      const SX = 48, SY = 31;
+      // stepped pyramids at either side, black with gold step edges
+      for (const s of [-1, 1]) for (let k = 0; k < 6; k++) { const y0 = 72 + k * 3, x0 = s < 0 ? 3 : 92 - (18 - k * 3) - k * 0, w = 26 - k * 4; const xa = s < 0 ? 3 + k * 2 : 92 - w - k * 2 + 2; rect(xa, 92 - (k + 1) * 3 + 1, xa + w, 92 - k * 3, C.BLACK); for (let x = xa; x <= xa + w; x++) put(x, 92 - (k + 1) * 3 + 1, C.GOLDD); }
+      // the stepped dais under the scarab
+      for (let k = 0; k < 3; k++) { const w = 22 - k * 5, y = 91 - k * 3; rect(SX - w, y - 2, SX + w - 1, y, k % 2 ? C.GOLDD : C.GOLD); for (let x = SX - w; x < SX + w; x++) put(x, y - 2, C.GOLDL); }
+      // the wings, outspread from its shoulders in three banded rows of feathers with stepped tips (folding in on a beat)
+      const span = 1 - fold;
+      const bands = [[C.TURQ, 0], [C.LAPIS, 4], [C.GOLD, 8]];
+      for (const s of [-1, 1]) for (const [col, off] of bands) {
+        const len = (33 - off * 0.9) * span;
+        for (let k = 0; k <= len; k++) {
+          const x = SX + s * (9 + k), yTop = 60 - k * 0.32 + off - fold * k * 0.6, tipStep = Math.floor((len - k) / 3) % 2;
+          for (let y = Math.round(yTop); y <= yTop + 4 + (tipStep ? 1 : 0); y++) put(x, y, (k % 4 === 0 && col !== C.GOLD) ? C.BLACK : col);
+        }
+        for (let k = 0; k <= len; k++) put(SX + s * (9 + k), Math.round(60 - k * 0.32 + off - fold * k * 0.6) - 1, off === 0 ? C.GOLD : C.BLACK);
+      }
+      // its forelegs up to the sun, gold and angular; mid and hind legs out to the dais
+      for (const s of [-1, 1]) { line(SX + s * 4, 55, SX + s * 10, 49, C.GOLD, 2); line(SX + s * 10, 49, SX + s * 9, 44, C.GOLD, 2); line(SX + s * 8, 78, SX + s * 15, 83, C.GOLD, 2); line(SX + s * 15, 83, SX + s * 15, 87, C.GOLD, 1); line(SX + s * 7, 70, SX + s * 13, 74, C.GOLDD, 1); }
+      // the sun: a gold disc in stepped rings, a coral band, a bright core
+      disc(SX, SY, 15.5, C.BLACK); disc(SX, SY, 14.5, C.GOLD); disc(SX, SY, 11.5, C.GOLDD); disc(SX, SY, 10.5, C.CORAL); disc(SX, SY, 8, C.GOLD); disc(SX, SY, 5, C.GOLDL);
+      for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283; put(SX + Math.cos(a) * 13, SY + Math.sin(a) * 13, C.GOLDL); }
+      // the scarab: a round head with kohl-lined eyes and short feelers, the pronotum, lapis wing cases slender and long
+      // with gold cloisonne wire making stepped chevrons filled with turquoise and coral enamel
+      ell(SX, 74, 10.5, 12.5, C.BLACK); ell(SX, 74, 9.5, 11.5, C.LAPIS);
+      for (let y = 63; y <= 85; y++) for (let x = SX - 10; x <= SX + 10; x++) {
+        if (((x - SX) / 9.5) ** 2 + ((y - 74) / 11.5) ** 2 > 1) continue;
+        const ax = Math.abs(x - SX), v = (y - 64 - ax * 0.6) % 6;
+        if (ax < 1) put(x, y, C.GOLD);
+        else if (v >= 0 && v < 1) put(x, y, C.GOLD);
+        else if (v >= 1 && v < 3 && ax > 3 && ax < 7) put(x, y, ((y >> 2) + ax) % 2 ? C.TURQ : C.CORAL);
+        else if (x < SX && ax > 5 && y < 72) put(x, y, C.LAPISL);
+      }
+      ell(SX, 60, 9, 5, C.BLACK); ell(SX, 60, 8, 4, C.LAPIS); for (let x = SX - 7; x <= SX + 7; x++) put(x, 63, C.GOLD); for (let x = SX - 5; x <= SX - 2; x++) put(x, 58, C.LAPISL);
+      disc(SX, 52, 5.5, C.BLACK); disc(SX, 52, 4.5, C.LAPISD); for (let x = SX - 4; x <= SX + 4; x++) put(x, 48, C.GOLD);
+      for (const s of [-1, 1]) { rect(SX + s * 2 - (s < 0 ? 1 : 0), 52, SX + s * 2 + (s > 0 ? 1 : 0), 53, C.CREAM); put(SX + s * 2, 52, C.BLACK); put(SX + s * 4, 53, C.BLACK); put(SX + s * 5, 54, C.BLACK); line(SX + s * 2, 47, SX + s * 4, 44, C.GOLD); }
+      // the frame: stepped deco corners and a double rule in its Border colour
+      const BC = ABGR(hexOf(borderK));
+      for (let k = 3; k < LR - 3; k++) { put(k, 3, BC); put(k, LR - 4, BC); put(3, k, BC); put(LR - 4, k, BC); }
+      for (let k = 6; k < LR - 6; k++) if (k < 14 || k > LR - 15) { put(k, 5, BC); put(k, LR - 6, BC); put(5, k, BC); put(LR - 6, k, BC); }
+      for (const [cx, cy] of [[3, 3], [LR - 4, 3], [3, LR - 4], [LR - 4, LR - 4]]) { const sx = cx < 48 ? 1 : -1, sy = cy < 48 ? 1 : -1; for (let k = 0; k < 4; k++) { put(cx + sx * k, cy + sy * (4 - k), BC); put(cx + sx * (4 - k), cy + sy * k, BC); } rect(Math.min(cx, cx + sx * 2), Math.min(cy, cy + sy * 2), Math.max(cx, cx + sx * 2), Math.max(cy, cy + sy * 2), BC); }
+    }
+    // ---------- the Clockwork: a pinball table seen from above, the tin beetle for its ball ----------
+    // wind its key and its clockwork works the flippers: it scoots round the table, bounced by the bumpers and slings and
+    // kicked back up by the flippers until the spring runs down and it settles in the cradle between them
+    const PBW = [];
+    {
+      const seg = (ax, ay, bx2, by2, k = 0) => PBW.push([ax, ay, bx2, by2, k]);
+      let qx = 6, qy = 34;
+      for (let k = 1; k <= 8; k++) { const a = Math.PI + k / 8 * Math.PI / 2, x = 21 + Math.cos(a) * 15, y = 34 + Math.sin(a) * 15; seg(qx, qy, x, y); qx = x; qy = y; }
+      seg(21, 19, 75, 19); qx = 75; qy = 19;
+      for (let k = 1; k <= 8; k++) { const a = -Math.PI / 2 + k / 8 * Math.PI / 2, x = 75 + Math.cos(a) * 15, y = 34 + Math.sin(a) * 15; seg(qx, qy, x, y); qx = x; qy = y; }
+      seg(6, 34, 6, 66); seg(90, 34, 90, 66); seg(6, 66, 30, 82); seg(90, 66, 66, 82);
+      seg(12, 56, 22, 73, 1); seg(84, 56, 74, 73, 2); seg(12, 56, 12, 67); seg(84, 56, 84, 67); seg(12, 67, 22, 73); seg(84, 67, 74, 73);
+    }
+    const BUMP = [[32, 41], [64, 41], [48, 56]];
+    const FLIP = [{ x: 31, y: 83, s: 1, a: 0.5, w: 0, upTo: -9, at: -9 }, { x: 65, y: 83, s: -1, a: 0.5, w: 0, upTo: -9, at: -9 }];
+    const LEGU = [-2, 0.4, 2.6], SPOTS = [[0.6, 2.2], [0.6, -2.2], [-2.4, 2.5], [-2.4, -2.5], [-3.9, 0.9], [-3.9, -0.9]];
+    const BSC = 1.95 * ({ Tiny: 0.82, Titan: 1.12 }[build] || 1), BWF = { Slender: 0.86, Burly: 1.1, Shieldback: 1.1, Dome: 1.05 }[build] || 1;
+    function pinball(t, dt, dn, px, py, taps, inp) {
+      const d = lb.d, snd = pb.touched;
+      const note = (dg, o) => { if (snd) c.sound.note(tone(dg) + 12, Object.assign({ dur: 0.07, vel: 0.12, wave: 'square', cutoff: 2600 }, o)); };
+      const flip = k => { const f = FLIP[k]; if (t < f.upTo - 0.05) return; f.upTo = t + 0.2; f.at = t; note(k ? 3 : 0, { dur: 0.04, vel: 0.1, cutoff: 1200 }); };
+      // the player: a short tap works both flippers; circling the finger winds the key (the clockwork then works them)
+      if (dn || taps.length) pb.touched = true;
+      for (const tp of taps) { flip(0); flip(1); }
+      if (dn) {
+        const a = Math.atan2(py - 56, px - 48);
+        if (pb.ang !== null) { let da = a - pb.ang; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; if (Math.abs(da) < 1.2) { pb.acc += Math.abs(da); pb.keyA += Math.abs(da) * 2; } }
+        pb.ang = a;
+        if (pb.acc > Math.PI / 4) { pb.acc = 0; pb.wind = Math.min(1, pb.wind + 0.08); c.sound.note(tone(6) + 24 + Math.round(pb.wind * 4), { dur: 0.015, vel: 0.14, wave: 'square', cutoff: 4000 }); }
+      } else pb.ang = null;
+      const speed = Math.hypot(pb.vx, pb.vy), cradled = Math.abs(pb.x - 48) < 3 && pb.y > 79 && speed < 6;
+      // left alone at the start, it shows itself off now and then (silently): a little wind of its own
+      if (!pb.touched && t > 1.2 && pb.wind <= 0 && cradled && t - pb.demoAt > 9) { pb.wind = 0.35; pb.demoAt = t; }
+      // the clockwork works the flippers while it is wound
+      if (pb.wind > 0 && !pb.lostAt) {
+        for (let k = 0; k < 2; k++) { const f = FLIP[k], dx = (pb.x - f.x) * f.s; if (dx > -3 && dx < 22 && pb.y > 69 && pb.y < 90 && pb.vy > -20 && t > f.upTo + 0.25) { flip(k); pb.wind = Math.max(0, pb.wind - 0.035); } }
+        pb.wind = Math.max(0, pb.wind - dt * 0.05); pb.keyA -= dt * (1 + pb.wind * 6); pb.run += dt * (2 + pb.wind * 8);
+      }
+      // the physics, in small steps: the table's tilt, the beetle's own scoot, walls, slings, bumpers and flippers
+      const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n, RB = 6.9;
+      const hitSeg = (ax, ay, bx2, by2, rad, e, vax, vay) => {
+        const dx = bx2 - ax, dy = by2 - ay, L2 = dx * dx + dy * dy || 1;
+        const u = Math.max(0, Math.min(1, ((pb.x - ax) * dx + (pb.y - ay) * dy) / L2)), qx = ax + dx * u, qy = ay + dy * u;
+        let nx = pb.x - qx, ny = pb.y - qy; const dd = Math.hypot(nx, ny);
+        if (dd >= rad || dd < 1e-6) return 0;
+        nx /= dd; ny /= dd; pb.x = qx + nx * rad; pb.y = qy + ny * rad;
+        const fvx = typeof vax === 'function' ? vax(u)[0] : 0, fvy = typeof vax === 'function' ? vax(u)[1] : 0;
+        const vn = (pb.vx - fvx) * nx + (pb.vy - fvy) * ny;
+        if (vn < 0) { pb.vx -= (1 + e) * vn * nx; pb.vy -= (1 + e) * vn * ny; }
+        return vn < -10 ? [nx, ny] : 0;
+      };
+      for (let s = 0; s < n && !pb.lostAt; s++) {
+        for (const f of FLIP) { const tgt = t < f.upTo ? -0.45 : 0.5, da = tgt - f.a; f.w = Math.abs(da) < 0.01 ? 0 : Math.sign(da) * 22; f.a += Math.sign(da) * Math.min(Math.abs(da), 22 * h); }
+        pb.vy += 48 * h;
+        if (pb.wind > 0 && Math.hypot(pb.vx, pb.vy) > 4) { pb.vx += Math.cos(pb.heading) * 14 * pb.wind * h; pb.vy += Math.sin(pb.heading) * 14 * pb.wind * h; }
+        pb.vx *= 1 - 0.2 * h; pb.vy *= 1 - 0.2 * h;
+        pb.x += pb.vx * h; pb.y += pb.vy * h;
+        for (const [ax, ay, bx2, by2, k] of PBW) { const r = hitSeg(ax, ay, bx2, by2, RB, k ? 0.5 : 0.35); if (r && k) { pb.vx += r[0] * 50; pb.vy += r[1] * 50; pb.slAt[k - 1] = t; pb.score += 10; pb.scoreAt = t; note(5, { dur: 0.05 }); } }
+        for (let k = 0; k < 3; k++) {
+          const [cx2, cy2] = BUMP[k]; let nx = pb.x - cx2, ny = pb.y - cy2; const dd = Math.hypot(nx, ny);
+          if (dd < 6.2 + RB && dd > 1e-6) {
+            nx /= dd; ny /= dd; pb.x = cx2 + nx * (6.2 + RB); pb.y = cy2 + ny * (6.2 + RB);
+            const vn = pb.vx * nx + pb.vy * ny, hard = vn < -14; if (vn < 0) { pb.vx -= (hard ? 1.85 : 1.3) * vn * nx; pb.vy -= (hard ? 1.85 : 1.3) * vn * ny; }
+            if (hard && t - pb.hitAt[k] > 0.12) {
+              pb.vx += nx * 14; pb.vy += ny * 14; pb.hitAt[k] = t; pb.score += 100; pb.scoreAt = t; pb.lit[k] = 1; note([0, 4, 7][k] + 12, { dur: 0.09, vel: 0.13 });
+              if (pb.lit[0] && pb.lit[1] && pb.lit[2] && t - pb.jackAt > 8) { pb.lit = [0, 0, 0]; pb.jackAt = t; pb.score += 1000; for (let q = 0; q < 4; q++) note([0, 4, 7, 12][q] + 12, { at: 0.1 + q * 0.07, dur: 0.1 }); }
+            }
+          }
+        }
+        for (const f of FLIP) {
+          const L = 13, ca = Math.cos(f.a), sa = Math.sin(f.a), tx = f.x + f.s * ca * L, ty = f.y + sa * L;
+          const r = hitSeg(f.x, f.y, tx, ty, RB + 2, 0.3, u => [u * L * f.w * -f.s * sa, u * L * f.w * ca]);
+          if (r && f.w) pb.score += 1;
+        }
+        const sp = Math.hypot(pb.vx, pb.vy); if (sp > 150) { pb.vx *= 150 / sp; pb.vy *= 150 / sp; }
+        if (pb.y > 99) { pb.lostAt = t; note(0, { dur: 0.3, cutoff: 800 }); }
+      }
+      // through the gap: it comes back in at the top of the table a moment later
+      if (pb.lostAt && t - pb.lostAt > 0.9) { pb.lostAt = 0; pb.x = 48; pb.y = 28; pb.vx = (pb.score % 3 - 1) * 12; pb.vy = 0; }
+      if (Math.hypot(pb.vx, pb.vy) > 5) { let da = Math.atan2(pb.vy, pb.vx) - pb.heading; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; pb.heading += da * Math.min(1, dt * 10); }
+      else if (cradled) { let da = -Math.PI / 2 - pb.heading; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; pb.heading += da * Math.min(1, dt * 4); }
+      // ---- the picture ----
+      if (!pb.bg) {
+        // the table is painted once: the cabinet in its Border colour, a bright playfield with its paper's pattern on it,
+        // chrome rails, white slingshots with red rubbers, and the dark apron under the flippers
+        const B = pb.bg = new Uint32Array(LR * LR), bh = hexOf(borderK);
+        const cab = ABGR((((bh >> 16 & 255) * 0.45 | 0) << 16) | (((bh >> 8 & 255) * 0.45 | 0) << 8) | ((bh & 255) * 0.45 | 0)), cabL = ABGR(bh);
+        const xl = y => y < 34 ? 99 : y <= 66 ? 6 : y <= 82 ? 6 + (y - 66) * 1.5 : 30;
+        const inside = (x, y) => {
+          if (y < 20 || y > 93) return false;
+          if (y < 34) { if (x < 21) return Math.hypot(x - 21, y - 34) < 15; if (x > 75) return Math.hypot(x - 75, y - 34) < 15; return true; }
+          const l = xl(y); return x > l && x < 96 - l;
+        };
+        const PF0 = ABGR(0x3c5cd8), PAT = ABGR(0x2a44b0);
+        for (let y = 0; y < LR; y++) for (let x = 0; x < LR; x++) B[y * LR + x] = inside(x, y) ? (paperMark(x, y) ? PAT : PF0) : cab;
+        for (let y = 0; y < LR; y++) { B[y * LR + 2] = cabL; B[y * LR + LR - 3] = cabL; }
+        // a painted target ring round the centre bumper, a band of light across the middle
+        for (let y = 20; y < 94; y++) for (let x = 0; x < LR; x++) { const r = Math.hypot(x - 48, y - 56); if (inside(x, y) && r > 11 && r < 13) B[y * LR + x] = PAT; }
+        // the apron: dark, with a chrome lip
+        for (let y = 83; y < 94; y++) for (let x = 3; x < LR - 3; x++) if (!inside(x, y)) B[y * LR + x] = ABGR(0x161626);
+        // slingshots
+        for (const s of [1, -1]) for (let y = 56; y <= 73; y++) for (let x = 12; x <= 22; x++) {
+          const inT = x >= 12 && (y - 56) >= (x - 12) * 1.7 - 0.5 && (y - 67) <= (x - 12) * 0.6 + 0.5;
+          if (inT) B[y * LR + (s > 0 ? x : 96 - x)] = ABGR(0xeef0f8);
+        }
+        // chrome rails along every wall: a bright edge and a shadow line beside it
+        const put = (x, y, c2) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < LR && y < LR) B[y * LR + x] = c2; };
+        for (const [ax, ay, bx2, by2, k] of PBW) {
+          const L = Math.hypot(bx2 - ax, by2 - ay), m = Math.ceil(L * 2), nx = -(by2 - ay) / L, ny = (bx2 - ax) / L;
+          for (let q = 0; q <= m; q++) { const x = ax + (bx2 - ax) * q / m, y = ay + (by2 - ay) * q / m; if (!k) put(x - nx, y - ny, ABGR(0x6a7080)); }
+          for (let q = 0; q <= m; q++) { const x = ax + (bx2 - ax) * q / m, y = ay + (by2 - ay) * q / m; put(x, y, k ? ABGR(0xe02020) : ABGR(0xe8ecf4)); if (k) put(x + (k === 1 ? 1 : -1), y, ABGR(0xe02020)); }
+        }
+        for (let x = 3; x < LR - 3; x++) { put(x, 17, ABGR(0xb8bcc8)); put(x, 18, ABGR(0x5a5e6a)); put(x, 1, ABGR(0xb8bcc8)); }
+      }
+      d.set(pb.bg);
+      // the score display: its traits, whole, a trait at a time (the score itself only on a jackpot)
+      const DG = ABGR(0x140804), DD = ABGR(0x2e1608), DK = ABGR(0xa8501a), DV = ABGR(0xffa848);
+      for (let y = 2; y < 17; y++) for (let x = 3; x < LR - 3; x++) d[y * LR + x] = (x & 1) && (y & 1) ? DD : DG;
+      if (t - pb.jackAt < 1.2) { lcentre('JACKPOT', 48, 4, Math.floor(t * 8) % 2 ? DV : DK); lcentre(String(pb.score), 48, 10, DV); }
+            else { const [k, v] = LT[Math.floor(t / 2.8) % LT.length]; lcentre(k, 48, 4, DK); lcentre(String(v).toUpperCase().slice(0, 22), 48, 10, DV); }
+      // the lamps: three over the bumpers (lit by hitting them), a star, and arrows up the middle (chasing while it runs)
+      const busy = pb.wind > 0 || Math.hypot(pb.vx, pb.vy) > 6, jack = t - pb.jackAt < 1.2 && Math.floor(t * 8) % 2;
+      const disc = (cx2, cy2, r, c2) => { for (let y = Math.floor(cy2 - r); y <= cy2 + r; y++) for (let x = Math.floor(cx2 - r); x <= cx2 + r; x++) if ((x - cx2) ** 2 + (y - cy2) ** 2 <= r * r) lpx(x, y, c2); };
+      const OUT = ABGR(0x0a0c20);
+      for (let k = 0; k < 3; k++) { const x = 38 + k * 10, on = pb.lit[k] || jack || (!busy && Math.floor(t * 3) % 3 === k); disc(x, 25, 2.6, OUT); disc(x, 25, 1.8, on ? ABGR(0xff4a3a) : ABGR(0x6a1a14)); if (on) lpx(x - 1, 24, ABGR(0xffd0c0)); }
+      for (let k = 0; k < 3; k++) {
+        const y0 = 66 + k * 5, on = jack || (busy ? Math.floor(t * 10) % 3 === 2 - k : Math.floor(t * 2.5) % 4 === 2 - k);
+        for (let j = 0; j < 4; j++) for (let q = -5 + j; q <= 5 - j; q++) lpx(48 + q, y0 + j - (Math.abs(q) > 4 - j ? 0 : 0), j === 0 || Math.abs(q) === 5 - j ? OUT : on ? ABGR(0xffd848) : ABGR(0x6a5418));
+      }
+      // the bumpers: a red skirt, a white cap, a yellow star; a hit flashes them and throws a ring of light
+      for (let k = 0; k < 3; k++) {
+        const [x, y] = BUMP[k], fl = t - pb.hitAt[k] < 0.15;
+        if (fl) { const rr = 7 + (t - pb.hitAt[k]) * 30; for (let q = 0; q < 28; q++) lpx(x + Math.cos(q / 28 * 6.283) * rr, y + Math.sin(q / 28 * 6.283) * rr, ABGR(0xfff4b0)); }
+        disc(x, y, 6.6, OUT); disc(x, y, 5.8, fl ? ABGR(0xffffff) : ABGR(0xf0c020)); disc(x, y, 4, ABGR(0xf8f8f8)); disc(x, y, 2.4, fl ? ABGR(0xffe8a0) : ABGR(0x2a44b0));
+        lpx(x - 2, y - 4, ABGR(0xffffff)); lpx(x - 3, y - 3, ABGR(0xffffff));
+      }
+      // the slingshots' rubbers flash yellow when they kick
+      for (let k = 0; k < 2; k++) if (t - pb.slAt[k] < 0.12) { const s = k ? -1 : 1; lline(s > 0 ? 13 : 83, 57, s > 0 ? 22 : 74, 72, ABGR(0xfff060)); }
+      // the flippers: white bats with red rubber, on yellow pivots
+      for (const f of FLIP) {
+        const ca = Math.cos(f.a), sa = Math.sin(f.a);
+        for (let q = 0; q <= 26; q++) { const u = q / 26, x = f.x + f.s * ca * 13 * u, y = f.y + sa * 13 * u, r = 2.4 - u * 0.9; disc(x, y, r + 0.7, ABGR(0xd02020)); }
+        for (let q = 0; q <= 26; q++) { const u = q / 26, x = f.x + f.s * ca * 13 * u, y = f.y + sa * 13 * u, r = 2.4 - u * 0.9; disc(x, y, r - 0.3, ABGR(0xf6f6f6)); }
+        disc(f.x, f.y, 1, ABGR(0xffc828));
+      }
+      // the spring's wind, as a row of lamps on the apron
+      for (let k = 0; k < 10; k++) { const on = k < Math.round(pb.wind * 10); lrect(29 + k * 4, 91, 30 + k * 4, 92, on ? ABGR(0xffd848) : ABGR(0x3a3428)); }
+      // its companion, wandering the top of the table
+      if (companion !== 'None') { const a = t * 0.9, x = 80 + Math.cos(a) * 3, y = 44 + Math.sin(a * 0.7) * 8, ink = companion === 'UFO' ? ABGR(0xc8ccd8) : ABGR(0x101018); for (const [a2, b2] of [[0, 0], [1, 0], [0, 1], [1, 1], [-1, Math.floor(t * 8) % 2 ? -1 : 0], [2, Math.floor(t * 8) % 2 ? -1 : 0]]) lpx(x + a2, y + b2, companion === 'Firefly' && a2 === 0 && b2 === 1 ? ABGR(0xffe060) : ink); }
+      // the beetle, from above: a red tin dome with black spots and rivets round its yellow rim, a white tin face with
+      // round eyes and a grille, spring feelers, and the key in its back, turning; ringed in black so it reads small
+      if (!pb.lostAt) {
+        const BR = 20, BWd = BR * 2 + 1, buf = pb.spr || (pb.spr = new Uint32Array(BWd * BWd)); buf.fill(0);
+        const hc = Math.cos(pb.heading), hs = Math.sin(pb.heading), step = Math.floor(pb.run * 3) % 2;
+        const RED = ABGR(0xff2a1e), REDL = ABGR(0xff9a80), REDD = ABGR(0x9a1010), INK = ABGR(0x141018), YEL = ABGR(0xf8c838), YELD = ABGR(0xa87818), WHT = ABGR(0xf6f4ee), GRY = ABGR(0x9aa0aa), RIV = ABGR(0xdcdce4);
+        const HW = { Wide: 3.8, Narrow: 2.3 }[head] || 3;
+        const kc = Math.abs(Math.cos(pb.keyA));
+        for (let y = -BR; y <= BR; y++) for (let x = -BR; x <= BR; x++) {
+          const u = (x * hc + y * hs) / BSC, w = (-x * hs + y * hc) / (BSC * BWF);
+          if (u < -9.6 || u > 9 || w > 6.4 || w < -6.4) continue;
+          let col = 0;
+          const leg = LEGU.some((lu, i) => Math.abs(u - lu - ((i + step) % 2 ? 0.6 : -0.6) * (Math.abs(w) - 4.4) * 0.5) < 0.55 && Math.abs(w) > 4.2 && Math.abs(w) < 6.2);
+          const arms = (pose === 'Arms Up' && u > 3 && u < 6.5 && Math.abs(Math.abs(w) - 3.6) < 0.5) || (pose === 'Waving' && u > 3 && u < 6.5 && Math.abs(w - 3.6 - Math.sin(t * 8) * (u - 3) * 0.5) < 0.5);
+          if (leg || arms) col = INK;
+          const dr = ((u + 1) / 4.7) ** 2 + (w / 4.4) ** 2;
+          if (dr <= 1) {
+            const ang = Math.atan2(w, u + 1), riv = dr > 0.78 && Math.abs(((ang / 6.283 * 14) % 1 + 1) % 1 - 0.5) < 0.17;
+            const spot = SPOTS.some(([a, b2]) => (u - a) ** 2 + (w - b2) ** 2 < 1.1);
+            col = dr > 0.78 ? (riv ? RIV : YEL) : Math.abs(w) < 0.45 && u < 2.8 ? REDD : spot ? INK : (w < -1.2 && u > 0.3 && u < 2.4 && dr < 0.5) ? REDL : RED;
+          }
+          const hu = (u - 3.9) / 2.1, hw = w / HW;
+          if (u > 3 && hu * hu + hw * hw <= 1 && !(head === 'Shovel' && u > 5.2)) {
+            col = hu * hu + hw * hw > 0.7 ? GRY : WHT;
+            if ((u - 4.2) ** 2 + (Math.abs(w) - HW * 0.45) ** 2 < 0.55) col = INK;
+            if (u > 5.1 && Math.abs(w) < HW * 0.55 && Math.round(w * 2) % 2 === 0) col = GRY;
+          }
+          if (head === 'Horned Plate' && u > 5 && u < 7.5 && Math.abs(w) < (7.5 - u) * 0.5) col = GRY;
+          if (u < -5.3 && u > -7 && Math.abs(w) < 0.6) col = YELD;
+          if (u <= -6.6 && u > -9.4 && ((u + 8) ** 2 / 1.6 + (Math.abs(w) - (0.4 + 1.5 * kc)) ** 2 / (0.5 + 0.9 * kc)) <= 1) col = YEL;
+          if (horns === 'Springs') for (const sgn of [-1, 1]) for (let q = 0; q < 5; q++) { const fu = 5.6 + q * 0.75, fw = sgn * (1.1 + q * 0.4 + (q % 2 ? 0.45 : -0.15)); if ((u - fu) ** 2 + (w - fw) ** 2 < 0.22) col = q % 2 ? GRY : RIV; }
+          if (held !== 'Nothing' && (u - 7.2) ** 2 + w * w < 1.6) col = held === 'Golden Dung Ball' ? YEL : ABGR(hexOf(1 + (held.length % 6)));
+          if (col) buf[(y + BR) * BWd + x + BR] = col;
+        }
+        const ox = Math.round(pb.x), oy = Math.round(pb.y);
+        for (let y = 0; y < BWd; y++) for (let x = 0; x < BWd; x++) {
+          const v = buf[y * BWd + x];
+          if (v) { lpx(ox + x - BR, oy + y - BR, v); continue; }
+          if ((x > 0 && buf[y * BWd + x - 1]) || (x < BWd - 1 && buf[y * BWd + x + 1]) || (y > 0 && buf[(y - 1) * BWd + x]) || (y < BWd - 1 && buf[(y + 1) * BWd + x])) lpx(ox + x - BR, oy + y - BR, OUT);
+        }
+      }
+    }
     // ---------- the head plate: round as ever, or wide, narrow, shovel-fronted, or with a point out from each cheek ----------
     function headPart(hy, htop) {
       if (head === 'Round') { part(24, hy, BL.hrx, BL.hry, HEADK, 2.3, -0.08, false, true); return; }
@@ -1062,6 +1523,7 @@ Proto.add({
     const tone = d => root + mode[((d % mode.length) + mode.length) % mode.length] + 12 * Math.floor(d / mode.length);
     function frame(t) {
       const inp = c.input;
+      if (LEG) { legendFrame(t, inp); return; }   // a legendary is drawn in a style of its own
       for (const tp of inp.taps()) {
         const tx = Math.floor(tp.x * T) - B, ty = Math.floor(tp.y * T) - B;
         const inside = tx >= 0 && ty >= 0 && tx < N && ty < N, z = inside ? zone[ty * N + tx] : -1;

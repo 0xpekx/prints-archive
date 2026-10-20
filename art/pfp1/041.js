@@ -11,7 +11,7 @@ Proto.add({
   num: 41,
   name: 'One Line',
   fam: 'Faces & People',
-  recipe: 'Each hash is a new person drawn in one pixel line over offset washes of flat colour, on a 64-cell grid. The pen (one cell, two, swelling or thick-and-thin), face shape, nose, lips, brows, eyes, facial hair, head tilt, hair, neckline, accent, skin wash, wash style, ink and ground all vary. About one in 200 keeps a golden brush behind the ear; about one in 450 is legendary: gilded on lacquer, printed as a cyanotype, or carved in marble.',
+  recipe: 'Each hash is a new person drawn in one pixel line over offset washes of flat colour, on a 64-cell grid. The pen (one cell, two, swelling or thick-and-thin), face shape, nose, lips, brows, eyes, facial hair, head tilt, hair, neckline, accent, skin wash, wash style, ink and ground all vary. About one in 200 keeps a golden brush behind the ear; about one in 450 is legendary: a gold-on-lacquer panel, a cyanotype among ferns, or a marble bust in a lit niche.',
   interactive: 'Tap to drop watercolour; the sitter watches your pointer.',
   music: true,
   seed: 0,
@@ -318,10 +318,11 @@ Proto.add({
     const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
     const mixc = (a, b, k) => [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * k));
     const word = c3 => ((255 << 24) | (c3[2] << 16) | (c3[1] << 8) | c3[0]) >>> 0;
+    // the legendaries are pictures of their own: an icon on gold leaf, a sunprint among ferns, a bust in a lit niche
     const LEG = legend ? {
-      'Gold Leaf': { ground: '#2b1619', line: '#ecc25a', face: '#c4923a', rim: '#8c5f1e', hair: '#e0b04c', cloth: '#a2722a', seam: '#9c6c24', glint: '#fff1b8', tooth: '#3a1e22', blooms: ['#e8b850', '#f4d27a', '#c08a30'] },
-      Cyanotype: { ground: '#1d4a8c', line: '#f2f6ff', face: '#6f9cd4', rim: '#a9c8ec', hair: '#3c6eb4', cloth: '#2c5c9f', seam: '#5a88c6', glint: '#d7e6fa', tooth: '#24529a', blooms: ['#8fb6e6', '#4a7cc0', '#c0d8f4'] },
-      Marble: { ground: '#2c3740', line: '#6c6660', face: '#ece6db', rim: '#cec6b8', hair: '#ddd5c7', cloth: '#d4ccbd', seam: '#bfb6a6', glint: '#fdfaf3', tooth: '#344049', blooms: ['#e9c9c0', '#cfd9d6', '#efe2c4'] },
+      'Gold Leaf': { ground: '#e2b250', line: '#2a1214', face: '#5c3620', rim: '#3a1e12', hair: '#2c1416', cloth: '#8e2a1c', seam: '#e0ac48', glint: '#fff3c4', tooth: '#3a1e22', blooms: ['#8e2a1c', '#2c1416', '#1f4f6e'] },
+      Cyanotype: { ground: '#1b4a8e', line: '#f2f6ff', face: '#6f9cd4', rim: '#a9c8ec', hair: '#3c6eb4', cloth: '#2c5c9f', seam: '#5a88c6', glint: '#d7e6fa', tooth: '#24529a', blooms: ['#8fb6e6', '#4a7cc0', '#c0d8f4'] },
+      Marble: { ground: '#26302c', line: '#4e4842', face: '#ece6db', rim: '#cec6b8', hair: '#ddd5c7', cloth: '#d4ccbd', seam: '#bfb6a6', glint: '#fdfaf3', tooth: '#2e3a35', blooms: ['#e9c9c0', '#cfd9d6', '#efe2c4'] },
     }[legend] : null;
     const g0 = rgb(LEG ? LEG.ground : grounds[ground]);
     const INK = word(rgb(LEG ? LEG.line : lineCol));
@@ -390,7 +391,7 @@ Proto.add({
     if (washStyle === 'Bold Blocks') {
       const circ = ell(dx * 1.5 - 60, -150 + dy, 230, 230, 40).map(q => cellAt(q, false));
       const rect = [[40 + dx, -330], [300 + dx, -330], [300 + dx, -30], [40 + dx, -30]].map(q => cellAt(q, false));
-      const pa = LEG ? null : [word(toward(oneCol || hairWash, night ? 0.8 : 0.72)), word(toward(oneCol || clothWash, night ? 0.8 : 0.72))];
+      const pa = legend === 'Gold Leaf' ? [word([30, 74, 138]), word([142, 42, 28])] : LEG ? null : [word(toward(oneCol || hairWash, night ? 0.8 : 0.72)), word(toward(oneCol || clothWash, night ? 0.8 : 0.72))];
       lay(LW, cover([circ]), pa ? pa[0] : W.hair, 0, false);
       lay(LW, cover([rect]), pa ? pa[1] : W.cloth, 0, false);
       lay(LW, cover([curve(faceBlob.map(q => [q[0] * 0.92, q[1] * 0.95]), true).map(q => cellAt(q, true))]), W.face, 0, false);
@@ -412,9 +413,9 @@ Proto.add({
       lay(LC, cover([bustPoly.map(q => cellAt(q, false))]), W.face, W.faceRim, false);
       const pl = cover([[[-250, plinthY], [250, plinthY], [250, 1200], [-250, 1200]].map(q => cellAt(q, false))]), PL = word([184, 176, 162]), PLHI = word([214, 206, 192]);
       for (let i = 0; i < NN; i++) if (pl[i]) LC[i] = (i >= N && !pl[i - N]) ? PLHI : PL;
-    } else lay(LC, cover([blobCells(clothB, false)]), W.cloth, W.clothRim, bleed);
+    } else lay(LC, cover([blobCells(clothB, false)]), W.cloth, W.clothRim, bleed && legend !== 'Gold Leaf');
     const sunB = sun && washStyle !== 'Bold Blocks' ? blob(sun[0], sun[1], sun[2], sun[2], 0.03) : null;
-    if (sunB) { const sc = LEG ? rgb(LEG.glint) : rgb(night ? '#e8c76a' : '#f6c5a0'); lay(L0, cover([blobCells(sunB, false)]), word(LEG ? mixc(g0, sc, 0.35) : mixc(g0, sc, night ? 0.8 : 0.9)), word(LEG ? mixc(g0, sc, 0.55) : mixc(sc, [150, 80, 40], 0.12)), bleed); }
+    if (sunB && legend !== 'Gold Leaf' && legend !== 'Marble') { const sc = LEG ? rgb(LEG.glint) : rgb(night ? '#e8c76a' : '#f6c5a0'); lay(L0, cover([blobCells(sunB, false)]), word(LEG ? mixc(g0, sc, 0.35) : mixc(g0, sc, night ? 0.8 : 0.9)), word(LEG ? mixc(g0, sc, 0.55) : mixc(sc, [150, 80, 40], 0.12)), bleed); }
 
     // the legendary surfaces: gold leaf laid in square sheets, sunprint and marble veins
     const leaf = new Uint8Array(NN);
@@ -422,7 +423,12 @@ Proto.add({
       const SEAM = word(rgb(LEG.seam)), sx = lcg() * 6 | 0, sy = lcg() * 6 | 0;
       for (const b of [LW, LC]) for (let y = 0, x; y < N; y++) for (x = 0; x < N; x++) {
         const i = y * N + x; if (!b[i]) continue; leaf[i] = 1;
-        if (legend === 'Gold Leaf' && b[i] !== W.hairRim && ((x + sx) % 7 === 0 || (y + sy) % 7 === 0)) b[i] = SEAM;
+        // the icon's robe is lacquer red with a gilt hem along its top and a sparse lattice of gold dots
+        if (legend === 'Gold Leaf' && b === LC && b[i] === W.cloth) {
+          const up = k => y - k >= 0 && b[(y - k) * N + x];
+          if (up(1) && up(2) && !up(3)) b[i] = SEAM;
+          else if (up(4) && ((x + sx) % 8 === 0 && (y + sy) % 8 === 0 || (x + sx + 4) % 8 === 0 && (y + sy + 4) % 8 === 0)) b[i] = SEAM;
+        }
         if (legend === 'Cyanotype' && b[i] === W.cloth && ((x + y * 2) % 5 === 0)) b[i] = SEAM;
       }
       // four grey veins wander down through the stone, across the face, hair and bust
@@ -435,6 +441,103 @@ Proto.add({
           const i = (y | 0) * N + (x | 0);
           for (const b of [LW, LC]) if (b[i] && b[i] !== W.faceRim && b[i] !== W.hairRim && b[i] !== W.clothRim) b[i] = VEIN;
         }
+      }
+    }
+
+    // ---------- the legendary grounds, each its own picture (their draws come from the legend stream) ----------
+    const hn = (x, y, s) => { let q = Math.imul((x * 374761393 + y * 668265263) ^ s, 1274126177); q ^= q >>> 15; q = Math.imul(q, 0x2c1b3c6d); q ^= q >>> 12; return (q >>> 0) / 4294967296; };
+    const BAYER0 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const FROND = word([238, 244, 252]), FROND2 = word([170, 198, 236]), FROND3 = word([206, 222, 244]);
+    const gild = new Uint8Array(NN), edge = new Uint8Array(NN), punch = [], fronds = [], motes = [];
+    let niche = null, haloR = 0;
+    const headC = cellAt([0, -40], true);
+    if (legend === 'Gold Leaf') {
+      // an icon: gold leaf laid in square sheets on red bole (a seam where each sheet overlaps the next, a speck of bole
+      // where the leaf broke), a tooled halo round the head, and a black lacquer frame with a gilt fillet
+      const GOLDS = [[232, 186, 82], [241, 199, 100], [224, 176, 74], [247, 210, 120]].map(word), SEAMG = word([200, 148, 56]), BOLE = word([154, 54, 36]);
+      const INC = word([158, 108, 36]), HI = word([255, 236, 168]), ox = lcg() * 9 | 0, oy = lcg() * 9 | 0, sd = lcg() * 1e9 | 0;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const u = Math.floor((x + ox) / 9), v = Math.floor((y + oy) / 9), i = y * N + x;
+        let col = GOLDS[Math.floor(hn(u, v, sd) * 4)];
+        if ((x + ox) % 9 === 0 && hn(x, v, sd + 1) < 0.85) col = SEAMG;
+        else if ((y + oy) % 9 === 0 && hn(u, y, sd + 2) < 0.85) col = SEAMG;
+        if (hn(x, y, sd + 3) < 0.004 && ((x + ox) % 9 < 2 || (y + oy) % 9 < 2)) col = BOLE;
+        L0[i] = col; gild[i] = col !== BOLE ? 1 : 0;
+      }
+      const BURN = [word([250, 216, 128]), word([246, 208, 114])], R = 19 + lcg() * 2; haloR = R; const hc = [headC[0], headC[1] - 3], nd = 30;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const d = Math.hypot(x + 0.5 - hc[0], y + 0.5 - hc[1]), i = y * N + x;
+        if (d < R - 0.6 && gild[i]) L0[i] = BURN[(Math.floor((x + ox) / 9) + Math.floor((y + oy) / 9)) & 1];   // the halo is burnished brighter
+        if (Math.abs(d - R) < 0.6) { L0[i] = INC; gild[i] = 0; } else if (Math.abs(d - R + 1) < 0.5 && y + 0.5 < hc[1]) L0[i] = HI;
+        else if (Math.abs(d - R + 4.2) < 0.6) { L0[i] = INC; gild[i] = 0; }
+      }
+      for (let k = 0; k < nd; k++) { const a = k / nd * Math.PI * 2, x = Math.floor(hc[0] + Math.cos(a) * (R - 2.1)), y = Math.floor(hc[1] + Math.sin(a) * (R - 2.1)); if (x >= 0 && y >= 0 && x < N && y < N) { L0[y * N + x] = INC; gild[y * N + x] = 0; punch.push([x, y]); } }
+      for (let i = 0; i < NN; i++) { const x = i % N, y = (i - x) / N, m = Math.min(x, y, N - 1 - x, N - 1 - y); if (m < 3) edge[i] = m < 2 ? 1 : 2; }
+    } else if (legend === 'Cyanotype') {
+      // a sunprint: Prussian blue brushed on cream paper (the strokes leave ragged edges), and fern fronds laid on it
+      // before the exposure, so they print as pale silhouettes behind the sitter
+      const B0 = word([16, 46, 98]), B1 = word([27, 74, 142]), B2 = word([21, 60, 120]), B3 = word([38, 92, 164]), sd = lcg() * 1e9 | 0;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const r = Math.hypot(x + 0.5 - headC[0], (y + 0.5 - headC[1]) * 0.85) / 34, v = Math.sin(x * 0.21 + y * 0.07 + sd % 7) * Math.sin(y * 0.18 - x * 0.05 + sd % 5) * 0.6 + 0.55 - r, b = BAYER0[(y & 3) * 4 + (x & 3)] / 16;
+        L0[y * N + x] = v > 0.3 + b * 0.35 ? B3 : v < -0.15 - b * 0.35 ? B0 : v < 0.05 - b * 0.3 ? B2 : B1;
+      }
+      // the brushed edge: each stroke (2-3 rows tall) stops at its own place on each side; top and bottom ragged too
+      for (let y = 0; y < N; y++) {
+        const st = Math.floor(y / 3), l = 1 + Math.floor(hn(st, 1, sd) * 4) + (hn(y, 2, sd) < 0.3 ? 1 : 0), r = 1 + Math.floor(hn(st, 3, sd) * 4) + (hn(y, 4, sd) < 0.3 ? 1 : 0);
+        for (let x = 0; x < N; x++) {
+          const t2 = Math.floor(x / 4), top = 1 + Math.floor(hn(t2, 5, sd) * 3), bot = 1 + Math.floor(hn(t2, 6, sd) * 3);
+          const m = Math.min(x - l, N - 1 - r - x, y - top, N - 1 - bot - y);
+          if (m < 0) edge[y * N + x] = 1; else if (m < 1 && hn(x, y, sd + 7) < 0.6) edge[y * N + x] = 2;
+        }
+      }
+      // two or three fronds from the corners and sides, clear of the face
+      // two long fronds rise from the bottom corners up the sides and lean in over the top, framing the sitter;
+      // sometimes a third, shorter one lies along the top edge
+      const lean = 0.0035 + lcg() * 0.003;
+      fronds.push({ x: 4 + lcg() * 3, y: 63, a: -1.42 - lcg() * 0.12, len: 40 + lcg() * 10, bend: lean, ph: lcg() * 6.28 });
+      fronds.push({ x: 57 + lcg() * 3, y: 63, a: -1.72 + lcg() * 0.12, len: 40 + lcg() * 10, bend: -lean, ph: lcg() * 6.28 });
+      if (lcg() < 0.5) { const l = lcg() < 0.5; fronds.push({ x: l ? 3 : 60, y: 2, a: l ? 0.2 : 2.94, len: 16 + lcg() * 6, bend: l ? 0.01 : -0.01, ph: lcg() * 6.28 }); }
+      for (const f of fronds) {
+        f.poses = [];
+        for (let k = 0; k < 8; k++) {
+          const sway = (k / 3.5 - 1) * 0.07, n = Math.round(f.len * 2), m = new Map(), at = (px, py, v) => { if (px >= 0 && py >= 0 && px < N && py < N) m.set(py * N + px, v); };
+          let x = f.x + 0.5, y = f.y + 0.5, a = f.a + sway;
+          for (let s = 0; s < n; s++) {
+            a += f.bend + sway * 0.03; x += Math.cos(a) * 0.5; y += Math.sin(a) * 0.5;
+            // each pinna leans toward the tip and shortens along the frond; a notch between pinnae lets the blue through
+            const u = s / n, L = (1 - u) * 7.5 * Math.min(1, u * 7 + 0.3);
+            if (s % 4 < 2) for (const side of [-1, 1]) { const la = a + side * 0.95; for (let q = 1; q <= L; q += 0.5) at(Math.floor(x + Math.cos(la) * q), Math.floor(y + Math.sin(la) * q), q > L - 1.5 ? FROND3 : FROND); }
+            at(Math.floor(x), Math.floor(y), FROND2);
+          }
+          f.poses.push(Int32Array.from([...m].flat()));
+        }
+      }
+    } else if (legend === 'Marble') {
+      // a bust in a gallery niche: an arched alcove in a dark green wall, a spotlight falling from above, dust in the beam
+      const WALL = word([38, 48, 44]), WALL2 = word([44, 56, 51]), NICHE = word([24, 31, 28]), MOULD = word([66, 80, 74]), BEAM = word([82, 84, 70]), BEAMN = word([52, 54, 46]);
+      const cx = 32 + Math.round((cellAt([0, 0], false)[0] - 32) * 0.5), w = 21, top = 15;
+      niche = [cx, w, top];
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const i = y * N + x, dx = x + 0.5 - cx, inArch = y + 0.5 >= top ? Math.abs(dx) < w : Math.hypot(dx, y + 0.5 - top) < w, rim = y + 0.5 >= top ? Math.abs(Math.abs(dx) - w) < 0.6 : Math.abs(Math.hypot(dx, y + 0.5 - top) - w) < 0.6;
+        let col = x % 16 === 0 ? WALL2 : WALL;
+        if (inArch) col = NICHE;
+        if (rim) col = MOULD;
+        const beamW = 5 + y * 0.32, lit = Math.abs(dx) < beamW ? 1 - Math.abs(dx) / beamW : 0;
+        if (lit > 0 && !rim && BAYER0[(y & 3) * 4 + (x & 3)] < lit * 13 * (1 - y / 90)) col = inArch ? BEAMN : BEAM;
+        L0[i] = col;
+      }
+      for (let k = 0; k < 10; k++) motes.push([lcg(), lcg(), lcg() * 6.28]);
+      // a brass plate on the plinth, its engraved name a row of dashes
+      { const px = Math.floor(cellAt([0, plinthY + 46], false)[0]), py = Math.floor(cellAt([0, plinthY + 46], false)[1]), BR = word([176, 136, 58]), BRD = word([112, 82, 30]), BRH = word([226, 190, 104]);
+        for (let j = -2; j <= 2; j++) for (let i = -7; i <= 7; i++) { const e = Math.abs(i) === 7 || Math.abs(j) === 2; put(LC, px + i, py + j, e ? BRD : j === -1 && i < 0 ? BRH : BR); }
+        for (let i = -5; i <= 5; i++) if (hn(i, 9, py) < 0.72) put(LC, px + i, py, BRD); }
+      // the bust is lit from above on the facing side: the far side of every row of stone steps down a shade
+      const SH = word([206, 198, 184]), SH2 = word([178, 170, 156]);
+      for (const b of [LW, LC]) for (let y = 0; y < N; y++) {
+        let a = -1, z = -1; for (let x = 0; x < N; x++) if (b[y * N + x]) { if (a < 0) a = x; z = x; }
+        if (a < 0) continue;
+        const wd = z - a + 1;
+        for (let x = a; x <= z; x++) { const i = y * N + x, u = facing > 0 ? (x - a) / wd : (z - x) / wd, v = b[i]; if (v !== W.face && v !== W.hair && v !== W.cloth) continue; if (u > 0.86) b[i] = SH2; else if (u > 0.66 && (u > 0.74 || ((x + y) & 1))) b[i] = SH; }
       }
     }
 
@@ -603,6 +706,80 @@ Proto.add({
       c.sound.note(root + step, { dur: 0.9, vel: 0.32, wave: 'sine', pan: (u - 0.5) * 1.2 });
       c.sound.note(root + step + 12, { dur: 0.35, vel: 0.12, wave: 'triangle', pan: (u - 0.5) * 1.2, at: 0.05, cutoff: 2400 });
     };
+    // ---------- the legendaries' toys ----------
+    // gold leaf: a drag lays gold over the lacquer, which flakes off again slowly; the halo rings when tapped.
+    // cyanotype: a stroke becomes a fern laid on the paper, printing white and developing back to blue.
+    // marble: each tap chisels a flake off the bust; the seventh wakes it for a while, then the stone heals.
+    const gildM = new Float32Array(NN), ferns = [], chips = [], flakes = [], sheets = new Map(), leafFall = [], dust = [];
+    let ringAt = -9, stroke = null, wasDown = false, blows = 0, press0 = null, shimX = 64, shimY = 40;
+    const dustAt = [];
+    const haloC = legend === 'Gold Leaf' ? [headC[0], headC[1] - 3] : null;
+    const toyTap = (u, v, t) => {
+      const cx = u * N, cy = v * N;
+      const ti = Math.min(N - 1, Math.floor(cy)) * N + Math.min(N - 1, Math.floor(cx));
+      if (legend === 'Gold Leaf') {   // a tap sends a wave of colour through the mother-of-pearl, out from the finger
+        ringAt = t; shimX = cx * 2; shimY = cy * 2;
+        [24, 28, 31, 36, 40].forEach((s, k) => c.sound.note(root + s, { dur: 1.6, vel: 0.1, wave: 'sine', at: 0.07 * k }));
+      } else if (legend === 'Marble') {
+        const i = Math.floor(cy) * N + Math.floor(cx);
+        if (!(LW[i] || LC[i])) return;
+        blows++;
+        chips.push([Math.floor(cx), Math.floor(cy), t, Math.floor(drip() * 4), 4 + Math.floor(drip() * 4)]);
+        // a chip flies off the stone, and a puff of dust sinks from the hit
+        const fa = (drip() - 0.5) * 2.4 + (cx < niche[0] ? Math.PI : 0);
+        flakes.push([cx, cy, Math.cos(fa) * 30, -18 - drip() * 10, t, 1]);
+        for (let k = 0; k < 5; k++) flakes.push([cx, cy, (drip() - 0.5) * 16, -4 - drip() * 6, t]);
+        for (let k = 0; k < 8; k++) dust.push([cx + (drip() - 0.5) * 3, cy, (drip() - 0.5) * 6, 4 + drip() * 8, t]);
+        while (dust.length > 60) dust.shift();
+        while (flakes.length > 60) flakes.shift();
+        c.sound.hit('click', 0.3); c.sound.note(root - 12 + Math.floor(drip() * 5), { dur: 0.3, vel: 0.12, wave: 'triangle', cutoff: 1400 });
+        if (blows % 7 === 0) { wakeAt = t; c.sound.note(root - 24, { dur: 2.4, vel: 0.24, wave: 'sine' }); c.sound.note(root - 17, { dur: 2, vel: 0.12, wave: 'sine', at: 0.02 }); c.sound.note(root + 12, { dur: 1.4, vel: 0.05, wave: 'triangle', at: 0.04, cutoff: 1800 }); }
+      }
+    };
+    const fernCells = (pts, out) => {
+      // a frond along the stroke: the stem follows it, pinnae lean toward its end and shorten as it goes
+      const n = pts.length; if (n < 2) return;
+      let len = 0; for (let k = 1; k < n; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+      let run = 0, step = 0;
+      for (let k = 1; k < n; k++) {
+        const [x0, y0] = pts[k - 1], [x1, y1] = pts[k], d = Math.hypot(x1 - x0, y1 - y0); if (d < 1e-3) continue;
+        const a = Math.atan2(y1 - y0, x1 - x0);
+        for (let s = 0; s < d; s += 0.5, step++) {
+          const x = x0 + (x1 - x0) * s / d, y = y0 + (y1 - y0) * s / d, u = (run + s) / Math.max(1, len), L = (1 - u) * 6 * Math.min(1, u * 7 + 0.3);
+          out.push(Math.floor(x), Math.floor(y), 2);
+          if (step % 4 < 2) for (const side of [-1, 1]) { const la = a + side * 0.95; for (let q = 1; q <= L; q += 0.5) out.push(Math.floor(x + Math.cos(la) * q), Math.floor(y + Math.sin(la) * q), q > L - 1.5 ? 3 : 1); }
+        }
+        run += d;
+      }
+    };
+    const toyMove = (inp, t, dtt) => {
+      const px = inp.x * N, py = inp.y * N;
+      if (legend === 'Gold Leaf') {
+        // maki-e: dragging sprinkles gold powder from the finger; it falls behind the face's gold line, settles on the
+        // robe (gilding it) or on the ground at the panel's foot, shines a while, then sinks into the lacquer
+        if (inp.down && inp.inside) for (let k = 0; k < 3; k++) { if (dustAt.length > 300) dustAt.shift(); dustAt.push([px * 2 + (hn(dustAt.length, Math.floor(t * 60), 9) - 0.5) * 6, py * 2 + (hn(Math.floor(t * 60), k, 7) - 0.5) * 4, (hn(k, dustAt.length, 3) - 0.5) * 6, 22 + hn(k, 1, dustAt.length) * 22, t, hn(dustAt.length, k, 1) < 0.25 ? 1 : 0, Math.floor(hn(k, 5, dustAt.length) * 9)]); }
+        for (const d of dustAt) if (d[3]) {
+          d[0] += d[2] * dtt; d[1] += d[3] * dtt;
+          const cx = Math.min(N - 1, Math.max(0, Math.floor(d[0] / 2))), cy = Math.min(N - 1, Math.max(0, Math.floor(d[1] / 2))), kd = kindM[cy * N + cx];
+          if (d[1] >= 118) { d[1] = 118 - (d[6] % 3); d[3] = 0; }
+          else if (kd === 4 && (Math.floor(d[1]) + d[6]) % 9 === 0) d[3] = 0;
+        }
+        for (let n = dustAt.length - 1; n >= 0; n--) if (t - dustAt[n][4] > 14) dustAt.splice(n, 1);
+        if (inp.down && !wasDown) press0 = { x: px, y: py, t, moved: 0 };
+        if (press0 && inp.down) press0.moved = Math.max(press0.moved, Math.hypot(px - press0.x, py - press0.y));
+        if (press0 && !inp.down) { if (press0.moved < 1.5 && t - press0.t < 0.45) toyTap(press0.x / N, press0.y / N, t); press0 = null; }
+      } else if (legend === 'Cyanotype') {
+        if (inp.down && !wasDown) stroke = { pts: [[px, py]], born: t };
+        if (stroke && inp.down) { const l = stroke.pts[stroke.pts.length - 1]; if (Math.hypot(px - l[0], py - l[1]) > 1.2 && stroke.pts.length < 80) stroke.pts.push([px, py]); }
+        if (stroke && !inp.down) { if (stroke.pts.length > 2) { const cells = []; fernCells(stroke.pts, cells); ferns.push({ cells: Int16Array.from(cells), born: t }); if (ferns.length > 5) ferns.shift(); c.sound.note(root + 7, { dur: 0.8, vel: 0.12, wave: 'sine' }); c.sound.note(root + 14, { dur: 1.2, vel: 0.08, wave: 'sine', at: 0.1 }); } stroke = null; }
+      } else if (legend === 'Marble') {
+        for (const f of flakes) { if (f[3] === null) continue; f[0] += f[2] * dtt; f[1] += f[3] * dtt; f[3] += 40 * dtt; if (f[1] >= floorY) { f[1] = floorY; f[3] = null; } }
+        for (const d of dust) { d[0] += d[2] * dtt; d[1] += d[3] * dtt; d[2] *= 0.97; }
+        for (let n = dust.length - 1; n >= 0; n--) if (t - dust[n][4] > 1.6) dust.splice(n, 1);
+        if (t - wakeAt > 7.6 && t - wakeAt < 9) { chips.length = 0; flakes.length = 0; }   // healed: the stone is whole again
+      }
+      wasDown = inp.down;
+    };
     const onTap = (u, v, t) => {
       const cx = Math.floor(u * N), cy = Math.floor(v * N);
       if (brushCell && Math.abs(cx - brushCell[0]) <= 4 && Math.abs(cy - brushCell[1]) <= 4) {
@@ -612,6 +789,7 @@ Proto.add({
         c.sound.hit('blip', 0.14); c.sound.note(root + 19, { dur: 0.25, vel: 0.16, wave: 'triangle', cutoff: 3000 }); c.sound.note(root + 24, { dur: 0.4, vel: 0.12, wave: 'sine', at: 0.08 });
         return;
       }
+      if (legend) { if (legend !== 'Gold Leaf') toyTap(u, v, t); return; }   // gold leaf rings on a short, still release instead
       dropBead(u, v, t);
       if (legend === 'Gold Leaf') { chimeAt = t; chimeX = cx + cy; [24, 28, 31].forEach((s, k) => c.sound.note(root + s, { dur: 1.2, vel: 0.1, wave: 'sine', at: 0.06 * k })); }
       if (legend === 'Cyanotype') { rings.push([cx, cy, t]); if (rings.length > 5) rings.shift(); c.sound.note(root - 12, { dur: 1.6, vel: 0.2, wave: 'sine', pan: (u - 0.5) }); c.sound.note(root - 5, { dur: 1.2, vel: 0.1, wave: 'sine', at: 0.12 }); }
@@ -643,13 +821,17 @@ Proto.add({
         if (gaze === 'Laughing') k = 'laugh';
         if (gaze === 'Dreaming') k = 'dream';
         if (blink || wink) k = 'shut';
-        if (legend === 'Marble') k = t - wakeAt < 2.6 || !blink ? 'open' : 'shut';   // a statue's blank stare, until a tap wakes it
+        if (legend === 'Marble') k = t - wakeAt < 6 || !blink ? 'open' : 'shut';   // a statue's blank stare, until a tap wakes it
         const [rows, px0, py0, ay] = set[k], flip = far ? facing > 0 : facing < 0, w = rows[0].length;
         stamp(F, rows, at[0], at[1], flip, null, w >> 1, ay);
         const open = k === 'open' || k === 'lashes' || k === 'up' || k === 'down';
-        if (open && (legend !== 'Marble' || t - wakeAt < 2.6)) {
+        if (open && (legend !== 'Marble' || t - wakeAt < 6)) {
           const ox = at[0] - (w >> 1), oy = at[1] - ay, pw = 2, sx0 = flip ? w - px0 - pw : px0;
-          for (let i = 0; i < pw; i++) put(F, ox + sx0 + lookX + i, oy + py0 + (lookAmt && lookY > 0.5 && k === 'open' ? 0 : 0), legend === 'Marble' ? word([70, 64, 60]) : INK);
+          if (legend === 'Marble') {
+            const ix = ox + sx0 + lookX, iy = oy + py0, ga = Math.min(1, (t - wakeAt) / 0.4) * Math.min(1, (6 - (t - wakeAt)) / 0.6);
+            for (let j = -2; j <= 2; j++) for (let i = -2; i <= 3; i++) { const xx = ix + i, yy = iy + j; if (xx >= 0 && yy >= 0 && xx < N && yy < N && F[yy * N + xx] !== INK && (Math.abs(i - 0.5) + Math.abs(j) > 2) && BAYER[(yy & 3) * 4 + (xx & 3)] < ga * 10) F[yy * N + xx] = WAKEG; }
+            for (let i = 0; i < pw; i++) { put(F, ix + i, iy, ga > 0.5 ? IRIS : word([70, 64, 60])); put(F, ix + i, iy + 1, ga > 0.5 ? (i ? IRISD : IRIS) : word([70, 64, 60])); }
+          } else for (let i = 0; i < pw; i++) put(F, ox + sx0 + lookX + i, oy + py0 + (lookAmt && lookY > 0.5 && k === 'open' ? 0 : 0), INK);
         }
       };
       one(NEAR, nearAt, false, gaze === 'Wink');
@@ -658,9 +840,108 @@ Proto.add({
 
     // ---------- the frame ----------
     const off = document.createElement('canvas'); off.width = off.height = N;
+    // ---------- the gold leaf legendary, redrawn as maki-e on a 128 grid of its own ----------
+    // black lacquer; the line raised in gold (lit along its top edge, shadowed below); the face dusted with fine gold,
+    // the hair and the halo inlaid with mother-of-pearl that shifts colour, the robe in graded gold powder; a gold
+    // fillet frame; a slow sheen crossing the lacquer
+    const MK = legend === 'Gold Leaf';
+    const moff = MK ? document.createElement('canvas') : null; if (moff) moff.width = moff.height = 128;
+    const mctx = moff && moff.getContext('2d'), mimg = moff && mctx.createImageData(128, 128), M32 = MK ? new Uint32Array(mimg.data.buffer) : null;
+    const kindM = new Uint8Array(NN), dzA = new Uint8Array(NN), dzB = new Uint8Array(NN), mBase = MK ? new Uint32Array(128 * 128) : null, prevF = MK ? new Uint32Array(NN) : null, radenPx = [], radenId = [], radenTop = MK ? new Uint8Array(128 * 128) : null;
+    const BAY4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+    const WHITEG = word([255, 252, 236]), FACEL = word([62, 26, 24]), FACEL2 = word([52, 21, 20]), LAC = word([12, 9, 11]), LAC2 = word([22, 17, 20]), LAC3 = word([34, 27, 31]), GLD = word([226, 176, 72]), GLDH = word([255, 230, 150]), GLDS = word([150, 104, 34]), GLDD = word([186, 138, 50]);
+    const IRID = [[236, 120, 214], [120, 150, 250], [90, 220, 230], [140, 240, 150], [250, 220, 110], [250, 150, 120]].map(word);
+    const RADEN = [[226, 196, 230], [180, 226, 220], [236, 214, 176], [168, 196, 240], [214, 240, 206], [244, 204, 210], [250, 248, 240]].map(word);
+    const hm = (x, y, k) => hn(x, y, k * 7919 + 13);
+    let mDy = -1, mFull = true, sheenAt = 0;
+    const rxy = haloC ? [headC[0] * 2, (headC[1] - 3) * 2] : [64, 40], RR = haloR * 2;
+    const cellKind = (i, dyy) => {
+      // 0 lacquer, 1 line, 2 face, 3 hair/blocks (mother-of-pearl), 4 robe, 5 an accent in its own colour
+      const v = F[i];
+      if (v === INK) return 1;
+      if (LH[i] && LH[i] !== INK && v === LH[i]) return 5;
+      if (onFace[i] && LW[i]) return 2;
+      if (LW[i]) return 3;
+      if (i >= dyy * N && LC[i - dyy * N]) return 4;
+      return 0;
+    };
+    const mPix = (X, Y, kind, i) => {
+      const x = X >> 1, y = Y >> 1;
+      if (kind === 1) { const up = y > 0 && F[i - N] === INK, dn = y < N - 1 && F[i + N] === INK; return (Y & 1) === 0 && !up ? GLDH : (Y & 1) === 1 && !dn ? GLDS : GLD; }
+      if (kind === 5) return F[i];
+      if (kind === 2) return LAC;   // the face is plain black lacquer, so its raised gold line reads
+      if (kind === 3) return -1;   // mother-of-pearl, coloured live
+      if (kind === 4) { const b = BAY4[(Y & 3) * 4 + (X & 3)], g = (0.2 + (y / N) * 0.5) * 16; return b === 0 && g > 6 ? GLDH : b < g ? GLD : LAC; }   // the robe in gold powder, graded denser toward the hem
+      // lacquer: the mother-of-pearl ring of the halo, a gold line inside it, and the lacquer's own faint grain
+      const d = Math.hypot(X + 0.5 - rxy[0], Y + 0.5 - rxy[1]);
+      if (haloC && Math.abs(d - RR) < 2.6) return -1;
+      if (haloC && Math.abs(d - RR + 4.5) < 0.6) return GLDD;
+      if (washStyle === 'Gold Flecks' && hm(X, Y, 6) < 0.025) return hm(X, Y, 8) < 0.4 ? GLDH : GLDD;   // its wash style: flecks of gold in the lacquer
+      return hm(X >> 2, Y, 3) < 0.08 ? LAC2 : LAC;
+    };
+    const renderCell = (i, dyy) => {
+      const kind = cellKind(i, dyy), x = i % N, y = (i - x) / N; kindM[i] = kind;
+      for (let v = 0; v < 2; v++) for (let u = 0; u < 2; u++) { const X = x * 2 + u, Y = y * 2 + v, c3 = mPix(X, Y, kind, i); mBase[Y * 128 + X] = c3 < 0 ? 0 : c3; }
+    };
+    const makiFrame = (t, dyy, inp) => {
+      if (dyy !== mDy) { mFull = true; mDy = dyy; }
+      if (mFull) {
+        for (let i = 0; i < NN; i++) { renderCell(i, dyy); prevF[i] = F[i]; }
+        radenPx.length = 0; radenId.length = 0;
+        // the inlay is a few big pieces of shell: the hair (and colour blocks) cut into pieces about twelve pixels across
+        // round jittered seeds, the halo ring into twelve arcs; a seam of gold between pieces, a lit top edge on each
+        const pieceOf = n => {
+          const X = n & 127, Y = n >> 7, d = Math.hypot(X + 0.5 - rxy[0], Y + 0.5 - rxy[1]);
+          if (haloC && Math.abs(d - RR) < 2.6) { const a = (Math.atan2(Y + 0.5 - rxy[1], X + 0.5 - rxy[0]) + Math.PI) / (Math.PI * 2) * 12; return Math.abs(a - Math.round(a)) * (RR * 0.52) < 0.6 ? -1 : 1000 + Math.floor(a) % 12; }
+          const gx = Math.floor(X / 12), gy = Math.floor(Y / 12); let b1 = 1e9, b2 = 1e9, id = 0;
+          for (let v = -1; v <= 1; v++) for (let u = -1; u <= 1; u++) { const cx = (gx + u) * 12 + hm(gx + u, gy + v, 11) * 12, cy = (gy + v) * 12 + hm(gx + u, gy + v, 12) * 12, dd = (X + 0.5 - cx) ** 2 + (Y + 0.5 - cy) ** 2; if (dd < b1) { b2 = b1; b1 = dd; id = (gy + v) * 20 + gx + u + 40; } else if (dd < b2) b2 = dd; }
+          return Math.sqrt(b2) - Math.sqrt(b1) < 1.1 ? -1 : id;
+        };
+        for (let n = 0; n < 128 * 128; n++) if (mBase[n] === 0) { radenPx.push(n); radenId.push(pieceOf(n)); }
+        for (let q = 0; q < radenPx.length; q++) { const n = radenPx[q]; radenTop[q] = radenId[q] >= 0 && n >= 128 && mBase[n - 128] === 0 && pieceOf(n - 128) !== radenId[q] ? 1 : 0; }
+        // the frame: lacquer edge, a gold fillet, corner flowers in gold
+        for (let n = 0; n < 128 * 128; n++) { const X = n & 127, Y = n >> 7, m = Math.min(X, Y, 127 - X, 127 - Y); if (m < 3) mBase[n] = LAC; else if (m === 3) mBase[n] = GLD; else if (m === 4) mBase[n] = GLDS; }
+        for (const [cx, cy] of [[8, 8], [119, 8], [8, 119], [119, 119]]) for (let a = 0; a < 5; a++) for (let r = 1; r <= 3; r++) { const X = Math.round(cx + Math.cos(a * 1.2566) * r), Y = Math.round(cy + Math.sin(a * 1.2566) * r); mBase[Y * 128 + X] = r === 3 ? GLDH : GLD; }
+        mFull = false;
+      } else for (let i = 0; i < NN; i++) if (F[i] !== prevF[i]) { prevF[i] = F[i]; renderCell(i, dyy); for (let v = 0; v < 2; v++) for (let u = 0; u < 2; u++) { const n = ((i >> 6) * 2 + v) * 128 + (i & 63) * 2 + u; if (!mBase[n]) mBase[n] = LAC2; } }
+      M32.set(mBase);
+      // the mother-of-pearl: each shell chip its own colour, the colours sliding slowly; a tap sends a wave through it
+      const sh = Math.floor(t * 2), wave = t - ringAt < 2.2 ? (t - ringAt) * 70 : -99, d0 = (X, Y) => Math.hypot(X - shimX, Y - shimY);
+      const gk = (t % 7) / 7, gl = gk < 0.45, gA = -Math.PI * 0.85 + gk / 0.45 * Math.PI * 1.7, gD = gk / 0.45 * 300 - 40;
+      for (let q = 0; q < radenPx.length; q++) {
+        const n = radenPx[q], id = radenId[q];
+        if (id < 0) { M32[n] = GLDS; continue; }
+        let k = (id * 3 + Math.floor(t * 0.4 + (id % 7) * 0.37)) % 6;
+        if (radenTop[q]) k = 6;
+        // a tap's wave: a band of colour runs through the shell, each chip turning through the inlay's colours as it passes
+        let col = -1;
+        if (wave > 0) { const X = n & 127, Y = n >> 7, dd = d0(X, Y) - wave; if (dd > -30 && dd < 2) col = IRID[(id + 6 + Math.floor(-dd / 5)) % 6]; }
+        // a slow glint runs round the halo (or across the shell if there's none), a white core with a rainbow trail
+        if (gl) { const X = n & 127, Y = n >> 7, ga = haloC && id >= 1000 ? ((Math.atan2(Y + 0.5 - rxy[1], X + 0.5 - rxy[0]) - gA) % 6.283 + 6.283 + 3.1416) % 6.283 - 3.1416 : ((X + Y) - gD) / 30; if (Math.abs(ga) < 0.12) col = RADEN[6]; else if (ga < 0 && ga > -0.6) col = IRID[Math.floor(-ga / 0.1) % 6]; }
+        M32[n] = col >= 0 ? col : RADEN[k];
+      }
+      // a slow sheen crosses the lacquer, diagonally
+      const sp = ((t * 22) % 360) - 60;
+      for (let Y = 5; Y < 123; Y++) { const x0 = Math.max(5, Math.floor(sp - Y)), x1 = Math.min(122, Math.floor(sp - Y + 14)); for (let X = x0; X <= x1; X++) { const n = Y * 128 + X; if (M32[n] === LAC && ((X + Y) & 1)) M32[n] = X - (sp - Y) < 7 ? LAC3 : LAC2; } }
+      // the sprinkled powder, falling and settled: it passes behind the face and every gold line (and a cell round
+      // them), so no speck ever crosses the face
+      if (dustAt.length) {
+        for (let i = 0; i < NN; i++) { const k = kindM[i]; dzA[i] = k === 1 || k === 2 || k === 5 || onFace[i] ? 1 : 0; }
+        for (let i = 0; i < NN; i++) { const x = i % N, y = (i - x) / N; let b = 0; for (let v = -1; v <= 1 && !b; v++) for (let u = -1; u <= 1; u++) { const xx = x + u, yy = y + v; if (xx >= 0 && yy >= 0 && xx < N && yy < N && dzA[yy * N + xx]) { b = 1; break; } } dzB[i] = b; }
+      }
+      const dput = (n, col) => { if (n >= 0 && n < 128 * 128 && !dzB[((n >> 7) >> 1) * N + ((n & 127) >> 1)]) M32[n] = col; };
+      for (const [x, y, , vy, born, big] of dustAt) {
+        const X = Math.floor(x), Y = Math.floor(y); if (X < 6 || Y < 6 || X > 121 || Y > 121) continue;
+        const age = t - born, n = Y * 128 + X;
+        if (vy) { dput(n, GLDH); dput(n + 1, GLD); dput(n + 128, GLD); dput(n + 129, GLDS); if (big && Math.floor(t * 12 + x) % 2) { dput(n - 1, GLDH); dput(n + 2, GLDH); dput(n - 128, GLDH); dput(n + 256, GLDH); } continue; }
+        dput(n, age > 6 ? GLDS : Math.floor(t * 3 + x + y) % 9 === 0 ? WHITEG : GLDH); dput(n + 1, age > 6 ? LAC2 : GLD);
+      }
+      // the wave's leading edge brightens the gold line a moment as it passes
+      if (wave > 0) for (let n = 0; n < 128 * 128; n++) { const v = M32[n]; if (v === GLD || v === GLDS) { const X = n & 127, Y = n >> 7, dd = d0(X, Y) - wave; if (dd > -3 && dd < 1) M32[n] = GLDH; } }
+    };
     const octx = off.getContext('2d'), img = octx.createImageData(N, N), F = new Uint32Array(img.data.buffer);
     // gold leaf: the line is gold on the lacquer and turns dark where it crosses the leaf
-    const LACQ = word([58, 26, 18]), swap = legend === 'Gold Leaf';
+    const LACQ = word([58, 26, 18]), swap = false;
     const lay2 = (src, dy, inked) => {
       for (let y = N - 1; y >= dy; y--) { const o = y * N, s = (y - dy) * N; for (let x = 0; x < N; x++) { const v = src[s + x]; if (v) F[o + x] = inked && swap && v === INK && F[o + x] !== L0[o + x] ? LACQ : v; } }
     };
@@ -670,6 +951,12 @@ Proto.add({
     const flyCol = word(rgb(LEG ? LEG.glint : washes[(washes.indexOf(clothWash) + 4) % washes.length]));
     const GLINT = LEG ? word(rgb(LEG.glint)) : 0, EXPO = word([18, 52, 104]), LIT = word(mixc(g0, [255, 246, 222], 0.3));
     const expo = legend === 'Cyanotype' ? new Float32Array(NN) : null;
+    const GLINT2 = word([252, 222, 140]), GOLDLINE = word([236, 190, 84]), FRAMEC = word([38, 14, 16]), FILLET = word([226, 178, 72]), SPARK = word([255, 252, 236]);
+    const PAPERC = word([240, 235, 222]), THIN = word([112, 148, 202]), MOTE = word([120, 140, 130]), MOTE2 = word([196, 210, 200]), GLEAM = word([252, 250, 244]);
+    const LEAF = word([246, 206, 104]), LEAFHI = word([255, 236, 170]), LEAFSH = word([196, 146, 50]);
+    const CRACKM = word([72, 66, 60]), IRIS = word([[46, 128, 168], [52, 146, 92], [176, 112, 40]][Math.abs(hx.charCodeAt(5)) % 3]), IRISD = word([18, 40, 54]), WAKEG = word([206, 230, 240]),
+      CHIPD = word([120, 112, 100]), CHIPL = word([255, 252, 246]), CHIPM = word([200, 192, 178]);
+    const floorY = legend === 'Marble' ? Math.floor(cellAt([0, shoulderY + 150], false)[1]) - 1 : N;
 
     return (t) => {
       const inp = c.input;
@@ -680,6 +967,7 @@ Proto.add({
       if (lookAmt > watch) lookAmt = Math.max(watch, lookAmt - dtt / 2.4); else lookAmt += (watch - lookAmt) * Math.min(1, dtt * 3);
       if (lookAmt < 1e-3) lookAmt = 0;
       lastT = t;
+      if (legend) toyMove(inp, t, dtt);
       const pcx = Math.floor(inp.x * N), pcy = Math.floor(inp.y * N);
 
       F.set(L0);
@@ -692,11 +980,16 @@ Proto.add({
       for (const [x, y, col, big] of splats) { put(F, x, y, col); if (big) put(F, x + 1, y, col); }
       const dy = Math.sin(t * 1.3) > 0.2 ? 1 : 0;   // a breath: the shoulders drop one cell and come back
       lay2(LC, dy);
+      if (fronds.length) {
+        // the fern fronds sway a little, as if a breath of air moved them during the exposure (eight poses, laid ready)
+        for (const f of fronds) { const k = Math.round((Math.sin(t * 0.8 + f.ph) + 1) * 3.5), cs = f.poses[k]; for (let j = 0; j < cs.length; j += 2) F[cs[j]] = cs[j + 1]; }
+      }
       lay2(LW, 0);
-      // gold leaf catches a band of light: it drifts by itself, follows the pointer, and runs from a tap
-      if (legend === 'Gold Leaf') {
-        const band = inp.inside ? pcx + pcy : ((t * 9) % (N * 3)) - N * 0.5, run = t - chimeAt < 1.2 ? chimeX + (t - chimeAt) * 90 : -99;
-        for (let i = 0; i < NN; i++) if (leaf[i] && F[i] !== W.faceRim) { const s = (i % N) + Math.floor(i / N); if (Math.abs(s - band) < 1.5 || Math.abs(s - run) < 1.5) F[i] = GLINT; }
+      if (legend === 'Cyanotype') {
+        // the laid ferns: white at first, then the blue develops back over them, a dithered step at a time
+        const draw = (cells, k) => { for (let j = 0; j < cells.length; j += 3) { const x = cells[j], y = cells[j + 1]; if (x >= 0 && y >= 0 && x < N && y < N && BAYER[(y & 3) * 4 + (x & 3)] >= k * 16) F[y * N + x] = cells[j + 2] === 2 ? FROND2 : cells[j + 2] === 3 ? FROND3 : FROND; } };
+        for (let n = ferns.length - 1; n >= 0; n--) { const age = t - ferns[n].born, k = Math.max(0, (age - 3) / 7); if (k >= 1) { ferns.splice(n, 1); continue; } draw(ferns[n].cells, k); }
+        if (stroke && stroke.pts.length > 1) { const cs = []; fernCells(stroke.pts, cs); draw(cs, 0); }
       }
       // the viewer's beads, as pixel watercolour: a flat pool, a darker rim one cell wide where the pigment
       // gathered, one dithered ring of bleed outside it; it dries by shrinking a cell at a time, and never
@@ -742,6 +1035,29 @@ Proto.add({
       lay2(LH, 0, true);
       eyes(t, (t % blinkP) < 0.14);
       if (LITE) for (let i = 0; i < NN; i++) if (onFace[i] && F[i] === INK) F[i] = LITE;
+if (legend === 'Cyanotype') { for (let i = 0; i < NN; i++) if (edge[i]) F[i] = edge[i] === 1 ? PAPERC : THIN; }
+      else if (legend === 'Marble') {
+        // dust turning slowly in the beam of light
+        for (const [u, v, ph] of motes) {
+          const y = Math.floor(2 + ((v * 54 + t * (1.2 + u)) % 54)), bw = 5 + y * 0.32, x = Math.floor(niche[0] + (u - 0.5) * bw * 1.7 + Math.sin(t * 0.7 + ph) * 1.5);
+          if (x >= 0 && x < N && y < N && F[y * N + x] === L0[y * N + x]) F[y * N + x] = (Math.sin(t * 2 + ph * 3) > 0.3) ? MOTE2 : MOTE;
+        }
+        // the chisel's marks: a dark nick with fresh pale stone beside it, and the flakes on the niche floor
+        // healing: once the statue sleeps again its cracks draw back into the nicks, shimmering, and close
+        const heal = t - wakeAt > 6 && t - wakeAt < 7.6 ? (t - wakeAt - 6) / 1.6 : 0;
+        for (const [x, y, born, kind, len] of chips) {
+          // each blow: a nick (shadow in it, fresh pale stone round it) and a crack two cells wide that grows from it
+          if (heal < 0.85) for (const [u, v, k2] of [[0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0], [-1, 0, 1], [0, -1, 1], [2, 0, 1], [1, -1, 2], [-1, 1, 2], [2, 1, 2]]) { const i = (y + v) * N + x + u; if (i >= 0 && i < NN && F[i] !== INK) F[i] = k2 === 0 ? CHIPD : k2 === 1 ? CHIPL : CHIPM; }
+          const ca = kind * 1.57 + 0.6, grown = Math.min(1, (t - born) / 0.3) * (1 - heal), L2 = 2 + len * grown;
+          for (let s = 2; s < L2; s++) { const xx = Math.floor(x + 0.5 + Math.cos(ca + s * 0.12) * s), yy = Math.floor(y + 0.5 + Math.sin(ca + s * 0.12) * s); put(F, xx, yy, heal && (s + Math.floor(t * 20)) % 3 === 0 ? GLEAM : CRACKM); put(F, xx + 1, yy, heal ? CHIPL : CHIPM); if (s > L2 * 0.6) { const b = ca + 0.9; put(F, Math.floor(xx + Math.cos(b) * 2), Math.floor(yy + Math.sin(b) * 2), CRACKM); } }
+          if (t - born < 0.3) for (let a = 0; a < 8; a++) put(F, Math.floor(x + 0.5 + Math.cos(a * 0.785) * (2 + (t - born) * 14)), Math.floor(y + 0.5 + Math.sin(a * 0.785) * (2 + (t - born) * 14)), GLEAM);
+        }
+        for (const f of flakes) { const x = Math.floor(f[0]), y = Math.floor(f[1]); put(F, x, y, f[3] === null ? CHIPM : CHIPL); if (f[5]) { put(F, x + 1, y, CHIPM); put(F, x, y + 1, CHIPM); put(F, x + 1, y + 1, CHIPD); } }
+        for (const [x, y, , , born] of dust) { const k = (t - born) / 1.6; if (BAYER[(Math.floor(y) & 3) * 4 + (Math.floor(x) & 3)] >= k * 16) put(F, Math.floor(x), Math.floor(y), k < 0.5 ? CHIPL : MOTE2); }
+        // a slow gleam passes over the polished stone now and then
+        const gx = ((t * 7 + niche[0]) % 90) - 13;
+        for (let i = 0; i < NN; i++) { const v = F[i]; if (v === W.face || v === W.hair || v === W.cloth) { const x = i % N, y = (i - x) / N, d = Math.abs(x - gx + (y - 32) * 0.35); if (d < 1.2 || (d < 2.4 && ((x + y) & 1))) F[i] = GLEAM; } }
+      }
       // the brush's bead glints when the pointer comes near
       // a vermilion bead swells under the brush, drips and falls, again and again
       if (brushDrip) {
@@ -751,6 +1067,12 @@ Proto.add({
       }
       if (brushCell && inp.inside && Math.abs(pcx - brushCell[0]) <= 6 && Math.abs(pcy - brushCell[1]) <= 6 && Math.floor(t * 3) % 2 === 0) { const [x, y] = brushCell; put(F, x, y - 1, word([255, 240, 200])); put(F, x - 1, y - 2, word([255, 250, 230])); put(F, x + 1, y - 2, word([255, 250, 230])); put(F, x, y - 3, word([255, 240, 200])); }
 
+      if (MK) {
+        makiFrame(t, dy, inp);
+        mctx.putImageData(mimg, 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false; ctx.drawImage(moff, 0, 0, 128, 128, 0, 0, S, S);
+        return;
+      }
       octx.putImageData(img, 0, 0);
       ctx.setTransform(1, 0, 0, 1, 0, 0);   // the whole canvas, cells scaled up
       ctx.imageSmoothingEnabled = false;   // the cells stay hard

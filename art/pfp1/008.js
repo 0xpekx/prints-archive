@@ -674,55 +674,8 @@ Proto.add({
       const inp = c.input, dt = Math.min(0.1, Math.max(0, t - lastT));
       lastT = t;
       beeps = beeps.filter(b => b[0] + b[1] > t);
-      // the hive: each feed has its own voice; the one under the pointer lights up
-      if (legend === 'Hive') {
-        const tileAt = (x, y) => { const hx = (x * S - ox) / G * 88, hy = (y * S - oy) / G * 88; return hx < 0 || hy < 0 || hx >= 88 || hy >= 88 ? -1 : (hx < 29 ? 0 : hx < 59 ? 1 : 2) + 3 * (hy < 29 ? 0 : hy < 59 ? 1 : 2); };
-        const ht = inp.inside ? tileAt(inp.x, inp.y) : -1;
-        if (ht >= 0 && ht !== hoverTile) c.sound.note(tone(ht + 2), { dur: 0.06, vel: 0.05, wave: 'sine' });
-        hoverTile = ht;
-        for (let i = 0; i < 9; i++) tileBeeps[i] = tileBeeps[i].filter(b => b[0] + b[1] > t);
-        for (const p of inp.taps()) {
-          const i = tileAt(p.x, p.y);
-          if (i < 0 || tileBeeps[i].length) continue;
-          c.sound.hit('click', 0.2);
-          let at = 0.3;
-          for (let k = 0; k < 3; k++) { const len = k === 2 ? 0.22 : 0.09; tileBeeps[i].push([t + at, len]); c.sound.note(tone(i + [0, 2, 4][k]), { dur: len, vel: 0.15, wave: 'square', cutoff: 1600, at, pan: (i % 3 - 1) * 0.4 }); at += len + 0.07; }
-          // then the rest of the hive answers, one after another, nearest first
-          const ix = i % 3, iy = Math.floor(i / 3);
-          for (let j = 0; j < 9; j++) if (j !== i) {
-            const dd = Math.hypot(j % 3 - ix, Math.floor(j / 3) - iy), a2 = at + 0.15 + dd * 0.22 + (j % 2) * 0.05;
-            tileBeeps[j].push([t + a2, 0.12]);
-            c.sound.note(tone(j + 1), { dur: 0.12, vel: 0.07, wave: 'triangle', cutoff: 2200, at: a2, pan: (j % 3 - 1) * 0.5 });
-          }
-        }
-        return;
-      }
-      // the envoy: greets you when the pointer arrives, and speaks a sentence when tapped
-      if (legend === 'The Envoy') {
-        envoyHover = inp.inside;
-        if (inp.inside && !wasIn) { c.sound.note(tone(7), { dur: 0.5, vel: 0.07, wave: 'sine' }); c.sound.note(tone(9), { dur: 0.7, vel: 0.06, wave: 'sine', at: 0.14 }); }
-        wasIn = inp.inside;
-        for (const p of inp.taps()) {
-          if (t < speakEnd - 0.4) continue;
-          speech = [];
-          const n = 4 + Math.floor(seqRand() * 3);
-          let at = 0.25;
-          speakStart = t + at;
-          for (let j = 0; j < n; j++) {
-            speech.push(1 + Math.floor(seqRand() * 511));
-            const syl = 1 + Math.floor(seqRand() * 2);
-            for (let s = 0; s < syl; s++) {
-              const last = j === n - 1 && s === syl - 1, len = last ? 0.4 : 0.14;
-              const step = last ? 0 : Math.round(3 + Math.sin(j * 1.3 + s) * 2.5 + (seqRand() - 0.5) * 2);
-              beeps.push([t + at, len]);
-              c.sound.note(tone(step), { dur: len, vel: 0.13, wave: 'triangle', cutoff: 1500, at, pan: (p.x - 0.5) * 0.3 });
-              at += len + 0.04;
-            }
-            at += 0.12;
-          }
-          speakEnd = t + at + 1.6;
-        }
-      }
+      if (legend === 'Hive') return feelHive(t, dt);
+      if (legend === 'The Envoy') return feelEnvoy(t, dt);
       for (const p of inp.taps()) {
         if (beeps.length) continue;
         // a little pause, then 3 to 6 beeps of mixed lengths
@@ -757,61 +710,362 @@ Proto.add({
         for (let x = 0; x < N; x++) { const st = noise(x, y, f) < 0.18 * k; L[y * N + x] = st ? (noise(y, x, f + 1) > 0.5 ? 2 : 1) : row[x]; RGB[y * N + x] = st ? -1 : rowC[x]; }
       }
     }
-    // the hive's wall of feeds: nine 28-cell screens with two-cell bezels between them
+    // ---------- the legendaries: one-of-ones of their own ----------
+    // The Hive: a honeycomb of hexagonal screens in honey light, this mint's own visitor in the middle in its own
+    // phosphor, the others round it in amber; a signal pulses out along the wax between them
+    const HG = 84, Rh = 14.6;
+    const SLOTS = [[42, 42, 4], [12, 42, 3], [72, 42, 5], [27, 16.5, 0], [57, 16.5, 1], [27, 67.5, 6], [57, 67.5, 2], [-3, 16.5, 7], [87, 67.5, 8],
+      [87, 16.5, -1], [-3, 67.5, -1], [12, -9, -1], [42, -9, -1], [72, -9, -1], [12, 93, -1], [42, 93, -1], [72, 93, -1]];
+    const HONEY = [[16, 8, 2], [92, 50, 8], [182, 104, 20], [255, 176, 44], [255, 236, 168]];
+    // which hex screen a cell of the honeycomb belongs to (or -1 for the wax), and how far inside it is
+    const hexAt = (x, y) => { for (let s = 0; s < SLOTS.length; s++) { const dx = Math.abs(x + 0.5 - SLOTS[s][0]), dy = Math.abs(y + 0.5 - SLOTS[s][1]); const e = Math.max(dx / (Rh * 0.866), (dy + dx * 0.5774) / Rh); if (e <= 1) return [s, e]; } return [-1, 9]; };
+    let hexMap = null, hexE = null;
+    const slotOfTile = i => SLOTS.findIndex(s => s[2] === i);
     const levelsOf = ph => {
       const bs = PHOS[ph] || PHOS.Green;
       if (ph === 'Duotone') return [[10, 4, 20], [104, 28, 118], [214, 68, 168], [92, 196, 255], [206, 246, 255]];
       if (ph === 'Thermal') return [[6, 4, 16], [72, 16, 112], [204, 38, 80], [255, 160, 30], [255, 248, 196]];
       return [0, 0.26, 0.52, 0.84, 1].map((f, i) => i === 4 ? bs.map(v => Math.round(v + (255 - v) * 0.55)) : bs.map(v => Math.round(v * f + (i === 0 ? 6 : 0))));
     };
-    let hiveCan = null, hctx = null, hiveImg = null;
+    let hiveCan = null, hctx = null, hiveImg = null, hiveF = 0;
+    const tileL = [];
     if (legend === 'Hive') {
-      for (const tl of tiles) tl.lv = levelsOf(tl.ph);
-      hiveCan = document.createElement('canvas'); hiveCan.width = hiveCan.height = 88;
-      hctx = hiveCan.getContext('2d'); hiveImg = hctx.createImageData(88, 88);
+      for (let i = 0; i < 9; i++) tileL.push(null);
+      for (const tl of tiles) tl.lv = HONEY;
+      tiles[4].lv = levelsOf(tiles[4].ph);
+      hiveCan = document.createElement('canvas'); hiveCan.width = hiveCan.height = HG;
+      hctx = hiveCan.getContext('2d'); hiveImg = hctx.createImageData(HG, HG);
+      hexMap = new Int8Array(HG * HG); hexE = new Float32Array(HG * HG);
+      for (let y = 0; y < HG; y++) for (let x = 0; x < HG; x++) { const [s, e] = hexAt(x, y); hexMap[y * HG + x] = s; hexE[y * HG + x] = e; }
     }
     function renderHive(t) {
       nowT = t;
-      const HG = 88, dd = hiveImg.data;
-      for (let i = 0; i < HG * HG; i++) { dd[i * 4] = 9; dd[i * 4 + 1] = 9; dd[i * 4 + 2] = 13; dd[i * 4 + 3] = 255; }
-      const keep = [head, eyes, antenna, mouth, mark, suit, feed];
+      const dd = hiveImg.data, keep = [head, eyes, antenna, mouth, mark, suit, feed];
+      const pulseR = ((t - chordAt < 2 ? (t - chordAt) * 30 : t * 9) % 60), tick = Math.floor(t * 8);
+      const playing = t - playT0 < playSeq.length * 0.24 + 0.3, step = Math.floor((t - playT0) / 0.24);
+      const hotSet = new Set([hoverTile]), pathSet = new Set(drawing ? hPath : playing ? playSeq : []);
+      if (playing && step >= 0 && step < playSeq.length) hotSet.add(SLOTS[playSeq[step]][2]);
+      if (t - chordAt < 0.6) for (let i = 0; i < 9; i++) hotSet.add(i);
+      // the wax first: dark, lit honey near each screen's edge, a signal pulse running out from the middle
+      for (let i = 0; i < HG * HG; i++) {
+        const x = i % HG, y = (i - x) / HG, s = hexMap[i];
+        let col;
+        if (s < 0) {
+          const r = Math.hypot(x + 0.5 - 42, y + 0.5 - 42);
+          col = Math.abs(r - pulseR) < 1.6 ? [255, 210, 90] : Math.abs(r - pulseR + 3) < 1.6 ? [150, 92, 20] : (x + y) % 5 === 0 ? [26, 14, 3] : [12, 7, 2];
+        } else if (SLOTS[s][2] < 0) col = (x * 7 + y * 13 + tick) % 23 === 0 ? HONEY[2] : hexE[i] > 0.88 ? HONEY[1] : [36, 20, 4];
+        else continue;
+        dd[i * 4] = col[0]; dd[i * 4 + 1] = col[1]; dd[i * 4 + 2] = col[2]; dd[i * 4 + 3] = 255;
+      }
+      // then each screen's visitor, all blinking together
       for (let i = 0; i < 9; i++) {
-        const T = tiles[i];
-        [head, eyes, antenna, mouth, mark, suit, feed] = T.v; curTile = i;
-        compose(t + i * 0.61);
-        const hot = i === hoverTile, bx = (i % 3) * 30, by = Math.floor(i / 3) * 30;
-        for (let q = 0; q < N * N; q++) {
-          const x = q % N, y = (q - x) / N;
-          let k = L[q];
-          if (hot && k) k = Math.min(4, k + 1);
-          const col = T.lv[k], j = ((by + y) * HG + bx + x) * 4;
-          dd[j] = col[0]; dd[j + 1] = col[1]; dd[j + 2] = col[2];
+        const T = tiles[i], si = slotOfTile(i), [cx, cy] = SLOTS[si];
+        // (the queen redraws every frame; her drones take turns, a third of them a frame)
+        if (i === 4 || !tileL[i] || (hiveF + i) % 3 === 0) {
+          [head, eyes, antenna, mouth, mark, suit, feed] = T.v; curTile = i;
+          compose(t + (i === 4 ? 0 : 0.05 * i));
+          tileL[i] = L.slice();
         }
-        if (hot) for (let y = by - 1; y <= by + N; y++) for (let x = bx - 1; x <= bx + N; x++) {
-          if (x < 0 || y < 0 || x >= HG || y >= HG || (x >= bx && x < bx + N && y >= by && y < by + N)) continue;
-          const col = T.lv[3], j = (y * HG + x) * 4; dd[j] = col[0]; dd[j + 1] = col[1]; dd[j + 2] = col[2];
+        const TL = tileL[i];
+        const hot = hotSet.has(i), onPath = pathSet.has(si), bx = Math.round(cx - 14), by = Math.round(cy - 14);
+        for (let y = Math.floor(cy - Rh); y <= cy + Rh; y++) for (let x = Math.floor(cx - Rh); x <= cx + Rh; x++) {
+          if (x < 0 || y < 0 || x >= HG || y >= HG) continue;
+          const j = y * HG + x;
+          if (hexMap[j] !== si) continue;
+          const lx = x - bx, ly = y - by;
+          let k = lx >= 0 && ly >= 0 && lx < N && ly < N ? TL[ly * N + lx] : 0;
+          if (hot && k) k = Math.min(4, k + 1);
+          const rim = hexE[j] > (i === 4 ? 0.86 : 0.92);
+          const col = rim ? (hot || onPath ? T.lv[4] : i === 4 ? (Math.sin(t * 3) > 0 ? T.lv[4] : T.lv[3]) : T.lv[2]) : T.lv[k];
+          dd[j * 4] = col[0]; dd[j * 4 + 1] = col[1]; dd[j * 4 + 2] = col[2]; dd[j * 4 + 3] = 255;
         }
       }
-      [head, eyes, antenna, mouth, mark, suit, feed] = keep; curTile = -1;
+      [head, eyes, antenna, mouth, mark, suit, feed] = keep; curTile = -1; hiveF++;
+      // the path you drew between the cells, and the signal running along it
+      const seq = drawing ? hPath : playing ? playSeq : [];
+      const plot = (x, y, col) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < HG && y < HG) { const j = (y * HG + x) * 4; dd[j] = col[0]; dd[j + 1] = col[1]; dd[j + 2] = col[2]; } };
+      for (let k = 0; k + 1 < seq.length; k++) {
+        const [x0, y0] = SLOTS[seq[k]], [x1, y1] = SLOTS[seq[k + 1]], n = Math.ceil(Math.hypot(x1 - x0, y1 - y0));
+        for (let q = 0; q <= n; q += 2) plot(x0 + (x1 - x0) * q / n, y0 + (y1 - y0) * q / n, playing && k < step ? [120, 80, 20] : [255, 220, 120]);
+        if (playing && k === step) { const a2 = ((t - playT0) / 0.24) % 1; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) plot(x0 + (x1 - x0) * a2 + dx, y0 + (y1 - y0) * a2 + dy, [255, 250, 220]); }
+      }
       hctx.putImageData(hiveImg, 0, 0);
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = '#060608'; ctx.fillRect(0, 0, S, S);
+      ctx.fillStyle = '#0a0602'; ctx.fillRect(0, 0, S, S);
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(hiveCan, ox, oy, G, G);
       ctx.globalCompositeOperation = 'lighter'; ctx.imageSmoothingEnabled = true;
-      ctx.globalAlpha = 0.3; ctx.drawImage(hiveCan, ox - G / 176, oy - G / 176, G + G / 88, G + G / 88);
-      ctx.globalAlpha = 0.05; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, oy + ((t * 0.12) % 1.3 - 0.15) * G, S, G * 0.1);
+      ctx.globalAlpha = 0.3; ctx.drawImage(hiveCan, ox - G / 168, oy - G / 168, G + G / 84, G + G / 84);
+      ctx.globalAlpha = 0.05; ctx.fillStyle = '#ffd890'; ctx.fillRect(0, oy + ((t * 0.12) % 1.3 - 0.15) * G, S, G * 0.1);
       ctx.globalCompositeOperation = 'source-over';
       const hc = G / HG;
-      if (hc >= 3) { ctx.globalAlpha = 0.4; ctx.fillStyle = '#000'; for (let y = 0; y < HG; y++) ctx.fillRect(0, oy + y * hc + hc * 0.7, S, hc * 0.3); }
+      if (hc >= 3) { ctx.globalAlpha = 0.35; ctx.fillStyle = '#000'; for (let y = 0; y < HG; y++) ctx.fillRect(0, oy + y * hc + hc * 0.7, S, hc * 0.3); }
       ctx.globalAlpha = 1;
-      const vg = ctx.createRadialGradient(S / 2, S / 2, G * 0.4, S / 2, S / 2, G * 0.78);
-      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+      const vg = ctx.createRadialGradient(S / 2, S / 2, G * 0.38, S / 2, S / 2, G * 0.78);
+      vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.6)');
       ctx.fillStyle = vg; ctx.fillRect(0, 0, S + 1, S + 1);
+    }
+
+    // ---------- the legendaries' toys ----------
+    // The Hive: draw a path across the cells and let go, and the signal runs it, each drone singing its own note in
+    // turn (so every path is a little tune); tap the queen and the whole hive sings at once; tap a drone and it calls
+    // and the hive answers
+    let hPath = [], drawing = false, playT0 = -99, playSeq = [], chordAt = -9, hDown = false, hPressT = -9;
+    function feelHive(t, dt) {
+      const inp = c.input;
+      const slotAt = (x, y) => { const hx = Math.floor((x * S - ox) / G * HG), hy = Math.floor((y * S - oy) / G * HG); if (hx < 0 || hy < 0 || hx >= HG || hy >= HG) return -1; const sl = hexMap[hy * HG + hx]; return sl >= 0 && SLOTS[sl][2] >= 0 ? sl : -1; };
+      const hs = inp.inside ? slotAt(inp.x, inp.y) : -1, ht = hs >= 0 ? SLOTS[hs][2] : -1;
+      if (ht >= 0 && ht !== hoverTile && !drawing) c.sound.note(tone(ht + 2), { dur: 0.06, vel: 0.05, wave: 'sine' });
+      hoverTile = ht;
+      for (let i = 0; i < 9; i++) tileBeeps[i] = tileBeeps[i].filter(b => b[0] + b[1] > t);
+      inp.taps();
+      const down = inp.inside && inp.down, pressed = down && !hDown, released = !down && hDown;
+      if (pressed) { hPath = hs >= 0 ? [hs] : []; drawing = true; hPressT = t; }
+      if (drawing && down && hs >= 0 && hPath[hPath.length - 1] !== hs && hPath.length < 16) { hPath.push(hs); c.sound.note(tone(ht + 2), { dur: 0.08, vel: 0.07, wave: 'square', cutoff: 1800 }); }
+      if (released && drawing) {
+        drawing = false;
+        if (hPath.length >= 2) {
+          playT0 = t + 0.15; playSeq = hPath.slice();
+          playSeq.forEach((sl, k) => { const i = SLOTS[sl][2]; tileBeeps[i].push([playT0 + k * 0.24, 0.2]); c.sound.note(tone(i + 3), { dur: 0.2, vel: 0.13, wave: 'square', cutoff: 1700, at: 0.15 + k * 0.24, pan: (SLOTS[sl][0] / 84 - 0.5) * 0.8 }); });
+        } else if (hPath.length === 1 && t - hPressT < 0.4) {
+          const i = SLOTS[hPath[0]][2];
+          if (i === 4) {
+            // the queen: every drone sings at once, a ring of light runs out through the wax
+            chordAt = t;
+            for (let j = 0; j < 9; j++) { tileBeeps[j].push([t + 0.05, 0.5]); c.sound.note(tone([0, 2, 4, 7, 9, 11, 12, 14, 16][j]), { dur: 0.6, vel: 0.06, wave: 'triangle', cutoff: 2200, at: 0.05 }); }
+          } else if (!tileBeeps[i].length) {
+            c.sound.hit('click', 0.2);
+            let at = 0.3;
+            for (let k = 0; k < 3; k++) { const len = k === 2 ? 0.22 : 0.09; tileBeeps[i].push([t + at, len]); c.sound.note(tone(i + [0, 2, 4][k]), { dur: len, vel: 0.15, wave: 'square', cutoff: 1600, at }); at += len + 0.07; }
+            const si = SLOTS[slotOfTile(i)];
+            for (let j = 0; j < 9; j++) if (j !== i) { const sj = SLOTS[slotOfTile(j)], d2 = Math.hypot(sj[0] - si[0], sj[1] - si[1]) / 30, a2 = at + 0.15 + d2 * 0.22; tileBeeps[j].push([t + a2, 0.12]); c.sound.note(tone(j + 1), { dur: 0.12, vel: 0.07, wave: 'triangle', cutoff: 2200, at: a2 }); }
+          }
+        }
+        hPath = [];
+      }
+      hDown = down;
+    }
+    // ===== The Envoy (redesign): a holographic foil trading card, on its own 56-dot grid. Its name on a silver bar, a
+    // rarity star, the crowned envoy stamped in flat foil shapes in the art box over its own Feed, its skin
+    // enamelled in its Phosphor, its card border in its Monitor's colour, and a foil that throws rainbow bands
+    // across the card as your pointer moves. Hold and drag round its head to turn its script halo: it ratchets a
+    // click at a time, and when you let go it spins on and settles on a click; land its jewel near the arrow at the
+    // art box's edge and it ticks home and the card wakes: the foil blazes, beams burst from its eyes, its crown
+    // flares out of the box and its words scroll along the foot of the card. A short, still tap: it blinks and
+    // says a word
+    const QE = 56, HX = 28, HY = 27, HR = 16, SLOT = Math.PI * 2 / 12;
+    const ceE = Math.max(1, Math.floor(S / QE)), oeE = Math.floor((S - ceE * QE) / 2), ME = Math.ceil(oeE / ceE) + 1, GEe = QE + 2 * ME;
+    let eCan = null, eCtx = null, eImg = null, eBuf = null, eCls = null;
+    if (legend === 'The Envoy') { eCan = document.createElement('canvas'); eCan.width = eCan.height = GEe; eCtx = eCan.getContext('2d'); eImg = eCtx.createImageData(GEe, GEe); eBuf = new Uint32Array(eImg.data.buffer); eCls = new Int8Array(GEe * GEe); }
+    const eRGB = a => (255 << 24) | (Math.round(a[2]) << 16) | (Math.round(a[1]) << 8) | Math.round(a[0]);
+    const eArr = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)], eHex = h => eRGB(eArr(h));
+    const eMix = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+    const HOLO = ['#ff8ab8', '#ffc878', '#e8ff8a', '#8affc8', '#7ad8ff', '#a89aff', '#f08aff'].map(eArr), SILVER = eArr('#c4c8d4'), DARKC = eHex('#14121c'), INKC = eHex('#1c1a2c');
+    const PHA = levelRgb, PH = PHA.map(eRGB), GOLDC = ['#9a6a18', '#e0a830', '#ffe080', '#ffffff'].map(eHex);
+    const BAND = { Chrome: '#d8dce6', 'Beige CRT': '#d8c8a0', Woodgrain: '#7a4a28', 'Black Bezel': '#2a2a32', 'Army Green': '#55663a', Gunmetal: '#4a5260', 'Red Plastic': '#c02c26', 'Monitor Wall': '#3a3a44' }[bezel];
+    const BANDA = BAND ? eArr(BAND) : null;
+    let haloA = 0, haloV = 0, eDownE = false, ePress = -9, eX0 = 0, eY0 = 0, eMoved = 0, grabA = null, wokeAt = -9, blinkE = -9, sheen = 0, eHover = false, eHx = 28, eHy = 28, settled = true, homing = false, lastSlot = 0;
+    const keyAt = SLOT * (3 + parseInt(c.hash.slice(-6, -3), 16) % 7);
+    const jewelOff = () => { let o = ((haloA + keyAt - Math.PI / 2) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI; return o; };
+    function speak(t, pan) {
+      speech = [];
+      const n = 4 + Math.floor(seqRand() * 3);
+      let at = 0.25;
+      speakStart = t + at;
+      for (let j = 0; j < n; j++) {
+        speech.push(1 + Math.floor(seqRand() * 511));
+        const syl = 1 + Math.floor(seqRand() * 2);
+        for (let s2 = 0; s2 < syl; s2++) {
+          const last = j === n - 1 && s2 === syl - 1, len = last ? 0.4 : 0.14, step = last ? 0 : Math.round(3 + Math.sin(j * 1.3 + s2) * 2.5 + (seqRand() - 0.5) * 2);
+          beeps.push([t + at, len]);
+          c.sound.note(tone(step), { dur: len, vel: 0.13, wave: 'triangle', cutoff: 1500, at, pan });
+          at += len + 0.04;
+        }
+        at += 0.12;
+      }
+      speakEnd = t + at + 1.6;
+    }
+    function feelEnvoy(t, dt) {
+      const inp = c.input;
+      eHover = inp.inside;
+      if (inp.inside && !wasIn) { c.sound.note(tone(7), { dur: 0.5, vel: 0.07, wave: 'sine' }); c.sound.note(tone(9), { dur: 0.7, vel: 0.06, wave: 'sine', at: 0.14 }); }
+      wasIn = inp.inside;
+      inp.taps();
+      const gx = (inp.x * S - oeE) / ceE, gy = (inp.y * S - oeE) / ceE, down = inp.inside && inp.down, pressed = down && !eDownE, released = !down && eDownE;
+      if (inp.inside) { eHx = gx; eHy = gy; }
+      if (pressed) { ePress = t; eX0 = gx; eY0 = gy; eMoved = 0; grabA = null; homing = false; }
+      if (down) {
+        eMoved = Math.max(eMoved, Math.hypot(gx - eX0, gy - eY0));
+        const a = Math.atan2(gx - HX, -(gy - HY));
+        if (eMoved > 1.5 && Math.hypot(gx - HX, gy - HY) > 2.5) {
+          if (grabA !== null) { let da = a - grabA; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2; haloA += da; haloV = haloV * 0.5 + da / Math.max(dt, 0.016) * 0.5; }
+          grabA = a; settled = false;
+        }
+      }
+      if (released) {
+        if (t - ePress < 0.3 && eMoved < 1.5) {
+          blinkE = t; c.sound.note(tone(4), { dur: 0.16, vel: 0.11, wave: 'triangle', cutoff: 1500 }); c.sound.note(tone(2), { dur: 0.28, vel: 0.1, wave: 'triangle', cutoff: 1500, at: 0.16 });
+          beeps.push([t, 0.45]);
+        }
+        haloV = Math.max(-10, Math.min(10, haloV));
+      }
+      if (!down && !settled) {
+        // it spins on and slows, then settles on the nearest click; near the arrow its jewel ticks home
+        haloA += haloV * dt; haloV *= Math.pow(0.3, dt);
+        if (Math.abs(haloV) < 1.4) {
+          const off = jewelOff();
+          if (!homing && Math.abs(off) <= SLOT * 3.01) homing = true;
+          const target = homing ? haloA - off : Math.round(haloA / SLOT) * SLOT;
+          haloV = 0; haloA += (target - haloA) * Math.min(1, dt * (homing ? 5 : 9));
+          if (Math.abs(target - haloA) < 0.01) {
+            haloA = target; settled = true;
+            if (homing) { wokeAt = t; homing = false; [0, 4, 7, 12, 16].forEach((k, i) => c.sound.note(tone(k + 5), { dur: 0.35, vel: 0.09, wave: 'sine', at: i * 0.07 })); if (t > speakEnd - 0.4) speak(t + 0.35, 0); }
+          }
+        }
+      }
+      // a click for every notch the halo turns past
+      const sl = Math.floor(haloA / SLOT + 0.5);
+      if (sl !== lastSlot) { lastSlot = sl; c.sound.hit('click', 0.06); }
+      // the foil's rainbow follows the pointer, and drifts on its own
+      const want = eHover ? (eHx + eHy) * 0.5 : t * 6;
+      sheen += (want - sheen) * Math.min(1, dt * (eHover ? 8 : 40));
+      eDownE = down;
+    }
+    const FONT = { T: ['111', '010', '010', '010', '010'], H: ['101', '101', '111', '101', '101'], E: ['111', '100', '110', '100', '111'], N: ['101', '111', '111', '101', '101'], V: ['101', '101', '101', '101', '010'], O: ['111', '101', '101', '101', '111'], Y: ['101', '101', '010', '010', '010'] };
+    function renderEnvoy(t) {
+      const tq = Math.floor(t * 12) / 12, key = tq + ':' + Math.round(haloA * 30) + ':' + Math.round(sheen * 2);
+      if (key === renderEnvoy.k) return;
+      renderEnvoy.k = key;
+      const B = eBuf, CL = eCls, W = GEe;
+      const at = (x, y) => { x = Math.round(x) + ME; y = Math.round(y) + ME; return x >= 0 && y >= 0 && x < W && y < W ? y * W + x : -1; };
+      // put: a flat colour; foil: the rainbow holo (k = 0 field, 1 silver stamping, 2 bright silver)
+      const put = (x, y, col) => { const i = at(x, y); if (i >= 0) { B[i] = col; CL[i] = -1; } };
+      const foil = (x, y, k) => { const i = at(x, y); if (i >= 0) CL[i] = k; };
+      const inE = (x, y, cx, cy, rx, ry) => ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1;
+      const woke = t - wokeAt < 4 ? 1 - (t - wokeAt) / 4 : 0, talk = talking(t), fl = woke > 0.45;
+      const inBox = (x, y) => x >= 4 && x <= 51 && y >= 11 && y <= 47;
+      B.fill(DARKC); CL.fill(-1);
+      // the card: rounded corners, its border in the Monitor's colour (holo silver with none), holo foil inside
+      for (let y = -ME; y < QE + ME; y++) for (let x = -ME; x < QE + ME; x++) {
+        const cx = Math.min(x, QE - 1 - x), cy = Math.min(y, QE - 1 - y);
+        if (cx < 0 || cy < 0 || (cx < 3 && cy < 3 && cx + cy < 3)) continue;
+        const ring = Math.min(cx, cy);
+        if (ring < 3) { if (BANDA) put(x, y, eRGB(ring === 0 ? eMix(BANDA, [0, 0, 0], 0.35) : (x + y) % 9 === 0 ? eMix(BANDA, [255, 255, 255], 0.3) : BANDA)); else foil(x, y, 1); }
+        else foil(x, y, 0);
+      }
+      // the name bar: bright silver, THE ENVOY in ink, the rarity star in holo
+      for (let y = 3; y <= 9; y++) for (let x = 6; x <= 49; x++) foil(x, y, y === 3 || y === 9 ? 1 : 2);
+      let tx = 9;
+      for (const ch of 'THE ENVOY') { if (ch === ' ') { tx += 3; continue; } FONT[ch].forEach((row, j) => { for (let i = 0; i < 3; i++) if (row[i] === '1') put(tx + i, 4 + j, INKC); }); tx += 4; }
+      for (const [dx, dy] of [[0, -2], [0, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [0, 1], [-1, 2], [1, 2]]) put(45 + dx, 6 + dy, PH[4]);
+      // the art box: its Feed in the Phosphor's colours, a silver rule round it
+      const f = Math.floor(tq * 12);
+      for (let y = 10; y <= 48; y++) for (let x = 3; x <= 52; x++) {
+        if (!inBox(x, y)) { foil(x, y, 2); continue; }
+        let v = 0;
+        const dx = x + 0.5 - 28, dy = y + 0.5 - 29;
+        if (feed === 'Grid') { if (y > 34) { const zz = 30 / (y - 33.5), gxx = dx / (y - 33.5); v = (Math.abs(((zz + tq * 2) % 2 + 2) % 2 - 1) > 0.85 || Math.abs((gxx * 3 % 1 + 1) % 1 - 0.5) > 0.42) ? 2 : 0; } else if (y === 34) v = 2; }
+        else if (feed === 'Waveform') { const wy = 19 + Math.round(Math.sin(x * 0.42 - tq * 4) * 4); v = y === wy ? 3 : Math.abs(y - wy) === 1 ? 1 : 0; }
+        else if (feed === 'Static') { let h = Math.imul(x * 374761393 + y * 668265263 + f * 2246822519, 1) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); v = ((h ^ (h >>> 16)) >>> 0) % 6 === 0 ? 2 : 0; }
+        else if (feed === 'Dead Air') v = y === 22 + Math.round(Math.sin(tq * 0.7) * 6) ? 2 : 0;
+        else if (feed === 'Radar') { const r = Math.hypot(dx, dy), aa = ((Math.atan2(dy, dx) - tq * 2) % (Math.PI * 2) + Math.PI * 4) % (Math.PI * 2); v = Math.abs(r % 6 - 3) > 2.6 ? 1 : aa < 0.5 ? 2 : 0; }
+        else if (feed === 'Planet') { const r = Math.hypot(x + 0.5 - 14, y + 0.5 - 20); v = r < 5 ? (x + y < 33 ? 3 : 2) : Math.abs(((x + 0.5 - 14) / 9) ** 2 + ((y + 0.5 - 20) / 2.2) ** 2 - 1) < 0.25 ? 3 : 0; if (!v && (x * 7 + y * 13) % 41 === 0) v = 2; }
+        else if (feed === 'Aurora') { for (let k = 0; k < 3; k++) { const cy = 16 + k * 4 + Math.sin(x * 0.25 + tq * 0.9 + k * 2) * 2.5; if (Math.abs(y - cy) < 1.2) v = 3 - k; } }
+        else if (feed === 'Warp') { const a = Math.atan2(dy, dx), r = Math.hypot(dx, dy), lane = Math.floor((a + Math.PI) * 12) % 24; v = lane % 3 === 0 && ((r - tq * 22 + lane * 7) % 14 + 14) % 14 < 4 ? 2 : 0; }
+        else if (feed === 'Falling Code') { if (x % 3 === 0) { const col = x / 3, hd = ((tq * (6 + col % 4) + col * 7) % 34) + 13; v = y < hd && y > hd - 7 ? (y === Math.floor(hd) ? 3 : 1) : 0; } }
+        else if (feed === 'Test Card') v = y < 27 ? Math.floor((x - 7) / 6) % 2 + 1 : 0;
+        else { const h = (x * 73 + y * 151) % 97; v = h === 0 ? (Math.sin(tq * 2 + x) > 0 ? 3 : 2) : 0; }
+        put(x, y, v ? PH[Math.min(4, v + 1)] : eRGB(eMix(PHA[0], [0, 0, 0], 0.3)));
+      }
+      // the arrow at the art box's right edge: where the halo's jewel must come to rest. It pulses, and burns white
+      // while the jewel is within reach of it
+      const near = Math.abs(jewelOff()) <= SLOT * 3.01;
+      for (let dy = -4; dy <= 4; dy++) for (let dx = 0; dx <= 4 - Math.abs(dy); dx++) put(51 - dx, HY + dy, dx === 4 - Math.abs(dy) ? INKC : woke > 0 || homing || near ? eHex('#ffffff') : GOLDC[Math.floor(t * 2) % 2 ? 2 : 1]);
+      // eye beams when the card wakes
+      const beams = t - wokeAt < 1.3;
+      // its shoulders and its Suit, stamped in silver foil
+      const shW = y => Math.min(6 + (y - 40) * 2.7, 24);
+      if (suit === 'High Collar') for (let y = 20; y <= 47; y++) for (let x = 4; x <= 51; x++) { const d = Math.hypot(x + 0.5 - 28, (y + 0.5 - 45) * 1.1), a = Math.atan2(y + 0.5 - 45, x + 0.5 - 28); if (d > 12.5 && d < 21 && y < 45 && inBox(x, y)) { if (Math.abs(Math.sin(a * 8)) < 0.25 || d > 20) foil(x, y, 2); else put(x, y, eRGB(eMix(PHA[1], [0, 0, 0], 0.3))); } }
+      for (let y = 40; y <= 47; y++) for (let x = 4; x <= 51; x++) {
+        const X = x + 0.5 - 28, w = shW(y);
+        if (Math.abs(X) > w) continue;
+        foil(x, y, Math.abs(X) > w - 1 || y === 40 ? 2 : 1);
+        if (suit === 'Robe' && Math.abs(Math.abs(X) - (y - 40) * 0.8) < 0.7) put(x, y, PH[3]);
+        if (suit === 'Robe' && Math.abs(X) < (y - 40) * 0.8 - 0.7) put(x, y, eRGB(eMix(PHA[1], [0, 0, 0], 0.2)));
+      }
+      if (suit === 'Pauldrons') for (const pxc of [12.5, 43.5]) for (let y = 34; y <= 44; y++) for (let x = Math.floor(pxc - 9); x <= pxc + 9; x++) { const q = ((x + 0.5 - pxc) / 8) ** 2 + ((y + 0.5 - 44) / 7.5) ** 2; if (q > 1 || y > 43 || !inBox(x, y)) continue; if (q > 0.72) put(x, y, INKC); else foil(x, y, y < 38 ? 2 : 1); if (q < 0.25 && (x + y) % 3 === 0) put(x, y, PH[4]); }
+      // the halo of its script, a click at a time, and its jewel, big, ringed in gold
+      for (let k = 0; k < 24; k++) {
+        const a = haloA + k * Math.PI * 2 / 24, cx = HX + Math.sin(a) * HR, cy = HY - Math.cos(a) * HR;
+        if (k % 2) { foil(Math.round(cx - 0.5), Math.round(cy - 0.5), 2); continue; }
+        for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) foil(Math.round(cx - 0.5) + dx, Math.round(cy - 0.5) + dy, k % 4 ? 1 : 2);
+      }
+      { const a = haloA + keyAt, cx = Math.round(HX + Math.sin(a) * HR - 0.5), cy = Math.round(HY - Math.cos(a) * HR - 0.5); for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.abs(dx) + Math.abs(dy); if (d > 4) continue; put(cx + 0.5 + dx, cy + 0.5 + dy, d === 4 ? INKC : d === 3 ? GOLDC[near || woke ? 3 : 2] : d === 0 ? eHex('#ffffff') : PH[4]); } }
+      // the neck and the long crowned head, enamelled in its Phosphor
+      const hw = y => y < 23.5 ? 10 * Math.sqrt(Math.max(0, 1 - ((23.5 - y) / 10) ** 2)) : 10 - (y - 23.5) * 0.45;
+      // (one hue, from its Phosphor: two lit tones on the left, two shaded on the right, a lit cheekbone, a shadowed jaw)
+      const TONES = [eMix(PHA[2], [255, 255, 255], 0.42), eMix(PHA[2], [255, 255, 255], 0.18), PHA[2], eMix(PHA[2], [0, 0, 0], 0.32), eMix(PHA[2], [0, 0, 0], 0.55)].map(eRGB), CHEEK = eRGB(eMix(PHA[2], [255, 255, 255], 0.68));
+      for (let y = 36; y < 42; y++) for (let x = 24; x < 32; x++) put(x, y, x < 28 ? TONES[2] : TONES[3]);
+      const inHead = (x, y) => y >= 14 && y < 40 && Math.abs(x + 0.5 - 28) <= hw(y + 0.5);
+      for (let y = 13; y < 41; y++) for (let x = 16; x < 41; x++) { if (!inHead(x, y) && (inHead(x - 1, y) || inHead(x + 1, y) || inHead(x, y - 1) || inHead(x, y + 1))) put(x, y, INKC); }
+      for (let y = 14; y < 40; y++) for (let x = 17; x < 40; x++) { if (!inHead(x, y)) continue; const X = (x + 0.5 - 28) / Math.max(1, hw(y + 0.5)); let k = X < -0.5 ? 0 : X < 0 ? 1 : X < 0.5 ? 2 : 3; if (y >= 34) k++; put(x, y, (y === 30 || y === 31) && X > -0.8 && X < -0.35 ? CHEEK : TONES[k]); }
+      // the crown: five points of gold foil with phosphor jewels, flaring right out of the box when the card wakes
+      const fx = fl ? Math.round(6 * woke) : 0;
+      for (const [x0, h] of [[20, 2], [24, 3], [28, 5], [32, 3], [36, 2]]) { const hh = h + fx * (x0 === 28 ? 2 : 1); for (let k = 0; k < hh; k++) { put(x0, 15 - k, GOLDC[k === hh - 1 ? 3 : 2]); if (k < h - 1) { put(x0 - 1, 15 - k, GOLDC[1]); put(x0 + 1, 15 - k, GOLDC[2]); } } }
+      for (let x = 18; x < 39; x++) { put(x, 15, GOLDC[1]); put(x, 16, GOLDC[2]); }
+      for (const x of [21, 28, 35]) put(x, 16, PH[4]);
+      // the third gem in its brow
+      for (const [dx, dy] of [[0, -2], [-1, -1], [1, -1], [-2, 0], [2, 0], [-1, 1], [1, 1], [0, 2]]) put(28 + dx, 21 + dy, GOLDC[2]);
+      for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1], [0, 0]]) put(28 + dx, 21 + dy, woke || talk ? eHex('#ffffff') : dx || dy ? PH[3] : PH[4]);
+      // its eyes, as its Eyes trait says: dark almonds with a burning light (shut a moment when it blinks)
+      const shut = t - blinkE < 0.25 || ((t + 1.7) % 5.3) < 0.14, glow = woke ? eHex('#ffffff') : PH[4];
+      const eyeC = [];
+      const almond = (ex, ey, rows, gx, wide) => {
+        rows.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === 'k' && (!shut || j === rows.length - 1)) put(ex + i, ey + j, INKC); });
+        if (!shut) { put(ex + gx, ey + 1, glow); if (wide) put(ex + gx + 1, ey + 1, glow); eyeC.push([ex + gx, ey + 1]); }
+        if (eyes === 'Lidded' && !shut) for (let i = 0; i < rows[0].length; i++) put(ex + i, ey, TONES[ex < 28 ? 1 : 2]);
+      };
+      if (eyes === 'Cyclops') almond(24, 25, ['..kkkk..', '.kkkkkk.', 'kkkkkkkk', '.kkkkkk.'], 3, true);
+      else if (eyes === 'Crown of Seven') { for (let k = 0; k < 7; k++) { const a = Math.PI * (0.12 + k * 0.76 / 6), x = Math.round(28 + Math.cos(a + Math.PI) * 7), y = Math.round(29 - Math.sin(a) * 4.5); put(x, y, shut ? INKC : glow); if (!shut) { put(x, y + 1, INKC); if (k === 1 || k === 5) eyeC.push([x, y]); } } }
+      else { almond(19, 26, ['...kkk', '.kkkkk', 'kkkkk.'], 3, false); almond(31, 26, ['kkk...', 'kkkkk.', '.kkkkk'], 2, false); }
+      // the slit of its mouth, glowing as it speaks
+      for (let x = 25; x < 31; x++) put(x, 34, talk ? PH[4] : INKC);
+      // eye beams, out to the edge of the card
+      if (beams) for (const [ex, ey] of eyeC) { const dir = ex < 28 ? -1 : 1; for (let k = 1; k < 40; k++) { const x = ex + dir * k, y = ey + Math.round(k * 0.35); if (x < 2 || x > 53) break; put(x, y - 1, PH[3]); put(x, y, eHex('#ffffff')); put(x, y + 1, k % 2 ? eHex('#ffffff') : PH[4]); put(x, y + 2, PH[3]); } }
+      // the foot of the card: a thin strip, an energy gem in its Phosphor and, while it speaks, its words scrolling by
+      for (let y = 49; y <= 52; y++) for (let x = 4; x <= 51; x++) foil(x, y, y === 49 ? 1 : 2);
+      for (const [dx, dy] of [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]]) put(5 + dx, 49 + dy, dx === 1 && dy === 1 ? eHex('#ffffff') : PH[3]);
+      if (t < speakEnd && speech.length) {
+        const scroll = Math.floor((t - speakStart) * 10);
+        speech.forEach((g, j) => { const gx = 46 + j * 5 - scroll; for (let i = 0; i < 9; i++) if (g >> i & 1) { const x = gx + i % 3, y = 50 + Math.floor(i / 3); if (x > 9 && x < 51) put(x, y, INKC); } });
+      } else for (let x = 11; x < 40; x++) put(x, 51, eRGB(eMix(SILVER, [0, 0, 0], 0.35)));
+      // the holo foil: rainbow bands across the card at the pointer's angle, silver stamping catching them; a held
+      // blaze when the card wakes
+      const sp = sheen, blaze = woke > 0 ? 0.5 + woke * 0.5 : 0;
+      for (let i = 0; i < W * W; i++) {
+        const k = CL[i];
+        if (k < 0) continue;
+        const x = i % W - ME, y = (i / W | 0) - ME, band = Math.floor((x * 0.7 + y + sp + (blaze ? tq * 30 : 0)) / 3), hc = HOLO[((band % 7) + 7) % 7];
+        let col = k === 0 ? eMix(hc, [40, 30, 70], 0.42) : k === 1 ? eMix(SILVER, hc, 0.35) : eMix([238, 240, 248], hc, 0.22);
+        if (blaze) col = eMix(col, [255, 255, 255], blaze * (k === 0 ? 0.35 : 0.5));
+        B[i] = eRGB(col);
+      }
+      // a holo band sweeping over the whole card, art and all, with the pointer (or on its own now and then)
+      const bp = eHover ? eHx * 0.7 + eHy : ((tq * 18) % 150) - 30;
+      for (let i = 0; i < W * W; i++) {
+        const x = i % W - ME, y = (i / W | 0) - ME, d = Math.abs(x * 0.7 + y - bp);
+        if (d >= 4) continue;
+        const v = B[i], cur = [v & 255, v >> 8 & 255, v >> 16 & 255], hc = HOLO[((Math.floor((x - y) / 3) % 7) + 7) % 7];
+        B[i] = eRGB(d < 1.5 ? eMix(cur, [255, 255, 255], 0.5) : eMix(cur, hc, 0.32));
+      }
+      eCtx.putImageData(eImg, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(eCan, oeE - ME * ceE, oeE - ME * ceE, W * ceE, W * ceE);
     }
     function render(t) {
       feel(t);
       if (legend === 'Hive') return renderHive(t);
+      if (legend === 'The Envoy') return renderEnvoy(t);
       compose(t);
       if (tune > 0) detune(t);
       if (fault === 'Snow') { const f = Math.floor(t * 8); for (let i = 0; i < N * N; i++) if (!L[i] && noise(i % N, (i / N) | 0, f + 40) > 0.95) L[i] = 1; }

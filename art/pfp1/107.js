@@ -254,6 +254,7 @@ Proto.add({
     }
 
     function scene(t) {
+      if (legend !== 'None') { legendScene(t); return; }
       // sky: a step gradient, two rows to a step, from the darkest at the top to the horizon
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) SK(x, y, STEPS[Math.min(4, y >> 1)]);
       // the light: a sun, or a moon at night, high (or low at dusk and sunrise) on one side, with a glow round it
@@ -459,7 +460,6 @@ Proto.add({
         if (show) { P(bx, by, body); P(bx + 1, by, bird === 'Blue Bird' ? '#f2b040' : '#f2a040'); if (bird === 'Two Birds') { P(bx, by - 1, '#3a7ae0'); } }
       }
       if (tgt !== cell) { tgt = cell; settle(t); }
-      if (legend !== 'None') legendMan(t, bt, ox, oy);
       // the frozen lake mirrors the snowman, dimmed into the ice
       if (setting === 'Frozen Lake') for (const [dst, src] of [[10, 9], [11, 8]]) for (let x = 0; x < N; x++) {
         const j = src * N + x;
@@ -497,75 +497,241 @@ Proto.add({
       }
     }
 
-    // ---------- the legendaries, each placed dot by dot like the rest ----------
-    const YETI = ['.W.WW.W.', 'WWWWWWWW', 'WFFFFFFS', 'WFKFFKFS', 'WFFFFFFS', 'WFFMMFFS', 'WWWWWWWS', 'SWW..WWS'];
-    const FL = ['#7a1006', '#c82c0c', '#f06818', '#ffb020', '#fff2b8'];
-    // diamond: white and three tones of ice blue (light, mid, deep)
-    const ICE = ['#ffffff', '#b4e2fa', '#6cbaea', '#2f7cc4'];
-    function legendMan(t, bt, ox, oy) {
-      const u = t - legAt, look = ptrCell ? (ptrCell[0] < 4 ? -1 : ptrCell[0] > 8 ? 1 : 0) : 0;
-      if (legend === 'Yeti') {
-        // a yeti instead of a snowman: shaggy white, a blue face; tapped, it throws its arms up and roars
-        const roar = u >= 0 && u < 1.3;
-        for (let r = 0; r < 8; r++) for (let q = 0; q < 8; q++) {
-          let ch = YETI[r][q];
-          if (roar && r === 4 && q > 1 && q < 6) ch = 'M';
-          if (roar && r === 5) ch = 'WFTMMTFS'[q];
-          if (r === 3 && (ch === 'K' || q === 2 + look || q === 5 + look)) ch = bt ? 'F' : (q === 2 + look || q === 5 + look) ? 'K' : 'F';
-          if (ch === '.') continue;
-          P(ox + q, oy + r, { W: '#f2f6fc', S: '#b0c2dc', F: '#5f86c8', K: '#101828', M: '#3a1830', T: '#ffffff' }[ch]);
-        }
-        for (const [x, sd] of [[ox - 1, -1], [ox + 8, 1]]) {
-          if (roar) { for (let y = oy + 2; y <= oy + 5; y++) P(x, y, y === oy + 2 ? '#5f86c8' : sd < 0 ? '#f2f6fc' : '#b0c2dc'); }
-          else { for (let y = oy + 5; y <= oy + 7; y++) P(x, y, sd < 0 ? '#f2f6fc' : '#b0c2dc'); P(x, oy + 8, '#5f86c8'); }
-        }
-      } else if (legend === 'Fire') {
-        // a snowman made of fire that never melts: every dot a flame, licking upward, a puddle glowing under it
-        const flare = (u >= 0 && u < 0.9 ? 1 : 0) + (ptrCell ? 0.5 : 0);
-        const tops = [];
-        for (let r = 0; r < 8; r++) for (let q = 0; q < 8; q++) {
-          const ch = B.art[r][q];
-          if (ch === '.') continue;
-          if (tops[q] === undefined) tops[q] = r;
-          const n = Math.sin(q * 1.9 + t * 5.3 + r) * 0.8 + Math.sin(r * 2.3 - t * 7.1 + q * 0.7) * 0.7;
-          const lv = Math.max(0, Math.min(4, Math.round((ch === 'L' ? 2.4 : 1.4) + n + (r < 3 ? 0.5 : 0) + flare * 0.6)));
-          P(ox + q, oy + r, FL[lv]);
-        }
-        tops.forEach((r, q) => {
-          if (r === undefined) return;
-          if (Math.sin(t * 6 + q * 2.1) > 0.1 - flare * 0.5) P(ox + q, oy + r - 1, FL[3]);
-          if (flare && Math.sin(t * 7.3 + q * 1.3) > 0.2) P(ox + q, oy + r - 2, FL[2]);
-        });
-        for (const e of [ox + B.ex[0], ox + B.ex[1]]) P(e, oy + B.eye, bt ? FL[3] : '#2a0802');
-        P(ox + B.nx, oy + B.nose, '#3a1a10');
-        for (let x = 3; x < 9; x++) P(x, 10, (x + Math.floor(t * 4)) % 3 ? '#3e5c8c' : '#f08a30');
-        if (u >= 0 && u < 1.5) for (let k = 0; k < 3; k++) { const y = Math.floor(hitCell[1] - u * 3 - k); if (y >= 0) P(hitCell[0] + (k % 2), y, k ? '#c8ccd4' : '#e8ecf0'); }
-      } else {
-        // a snowman cut from diamond: light ice on the lit side, deep ice in the shade, straight diagonal facet lines
-        // across both balls, and every couple of seconds a white sparkle stepping cell by cell down across it
-        const sp = (t % 2.2) / 0.09 | 0;
-        for (let r = 0; r < 8; r++) for (let q = 0; q < 8; q++) {
-          const ch = B.art[r][q];
-          if (ch === '.') continue;
-          const line = (q + r) % 3 === 0;
-          let col = ch === 'D' ? (line ? ICE[2] : ICE[3]) : line ? ICE[2] : ICE[1];
-          const dd = Math.abs(q - sp - 1) + Math.abs(r - sp);
-          if (dd === 0) col = ICE[0];
-          else if (dd === 1) col = ch === 'D' ? ICE[1] : '#eefaff';
-          if (ptrCell && ptrCell[0] === ox + q && ptrCell[1] === oy + r) col = ICE[0];
-          P(ox + q, oy + r, col);
-        }
-        if (ptrCell) { const [px, py] = ptrCell; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = px + a, y = py + b; if (x >= ox && y >= oy && x < ox + 8 && y < oy + 8 && B.art[y - oy][x - ox] !== '.') P(x, y, '#e8fcff'); } }
-        for (const e of [ox + B.ex[0], ox + B.ex[1]]) P(e, oy + B.eye, bt ? '#94dcfa' : '#1a2a5a');
-        P(ox + B.nx, oy + B.nose, '#c8102e'); P(ox + B.nx + 1, oy + B.nose, '#f03048');
-        if (u >= 0 && u < 1.1) {
-          // a tap rings it like glass: a ring of icy light spreading out over the sky
-          const rr = u * 9;
-          for (let y = 0; y < 10; y++) for (let x = 0; x < N; x++) { const d = Math.hypot(x - 5.5, y - 5.5); if (Math.abs(d - rr) < 0.7 && skyM[y * N + x]) P(x, y, (x + y) % 2 ? ICE[0] : ICE[1]); }
+    // ---------- the legendaries: each a whole scene of its own, placed dot by dot like the rest ----------
+    // (a little per-print variety comes from the facet list, drawn from the legendary's own stream)
+    const YETI = [
+      '.Hk......kH.',
+      '.dH......Hd.',
+      '..HWWWWWWH..',
+      '..WWWWWWWWW.',
+      '.WBBWWWWBBW.',
+      '.WFEFFFFEFW.',
+      '.WFFFNNFFFW.',
+      'WWFMTMMTMFWW',
+      'CWFMMMMMMFWC',
+      'WWWSWWWWSWWW',
+      'W.WSWSWWSW.W',
+    ];
+    const YROAR = { 3: 'C.WWWWWWWWWC', 4: 'CWBBWWWWBBWC', 6: '.WFMMMMMMFW.', 7: 'WWFTMMMMTFWW', 8: 'CWFMTMMTMFWC' };
+    // the toys: the yeti throws snowballs back; the fire is blown on and stoked; the diamond splits your light and turns
+    const yt = { hits: 0, back: [], shakeAt: -9 }, fr = { stoke: 0, wind: 0, puffAt: -9 }, dm = { rot: 0, lastX: null, tingAt: -9, last: -1, flash: -1, burstAt: -9 };
+    let lastT = 0, press = null;
+    const gemCell = new Uint8Array(N * N);
+    function legendInput(t, inp) {
+      const dt = Math.min(0.1, Math.max(0, t - lastT)); lastT = t;
+      // (the gallery reports a tap on every press: here a tap only counts when the press is let go quickly and still,
+      // so holding for the blizzard or dragging to turn the gem never also throws or rings)
+      const tapsNow = [];
+      for (const lob of inp.taps()) { if (legend === 'Diamond' && inp.down) dm.lastX = lob.x; if (inp.down) press = { x: lob.x, y: lob.y, at: t, moved: 0, lx: lob.x, ly: lob.y }; else tapsNow.push(lob); }
+      if (press) {
+        if (inp.down && inp.inside) { press.moved += Math.hypot(inp.x - press.lx, inp.y - press.ly); press.lx = inp.x; press.ly = inp.y; }
+        else { if (t - press.at < 0.35 && press.moved < 0.04) tapsNow.push({ x: press.x, y: press.y }); press = null; }
+      }
+      for (const lob of tapsNow) {
+        if (ball || legend === 'Fire') continue;
+        // a snowball, thrown in from the side you tapped, as for every snowman
+        const left = lob.x < 0.5;
+        ball = { at: t, x0: left ? 0 : N - 1, y0: Math.max(0, Math.min(6, Math.floor(lob.y * N) - 2)) };
+        hitCell = [left ? 3 : 7, 3 + Math.floor(mr() * 4)];
+        hitAt = t + 0.4;
+        c.sound.note(base + 12 + tones[4], { dur: 0.05, vel: 0.1, wave: 'triangle', pan: left ? -0.6 : 0.6 });
+        c.sound.hit('noise', 0.4, { at: 0.4, cutoff: 1800, dur: 0.18, pan: left ? -0.2 : 0.2 });
+        if (legend === 'Yeti') {
+          // ...and it throws one straight back at where you tapped; every third hit it roars
+          yt.hits++;
+          yt.back.push({ at: t + 1, to: [Math.max(1, Math.min(10, Math.floor(lob.x * N))), Math.max(1, Math.min(10, Math.floor(lob.y * N)))], from: left ? 10 : 1 });
+          c.sound.hit('noise', 0.25, { at: 1, cutoff: 600, dur: 0.3 }); c.sound.hit('noise', 0.5, { at: 1.5, cutoff: 1400, dur: 0.35 });
+          if (yt.hits % 3 === 0) { legAt = t + 0.4; yt.shakeAt = t + 0.4; c.sound.hit('noise', 0.3, { at: 0.45, cutoff: 500, dur: 0.8 }); for (let k = 0; k < 3; k++) c.sound.note(base - 24 + tones[2 - k], { at: 0.45 + k * 0.12, dur: 0.2, vel: 0.2, wave: 'sawtooth', cutoff: 420 }); }
+        } else { legAt = t + 0.4; for (let k = 0; k < 4; k++) c.sound.note(base + 24 + tones[(k * 2) % 5], { at: 0.42 + k * 0.05, dur: 1.2 - k * 0.15, vel: 0.1, wave: 'sine' }); }
+      }
+      yt.back = yt.back.filter(b2 => t - b2.at < 2.4);
+      flurry = (inp.inside && inp.down && legend !== 'Fire') || (legend === 'Yeti' && t - legAt < 1.6 && t > legAt);
+      if (legend === 'Fire') {
+        // the pointer is a breath of wind: the flames lean away from it; hold it down and the fire roars up
+        const was = fr.stoke;
+        fr.stoke = Math.max(0, Math.min(1, fr.stoke + (inp.inside && inp.down ? dt / 1.4 : -dt / 0.7)));
+        fr.wind += ((ptrCell ? Math.max(-1, Math.min(1, (5.5 - ptrCell[0]) / 3)) : 0) - fr.wind) * Math.min(1, dt * 6);
+        if (fr.stoke > was && Math.floor(was * 6) !== Math.floor(fr.stoke * 6)) c.sound.hit('noise', 0.08 + fr.stoke * 0.2, { cutoff: 2500 + fr.stoke * 3000, dur: 0.25 });
+        if (was > 0.55 && !(inp.inside && inp.down) && t - fr.puffAt > 1) { fr.puffAt = t; c.sound.hit('noise', 0.35, { cutoff: 6000, dur: 0.6 }); c.sound.note(base - 12, { dur: 0.3, vel: 0.15, wave: 'sine' }); }
+      } else if (legend === 'Diamond') {
+        // drag sideways to turn the gem; its facets ring as the light crosses them
+        if (inp.inside && inp.down && dm.lastX !== null) { dm.rot += (inp.x - dm.lastX) * 14; dm.lastX = inp.x; } else dm.lastX = inp.down ? inp.x : null;
+        if (ptrCell) {
+          const id = ptrCell[1] * N + ptrCell[0], q = ptrCell[0], r = ptrCell[1];
+          if (id !== dm.last && gemCell[id] && t - dm.tingAt > 0.1) { dm.tingAt = t; dm.flash = id; c.sound.note(base + 24 + tones[facet[(r * 12 + q + Math.round(dm.rot) + 6400) & 63]], { dur: 0.35, vel: 0.05, wave: 'sine' }); }
+          dm.last = id;
         }
       }
     }
-
+    const FL = [['#7a1006', '#c82c0c', '#f06818', '#ffb020', '#fff2b8'], ['#5a0820', '#b01830', '#e84818', '#ffa020', '#fff0c0'], ['#7a2a06', '#c86010', '#f0a018', '#ffd040', '#ffffe0']][facet[3] % 3];
+    const ICE = ['#ffffff', '#c4ecff', '#7cc8f0', '#3a88cc', '#1c4c94'];
+    const PRISM = ['#ffa0e0', '#fff0a0', '#a0fff8', '#c0b0ff'];
+    // the yeti's fur and face, and the aurora's two colours, vary a little by print
+    const YFACE = ['#4a6aa8', '#5a5aa8', '#3c7a9c'][facet[0] % 3], YHORN = ['#efe4c8', '#d8c8a0', '#c8d8e8'][facet[1] % 3];
+    const AUR = [['#40e0a0', '#b080ff'], ['#60f0c0', '#ff80c0'], ['#40c8f0', '#a0f070']][facet[2] % 3];
+    function legendScene(t) {
+      const since = t - hitAt, u = t - legAt, bt = (t + blinkOff) % blinkGap < 0.18;
+      const put = (x, y, col) => { if (x >= 0 && y >= 0 && x < N && y < N && col) { cell[y * N + x] = col; skyM[y * N + x] = 0; bgM[y * N + x] = 0; } };
+      const ptrOn = (x, y) => ptrCell && ptrCell[0] === x && ptrCell[1] === y;
+      if (legend === 'Yeti') {
+        // a storm sky, darkest at the top, lightning now and then; held, the blizzard comes on and the sky goes pale with it
+        const lf = t % 5.3, flash = lf < 0.08 || (lf > 0.16 && lf < 0.2), bliz = flurry;
+        const SKYY = flash ? ['#8a98c0', '#9aa8cc', '#a8b4d4', '#b4c0dc', '#c0cce4'] : bliz ? ['#3c4864', '#4a5874', '#586886', '#687896', '#7888a6'] : ['#0a0e1c', '#121a2e', '#1c2640', '#283450', '#344262'];
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) SK(x, y, SKYY[Math.min(4, y >> 1)]);
+        for (let x = 0; x < N; x++) BG(x, 11, x % 4 === 1 ? '#c4d4e8' : '#e8f0f8');
+        const roar = u >= 0 && u < 1.3, glow = Math.sin(t * 2.2) > 0.2 ? '#8ef6ff' : '#4ad0f0';
+        YETI.forEach((row, r) => {
+          if (roar && YROAR[r]) row = YROAR[r];
+          for (let q = 0; q < N; q++) {
+            const ch = row[q];
+            if (ch === '.') continue;
+            let col = { W: '#f2f6fc', S: '#a8b8d4', F: YFACE, B: '#101830', N: '#141c34', E: roar ? '#ff3c3c' : bt ? YFACE : glow, M: '#12060e', T: '#ffffff', C: '#20283a', H: '#e8c870', k: '#fff0b0', d: '#5a3e18' }[ch];
+            // the shag ruffles in the wind: its edge cells come and go (wildly in the blizzard)
+            if ((ch === 'W' || ch === 'S') && (q <= 1 || q >= 10 || r === 10) && Math.sin(t * (bliz ? 11 : 4) + r * 1.7 + q) > (bliz ? 0.35 : 0.75)) continue;
+            put(q, r, col);
+          }
+        });
+        if (roar) for (let k = 0; k < 3; k++) put(5 + (k % 2), 9 + k, k ? '#c8d4e8' : '#ffffff');
+        // the blizzard: streaks of snow driving across everything, a bright head and a pale tail
+        const n = bliz ? 16 : roar ? 9 : 6;
+        for (let i = 0; i < n; i++) {
+          const f = flakes[i % 7], sp = (f[2] * 2.6 + (i > 6 ? 1.5 : 0)) * (bliz ? 1.8 : 1), y = Math.floor((f[1] + i * 3.7 + t * sp * 1.6) % 12), x = Math.floor((f[0] + i * 5.3 + t * sp * 2.4) % 12);
+          const onFur = c2 => c2 === '#f2f6fc' || c2 === '#a8b8d4';
+          put(x, y, onFur(cell[y * N + x]) ? '#9cb0d0' : '#ffffff');
+          if (bliz) { const tx = (x + 11) % 12, ty = (y + 11) % 12; put(tx, ty, onFur(cell[ty * N + tx]) ? '#b8c8e0' : '#c8d4ec'); }
+        }
+        // its snowballs coming back at you: wound up in its fist, then growing from one cell to a big ball as they fly at
+        // the glass, then a ring of frost that slowly melts away
+        for (const b2 of yt.back) {
+          const u2 = t - b2.at;
+          if (u2 < 0) { if (u2 > -0.4) { put(b2.from, 7, '#ffffff'); put(b2.from, 8, '#20283a'); } continue; }
+          if (u2 < 0.45) {
+            const k = u2 / 0.45, x = Math.round(b2.from + (b2.to[0] - b2.from) * k), y = Math.round(7 + (b2.to[1] - 7) * k), r = k < 0.34 ? 0 : k < 0.67 ? 0.5 : 1;
+            for (let dy = -Math.ceil(r); dy <= Math.floor(r + 0.5); dy++) for (let dx = -Math.ceil(r); dx <= Math.floor(r + 0.5); dx++) put(x + dx, y + dy, dx === 0 && dy === 0 ? '#ffffff' : '#d4e4f8');
+          } else {
+            const m = (u2 - 0.45) / 1.9;
+            for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+              const d = Math.hypot(dx, dy), keep = (((dx + 3) * 7 + (dy + 3) * 13) % 10) / 10;
+              if (d > 2.4 || keep < m * 1.3 - 0.2) continue;
+              put(b2.to[0] + dx, b2.to[1] + dy + (m > 0.45 && keep < 0.5 ? 1 : 0), d < 0.5 ? '#ffffff' : d < 1.5 ? '#e4f2ff' : '#8ab4dc');
+            }
+          }
+        }
+      } else if (legend === 'Fire') {
+        // a snowman of living fire in a black top hat, standing in the pool it has melted; the night glows round it
+        const flare = (u >= 0 && u < 0.9 ? 1 : 0) + fr.stoke * 1.6, lean = fr.wind;
+        for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+          const d = Math.hypot(x - 5.5, (y - 6.5) * 1.1) - Math.sin(t * 5.1) * 0.25 - flare * 0.8;
+          SK(x, y, d < 4 ? '#5a2014' : d < 5.2 ? '#3a1620' : d < 6.6 ? '#24101e' : '#160a18');
+        }
+        // the snow round the edges, slumping, and the pool and its glowing reflection
+        for (const x of [0, 1, 10, 11]) { BG(x, 9, x === 0 || x === 11 ? '#c8d0e0' : '#8a8ca8'); BG(x, 10, '#d8e0ec'); BG(x, 11, '#b8c4d8'); }
+        for (let x = 2; x < 10; x++) { const w = (x + Math.floor(t * 4)) % 4; BG(x, 10, w === 0 ? '#f8b040' : w === 2 ? '#c84a18' : '#5a2010'); BG(x, 11, (x + Math.floor(t * 3)) % 3 ? '#2a1010' : '#8a2a10'); }
+        BG(1, 10, '#6a3a40'); BG(10, 10, '#6a3a40');
+        // the figure: two balls and a head, every dot a flame that licks upward
+        const BODY = ['....xxxx....', '...xxxxxx...', '....xxxx....', '...xxxxxx...', '..xxxxxxxx..', '..xxxxxxxx..', '...xxxxxx...'];
+        BODY.forEach((row, r) => { for (let q = 0; q < N; q++) if (row[q] === 'x') {
+          const x = q + (r < 3 && Math.abs(lean) > 0.55 ? Math.sign(lean) : 0), y = r + 3, edge = q === row.indexOf('x') || q === row.lastIndexOf('x');
+          const n = Math.sin(x * 1.9 + t * 5.3 + y) * 0.8 + Math.sin(y * 2.3 - t * 7.1 + x * 0.7) * 0.7;
+          const core = 3.6 - Math.abs(q - 5.5) * 0.5 - (edge ? 1.8 : 0) - (r === 2 ? 0.6 : 0);
+          put(x, y, FL[Math.max(0, Math.min(4, Math.round(core + n * 0.45 + flare * 0.5)))]);
+        } });
+        // tongues of flame off the shoulders and for arms, and flickering above the hat
+        for (const [x0, y, ph] of [[1, 6, 0], [0, 5, 1.3], [10, 6, 2.1], [11, 5, 0.6], [2, 4, 3.1], [9, 4, 2.4], [1, 9, 1.7], [10, 9, 0.2]]) { const x = x0 + Math.round(lean * (9 - y) / 5), s = Math.sin(t * 6.2 + ph * 2); if (s > 0.1 - flare * 0.6) put(x, y, s > 0.75 ? FL[3] : FL[2]); if (s > 0.6 && y > 1) put(x + Math.round(lean), y - 1, FL[1]); }
+        // stoked, it roars up: a column of flame climbs where the hat was
+        if (fr.stoke > 0.25) for (let k = 0; k < Math.round(fr.stoke * 4); k++) for (let x = 4; x <= 7; x++) { if ((x + k + Math.floor(t * 12)) % 3 === 0) continue; put(x + Math.round(lean * (k + 1) / 2), 2 - k, k ? FL[2 + ((x + k) & 1)] : FL[4]); }
+        // the hat: black, with a band of glowing ember, hopping when it flares
+        // (blown off the top when it's stoked, dropping back on as it dies down)
+        const hy = 1 - Math.round(fr.stoke * fr.stoke * 6) - (u >= 0 && u < 0.35 ? 1 : 0), hx = Math.round(lean * fr.stoke * 2);
+        for (let x = 4; x <= 7; x++) { put(x + hx, hy - 1, x === 4 ? '#5a4a58' : '#2a2230'); put(x + hx, hy, x === 4 ? '#ffa040' : Math.sin(t * 4 + x) > 0.3 ? '#ff8030' : '#c03010'); }
+        for (let x = 3; x <= 8; x++) put(x + hx, hy + 1, x === 3 ? '#5a4a58' : '#3a3040');
+        if (hy < 1 && fr.stoke < 0.25) for (let x = 4; x <= 7; x++) put(x, 2, FL[3]);
+        // face: two coals and a smouldering nose
+        put(4, 4, bt ? FL[3] : '#1a0804'); put(7, 4, bt ? FL[3] : '#1a0804'); put(6, 5, '#3a1a10'); put(7, 5, Math.sin(t * 3) > 0 ? '#ff5a1a' : '#a02a10');
+        // sparks and steam rising into the dark
+        for (let k = 0; k < 4; k++) { const f = flakes[k], ph = (t * (0.35 + f[2] * 0.15) + f[1] / 12) % 1, y = Math.floor(9 - ph * 10), x = Math.floor(2 + (f[0] % 8) + Math.sin(t * 2 + k) * 0.8); if (y >= 0 && skyM[y * N + x]) put(x, y, ph > 0.7 ? '#8a2a10' : ph > 0.35 ? '#f06818' : '#ffd060'); }
+        const sp = (t * 0.6) % 1; if (sp < 0.5) { const k = Math.floor(sp * 6); put(sp < 0.25 ? 1 : 10, 8 - k, k > 1 ? '#5a5060' : '#9a90a0'); }
+        // let go of a big blaze: a ring of steam bursts off the snow
+        const pu = t - fr.puffAt; if (pu < 0.7) { const r = 1 + Math.floor(pu * 7); for (const [dx, dy] of [[-1, 0], [1, 0], [-1, -1], [1, -1], [0, -1]]) { const x = 5 + dx * (r + 1), y = 8 + dy * r; if (y >= 0 && x >= 0 && x < N && skyM[y * N + x]) put(x, y, r > 3 ? '#6a6070' : '#b8b0bc'); } }
+        // the snow round it melts back as it burns hotter
+        if (fr.stoke > 0.5) for (const x of [1, 10]) { put(x, 9, '#2a1010'); put(x, 10, '#c84a18'); }
+        if (u >= 0 && u < 1.5) for (let k = 0; k < 3; k++) { const y = Math.floor(hitCell[1] - u * 3 - k); if (y >= 0) put(hitCell[0] + (k % 2), y, k ? '#c8ccd4' : '#e8ecf0'); }
+      } else {
+        // a snowman cut from diamond: a small faceted head with a ruby nose on a brilliant-cut body, balanced on its point,
+        // dark-outlined against the night, on dark ice; the facets are lit from the upper left and slide round as it turns
+        const NIGHT = ['#0e1634', '#142048', '#1a2a58', '#203464', '#263c70'];
+        for (let y = 0; y < 10; y++) for (let x = 0; x < N; x++) SK(x, y, NIGHT[Math.min(4, y >> 1)]);
+        for (let x = 0; x < N; x++) { const a1 = Math.round(1 + Math.sin(x * 0.55 + t * 0.6 + auroraPh) * 0.8); if ((x + Math.floor(t * 1.5)) % 4) SK(x, a1, mix(AUR[0], NIGHT[1], 0.35)); }
+        for (const st of starsAt) if (Math.sin(t * 1.4 + st[2]) > 0 && skyM[st[1] * N + st[0]] && st[1] < 4) BG(st[0], st[1], '#fff8d0');
+        for (let x = 0; x < N; x++) { BG(x, 10, (x + Math.floor(t * 0.8)) % 6 === 0 ? '#3a5a8a' : '#1e3458'); BG(x, 11, '#142644'); }
+        const GEM = ['....oLWMo...', '...oLKLKMo..', '...oLMRMDo..', '....ooooo...', '..oLLLMMDDo.', '.oLLLMMMDDXo', '..oLMMMDDXo.', '...oMMDDXo..', '....oMDXo...', '.....oXo....', '......o.....'];
+        const TONE = ['#d8f4ff', '#8cd0f4', '#3c88cc', '#1e5aa4'], rot = dm.rot, bandX = ((t * 1.6 + rot * 3) % 12 + 12) % 12;
+        gemCell.fill(0);
+        GEM.forEach((row, y) => { for (let x = 0; x < N; x++) {
+          const ch = row[x];
+          if (ch === '.') continue;
+          let col;
+          if (ch === 'o') col = '#060a1c';
+          else if (ch === 'K') col = bt ? TONE[1] : '#0a1430';
+          else if (ch === 'R') col = '#ff2848';
+          else {
+            // the facet tone: its letter gives the light (upper left) to shade (lower right); turning slides the facets round
+            // its own tone, and a band of light sliding round the gem (turning it moves the band)
+            const base = { L: 0, M: 1, D: 2, X: 3, W: 0 }[ch];
+            const inBand = Math.abs(((x - bandX) % 12 + 18) % 12 - 6) > 4.6;
+            col = ch === 'W' ? '#ffffff' : inBand ? (base > 1 ? TONE[1] : '#ffffff') : TONE[base];
+          }
+          gemCell[y * N + x] = ch === 'o' ? 0 : 1;
+          put(x, y, col);
+        } });
+        // facet chimes flash under the finger
+        if (dm.flash >= 0 && t - dm.tingAt < 0.25) for (const d of [0, -1, 1, -N, N]) { const i = dm.flash + d; if (gemCell[i]) put(i % N, (i / N) | 0, '#ffffff'); }
+        // crystal arms, and its reflection on the ice
+        put(1, 4, TONE[1]); put(0, 3, TONE[0]); put(10, 3, TONE[2]); put(11, 2 + (Math.sin(t * 1.3) > 0.6 ? -1 : 0), TONE[1]);
+        put(6, 11, '#4c7ab0'); put(5, 11, '#2e5488'); put(7, 11, '#2e5488');
+        // the payoff: with your light on it, when the band of light comes round to the middle of the gem it blazes:
+        // prismatic fire bursting out of it in every direction, with a chord
+        const lightOn = ptrCell && !gemCell[ptrCell[1] * N + ptrCell[0]], mid = Math.abs(((bandX - 6) % 12 + 18) % 12 - 6) < 0.5;
+        if (lightOn && mid && t - dm.burstAt > 1.4) { dm.burstAt = t; for (const d of [0, 4, 7, 12]) c.sound.note(base + 24 + d, { dur: 1.2, vel: 0.08, wave: 'sine' }); }
+        const bu = t - dm.burstAt;
+        if (bu < 1) { const SP = ['#ff3050', '#ff9020', '#ffe030', '#40e060', '#3090ff', '#9050ff']; for (let k = 0; k < 8; k++) { const a = k / 8 * 6.283 + 0.2, r = 3 + bu * 7; const x = Math.round(6 + Math.cos(a) * r), y = Math.round(6 + Math.sin(a) * r); if (x >= 0 && y >= 0 && x < N && y < N && !gemCell[y * N + x]) put(x, y, SP[(k + Math.floor(bu * 10)) % 6]); } }
+        const fs2 = (t % 3.4) / 3.4;
+        if (fs2 < 0.22) { put(2, 3, '#ffffff'); if (fs2 > 0.06 && fs2 < 0.16) { put(1, 3, '#e8fcff'); put(2, 2, '#e8fcff'); } }
+        // the pointer is a light: a one-cell beam to the gem, and out of its far side a clean rainbow, one cell per colour,
+        // that swings as you turn the gem
+        if (ptrCell && !gemCell[ptrCell[1] * N + ptrCell[0]]) {
+          const px = ptrCell[0], py = ptrCell[1], cx = 6, cy = 6, dx = cx - px, dy = cy - py, L2 = Math.hypot(dx, dy) || 1;
+          for (let k = 1; k < L2; k++) { const x = Math.round(px + dx * k / L2), y = Math.round(py + dy * k / L2); if (gemCell[y * N + x]) break; if (!gemCell[y * N + x] && cell[y * N + x] !== '#060a1c') put(x, y, '#fff2b0'); }
+          put(px, py, '#ffffff');
+          const SPEC = ['#ff3050', '#ff9020', '#ffe030', '#40e060', '#3090ff', '#9050ff'];
+          // the rainbow lands on the ice on the far side from the light, six cells, red nearest the gem
+          const side = px < 6 ? 1 : -1, sw2 = side > 0 ? -((Math.round(rot) % 2 + 2) % 2) : (Math.round(rot) % 2 + 2) % 2;   // it swings a cell as the gem turns
+          for (let k2 = 0; k2 < 6; k2++) { const x = 6 + side * (1 + k2) + sw2; if (x >= 0 && x < N && !gemCell[10 * N + x] && cell[10 * N + x] !== '#060a1c') { put(x, 10, SPEC[k2]); put(x, 11, mix(SPEC[k2], '#142644', 0.55)); } }
+          // and a thread of coloured light from the gem's point down to it
+          const fx = 6 + side * (1 + 2) + sw2; put(Math.round((6 + fx) / 2) + (side > 0 ? 0 : 0), 9, (Math.floor(t * 6) % 2) ? SPEC[2] : SPEC[4]);
+        }
+        if (u >= 0 && u < 1.1) {
+          const rr = u * 9;
+          for (let y = 0; y < 10; y++) for (let x = 0; x < N; x++) { const d = Math.hypot(x - 6, y - 6); if (Math.abs(d - rr) < 0.7 && skyM[y * N + x]) put(x, y, (x + y) % 2 ? '#ffffff' : PRISM[(x + y) % 4]); }
+        }
+        if (flurry) for (let i = 0; i < 7; i++) { const f = flakes[i], y = Math.floor((f[1] + t * f[2]) % 10), x = (f[0] + Math.floor((t * f[2] + i) / 3)) % N; if (skyM[y * N + x]) put(x, y, '#ffffff'); }
+      }
+      // a snowball in flight, then the splat flying apart
+      if (ball) {
+        const bu = (t - ball.at) / 0.4;
+        if (bu >= 1) ball = null;
+        else put(Math.round(ball.x0 + (hitCell[0] - ball.x0) * bu), Math.round(ball.y0 + (hitCell[1] - ball.y0) * bu - Math.sin(bu * Math.PI) * 2), '#ffffff');
+      }
+      if (since >= 0 && since < 0.45) {
+        const r = since < 0.15 ? 0 : 1 + Math.floor(since * 4);
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1]]) put(hitCell[0] + dx * r, hitCell[1] + dy * r, legend === 'Fire' ? (r ? '#c8ccd4' : '#ffffff') : r ? '#f4fbff' : '#ffffff');
+      }
+      if (legend === 'Yeti' && t - yt.shakeAt >= 0 && t - yt.shakeAt < 0.6) {
+        // the roar shakes the whole frame, a cell one way and then the other
+        const sh = Math.floor((t - yt.shakeAt) * 14) % 2 ? 1 : -1;
+        for (let y = 0; y < N; y++) { const row = cell.slice(y * N, y * N + N); for (let x = 0; x < N; x++) cell[y * N + x] = row[Math.max(0, Math.min(N - 1, x - sh))]; }
+      }
+    }
     // a colour nudged lighter or darker, for the mosaic's uneven tiles
     const nudge = (hex, k) => {
       const v = parseInt(hex.slice(1), 16);
@@ -606,6 +772,8 @@ Proto.add({
       clock = t;
       const inp = c.input;
       ptrCell = inp.inside ? [Math.floor(inp.x * N), Math.floor(inp.y * N)] : null;
+      // a legendary is a toy of its own (see legendInput)
+      if (legend !== 'None') { legendInput(t, inp); draw(t); return; }
       if (ptrCell && !wasIn && legend === 'Fire') c.sound.hit('noise', 0.08, { cutoff: 5000, dur: 0.3 });
       wasIn = !!ptrCell;
       if (legend === 'Diamond' && ptrCell) {

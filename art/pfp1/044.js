@@ -9,7 +9,7 @@ Proto.add({
   num: 44,
   name: 'Two Sides',
   fam: 'Faces & People',
-  recipe: 'Each hash is a new sitter painted as two views at once, as pixel art on a 64-cell grid: the face split into a front half and a side half, mismatched eyes and a profile nose, on a background cut into flat planes. Head shape, age, mood, nose, eyes, hair or hat, collar, beard, jewellery, garment, prop and backdrop all vary, with gilt skin, a third eye and a laurel among the rares; one in two hundred holds a rose in the teeth, and rarer still are the legendaries: Plaster, Shattered and The Instrument.',
+  recipe: 'Each hash is a new sitter painted as two views at once, as pixel art on a 64-cell grid: the face split into a front half and a side half, mismatched eyes and a profile nose, on a background cut into flat planes. Head shape, age, mood, nose, eyes, hair or hat, collar, beard, jewellery, garment, prop and backdrop all vary, with gilt skin, a third eye and a laurel among the rares; one in two hundred holds a rose in the teeth, and rarer still are the legendaries: a Plaster cast on a gallery wall, the sitter Shattered in a gilt mirror, and The Instrument in a papier colle.',
   interactive: 'Tap the face to change its mood. Tap the prop or the background to play it.',
   music: true,
   seed: 0,
@@ -456,7 +456,36 @@ Proto.add({
     const moonAt = [1000 - propAt[0], 150];
     const moonM = prop === 'Moon' ? cover(ell(moonAt[0], moonAt[1], 74, 74, 24), new Uint8Array(NN)) : null;
     const moonS = prop === 'Moon' ? cover(ell(moonAt[0] + 34, moonAt[1] - 16, 64, 64, 24), new Uint8Array(NN)) : null;
+    // the instrument's backdrop is a papier colle: scraps of newspaper and sheet music, faux-bois paper, a black
+    // plane and charcoal lines on ochre paper; a tap on it stains the little diamond in the palette's colours
+    let collTint = pal[0], musTop = 0, musX = [0, 0];
+    const musM = new Uint8Array(NN);
+    const collage = () => {
+      const S = flip, base = T('#b9a27a'), smudge = T('#a99068'), CH = T('#2a2420');
+      for (let k = 0; k < NN; k++) { const i = k % N, j = (k - i) / N; backL[k] = dith(i, j, 0.5 + 0.5 * Math.sin(i * 0.3 + j * 0.17)) && hv(k) < 0.25 ? smudge : base; }
+      const paper = (pts, col, fn) => { const m = cover(pts, new Uint8Array(NN)), kc = T(col); for (let k = 0; k < NN; k++) if (m[k]) { const i = k % N, j = (k - i) / N; backL[k] = fn ? fn(i, j, kc) : kc; } for (let k = 0; k < NN; k++) if (m[k] && open4(m, k)) backL[k] = deep(kc); return m; };
+      const GRAIN = T('#6e4220');
+      paper([[hcx + S * 130, 600], [hcx + S * 520, 560], [hcx + S * 540, 1000], [hcx + S * 150, 1000]], '#9a6232', (i, j, kc) => (j + Math.round(Math.sin(i * 0.5) * 1.2)) % 3 === 0 ? GRAIN : kc);
+      const HATCH = T('#4a3c30');
+      paper([[hcx + S * 70, 40], [hcx + S * 430, -10], [hcx + S * 480, 560], [hcx + S * 120, 610]], '#2a221c', (i, j, kc) => (i + j) % 3 === 0 ? HATCH : kc);
+      const INKG = T('#8a8070'), news = cover([[hcx - S * 480, 70], [hcx - S * 150, 40], [hcx - S * 130, 410], [hcx - S * 460, 440]], new Uint8Array(NN));
+      let top = N; for (let k = 0; k < NN; k++) if (news[k]) top = Math.min(top, (k - k % N) / N);
+      paper([[hcx - S * 480, 70], [hcx - S * 150, 40], [hcx - S * 130, 410], [hcx - S * 460, 440]], '#e6ddc4', (i, j, kc) => j < top + 7 ? CH : j % 2 === 1 && hv(i * 3 + j * 101) < 0.82 ? INKG : kc);
+      // the masthead: JOU, cut off where the scrap was torn
+      const GLY = { J: ['111', '001', '001', '101', '111'], O: ['111', '101', '101', '101', '111'], U: ['101', '101', '101', '101', '111'] }, CREAM = T('#e6ddc4');
+      let lx = Math.round(((S > 0 ? hcx - S * 470 : hcx - S * 160) + 40) / CW);
+      for (const ch of 'JOU') { for (let r = 0; r < 5; r++) for (let q = 0; q < 3; q++) if (GLY[ch][r][q] === '1') { const k = (top + 1 + r) * N + lx + q; if (news[k]) backL[k] = CREAM; } lx += 4; }
+      const STAFF = T('#6a6258'), NOTE = T('#1e1a16'), mus = [[hcx - S * 490, 480], [hcx - S * 170, 450], [hcx - S * 150, 720], [hcx - S * 470, 740]];
+      let mtop = N; { const m = cover(mus, new Uint8Array(NN)); for (let k = 0; k < NN; k++) if (m[k]) { mtop = Math.min(mtop, (k - k % N) / N); musM[k] = 1; } }
+      musTop = mtop; { let a = N, b = 0; for (let k = 0; k < NN; k++) if (musM[k] && (k - k % N) / N >= mtop + 3 && (k - k % N) / N <= mtop + 11) { a = Math.min(a, k % N); b = Math.max(b, k % N); } musX = [a, b]; }
+      paper(mus, '#efe6cf', (i, j, kc) => { const r = j - mtop - 3; if (r >= 0 && r <= 8 && r % 2 === 0) return STAFF; const h = hv(i * 13 + 7); if (r >= 0 && r <= 8 && i % 4 === 1 && h < 0.55 && (r === Math.floor(h * 16) % 8)) return NOTE; return kc; });
+      paper([[hcx - S * 300, 770], [hcx - S * 190, 700], [hcx - S * 80, 790], [hcx - S * 190, 870]], collTint);
+      // charcoal: two long strokes across the whole sheet and a ring echoing the sound hole
+      seg(backL, [hcx - S * 520, 930], [hcx + S * 520, 240], CH); seg(backL, [hcx + S * 300, 0], [hcx + S * 330, 1000], CH);
+      ringCells(backL, [hcx + S * 320, 760], 120, CH);
+    };
     const buildBack = () => {
+      if (lute) { collage(); return; }
       for (let k = 0; k < NN; k++) {
         const n = pid[k], col = T(planeNow[n]), i = k % N, j = (k - i) / N;
         const nr = i < N - 1 ? pid[k + 1] : n, nd = j < N - 1 ? pid[k + N] : n;
@@ -738,6 +767,10 @@ Proto.add({
       trail(sitL, seamPath, CAST[4], sm);
       const [ti, tj] = cellOf(noseTip);
       for (const [di, dj, k] of [[0, 0, CAST[1]], [-flip, 0, CAST[2]], [0, -1, CAST[2]], [0, 1, CAST[1]]]) plot(sitL, ti + di, tj + dj, k);
+      // a hairline crack runs down from the crown, and a flake has come off the brow
+      trail(sitL, [P(70, -300), P(48, -236), P(78, -180), P(52, -118), P(84, -60)], CAST[1], sm);
+      const [bi, bj] = cellOf(P(-120, -150));
+      for (const [di, dj, k] of [[0, 0, CAST[1]], [1, 0, CAST[2]], [0, 1, CAST[2]], [1, 1, CAST[1]]]) if (sm[(bj + dj) * N + bi + di]) plot(sitL, bi + di, bj + dj, k);
     }
     xf = p => p;
 
@@ -779,56 +812,65 @@ Proto.add({
     }
 
     if (legend === 'Plaster') {
-      framed(sitL, [[70, 900], [930, 900], [930, 1010], [70, 1010]], '#ddd6c8');
-      framed(sitL, [[40, 868], [960, 868], [930, 912], [70, 912]], '#f6f1e6');
+      framed(sitL, [[90, 944], [910, 944], [910, 1010], [90, 1010]], '#ddd6c8');
+      framed(sitL, [[60, 916], [940, 916], [910, 952], [90, 952]], '#f6f1e6');
     }
-    // ---------- the shattered legendary: the whole figure cut into facets by six straight cuts ----------
-    let facet = null, facetShift = 0;
-    if (legend === 'Shattered') {
-      facet = new Int16Array(NN);
-      const cuts = [];
-      for (let k = 0; k < 6; k++) { const a = (k + rare(0x100 + k) * 0.8) * Math.PI / 6, ox = hcx + (rare(0x200 + k) - 0.5) * 300, oy = hcy + 80 + (rare(0x300 + k) - 0.5) * 420; cuts.push([ox, oy, Math.cos(a), Math.sin(a)]); }
+    // ---------- the shattered legendary: the sitter seen in a broken mirror in a gilt frame ----------
+    // a blow landed toward one corner of the glass: cracks run out from it to the frame and ring it twice, and each
+    // shard of glass sits a cell askew and catches the light at its own angle
+    let facetShift = 0, reformAt = -9, shard = null, crackM = null, imp = null;
+    const shardMode = [], shardDisp = [], rays = [], frameM = new Uint8Array(NN);
+    const blows = [], crackAt = new Float32Array(NN), underC = new Uint8Array(NN);
+    // one blow: where it struck, its rays (angles), two ring radii and each sector's ring jitter, from a seeded rule
+    const blowAt = (x, y, R, born) => { const NRAY = 9 + Math.floor(R(3) * 4), ang = [], w = []; for (let k = 0; k < NRAY; k++) { ang.push((k + 0.5 + (R(0x10 + k) - 0.5) * 0.7) / NRAY * Math.PI * 2); w.push(0.8 + R(0x20 + k) * 0.4); } return { x, y, NRAY, ang, w, r1: 4 + R(4) * 2, r2: 15 + R(5) * 5, wob: Math.floor(R(0) * 4), born, R }; };
+    // the glass's pieces: a cell's shard is where it lies relative to every blow, and a crack runs wherever two
+    // neighbouring cells lie in different shards; a crack the newest blow made appears as its web grows out
+    const breakGlass = () => {
+      const ids = new Map(), parts = new Array(blows.length), dirs = [];
+      shardMode.length = 0; shardDisp.length = 0; rays.length = 0;
+      const sid = (b, i, j) => { const dx = i + 0.5 - b.x, dy = j + 0.5 - b.y, d = Math.hypot(dx, dy); if (d < 1.7) return [-1, d, 0]; if (b.far && d > b.far) return [99, d, 0]; let a = Math.atan2(dy, dx) + 0.1 * Math.sin(d * 0.45 + b.wob); a = ((a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); let sec = b.NRAY - 1; for (let k = 0; k < b.NRAY; k++) if (a < b.ang[k]) { sec = (k + b.NRAY - 1) % b.NRAY; break; } const ring = d < b.r1 * b.w[sec] ? 0 : d < b.r2 * b.w[sec] ? 1 : 2; return [sec * 3 + ring, d, b.ang[sec] + Math.PI / b.NRAY]; };
+      const old = new Int32Array(NN), oids = new Map(), last = blows[blows.length - 1];
+      for (const b of blows) if (!b.S) { b.S = new Int16Array(NN); b.A = new Float32Array(NN); for (let n = 0; n < NN; n++) { const i = n % N, r = sid(b, i, (n - i) / N); b.S[n] = r[0]; b.A[n] = r[2]; } }
       for (let n = 0; n < NN; n++) {
-        const i = n % N, j = (n - i) / N, x0 = (i + 0.5) * CW, y0 = (j + 0.5) * CW;
-        let id = 0;
-        cuts.forEach(([ox, oy, nx, ny], k) => { if ((x0 - ox) * ny - (y0 - oy) * nx > 0) id |= 1 << k; });
-        facet[n] = id;
+        const i = n % N, j = (n - i) / N; let key = 0, okey = 0, imp2 = false, am = 0, near = 0;
+        for (let q = 0; q < blows.length; q++) { const b = blows[q], s = b.S[n]; if (s < 0) imp2 = true; key = key * 128 + s + 1; if (q < blows.length - 1) okey = key; else { am = b.A[n]; near = s % 3; } }
+        if (imp2) { shard[n] = -1; old[n] = -1; continue; }
+        if (!ids.has(key)) { const id = ids.size; ids.set(key, id); const h = hv(id * 7 + blows.length * 131), push = near < 2 ? 1 : h < 0.6 ? 1 : 0; shardMode.push(Math.floor(hv(id * 13 + 5) * 3)); shardDisp.push([Math.round(Math.cos(am) * push), Math.round(Math.sin(am) * push)]); }
+        shard[n] = ids.get(key);
+        if (!oids.has(okey)) oids.set(okey, oids.size); old[n] = oids.get(okey);
       }
-      // the cracks go round the eyes and the mouth: each of those (with its brow) is one whole facet
-      const keepZones = [[hcx, mouthY, mouthW + 52, 50]];
-      if (eyes === 'One eye') keepZones.push([hcx - flip * 20, eyeY - 30, 110, 78]);
-      else {
-        keepZones.push([eyeA[0], eyeA[1] - 20, 96, 76], [eyeB[0], eyeB[1] - 20, 96, 76]);
-        if (eyes === 'Three eyes') keepZones.push([hcx + flip * 6, eyeY - 104 * lf, 70, 46]);
+      for (let n = 0; n < NN; n++) {
+        const i = n % N, cr = shard[n] < 0 || (i < N - 1 && shard[n + 1] !== shard[n]) || (n < NN - N && shard[n + N] !== shard[n]);
+        crackM[n] = shard[n] < 0 ? 2 : cr ? 1 : 0;
+        const ocr = blows.length > 1 && (old[n] < 0 || (i < N - 1 && old[n + 1] !== old[n]) || (n < NN - N && old[n + N] !== old[n]));
+        crackAt[n] = crackM[n] && blows.length > 1 && !ocr ? last.born + Math.hypot(i + 0.5 - last.x, (n - i) / N + 0.5 - last.y) / 90 : -99;
       }
-      for (const [zx, zy, rx, ry] of keepZones) {
-        const zm = mask(ell(zx, zy, rx, ry, 20)), [ci, cj] = tiltXf([zx, zy]).map(v => Math.max(0, Math.min(N - 1, Math.floor(v / CW))));
-        const id = facet[cj * N + ci];
-        for (let n = 0; n < NN; n++) if (zm[n]) facet[n] = id;
-      }
-    }
-    // only the head's outline, the hair and the body come apart; the face inside the outline stays put
-    const still = legend === 'Shattered' ? inside(H) : null;
-    const cracks = new Map();
-    const crackOf = k => { if (!cracks.has(k)) cracks.set(k, T(blend(toneHex(k), outline, 0.42))); return cracks.get(k); };
-    let reformAt = -9;
-    const disp = [];
+      for (let n = 0; n < NN; n++) { const i = n % N, j = (n - i) / N; underC[n] = (i > 0 && crackM[n - 1] === 1) || (j > 0 && crackM[n - N] === 1) ? 1 : 0; }
+      for (const b of blows) for (let k = 0; k < b.NRAY; k++) rays.push([Math.cos(b.ang[k]), Math.sin(b.ang[k]), b.R(0x40 + k), b.x, b.y]);
+      imp = [last.x, last.y];
+    };
     if (legend === 'Shattered') {
-      const sx = new Float64Array(64), sy = new Float64Array(64), sn = new Float64Array(64);
-      for (let n = 0; n < NN; n++) if (sitL[n]) { const id = facet[n], i = n % N; sx[id] += i; sy[id] += (n - i) / N; sn[id]++; }
-      const ci = hcx / CW, cj = (hcy + 120) / CW;
-      for (let id = 0; id < 64; id++) {
-        if (!sn[id]) { disp.push([0, 0]); continue; }
-        let dx = sx[id] / sn[id] - ci, dy = sy[id] / sn[id] - cj; const L = Math.hypot(dx, dy) || 1, mag = 1 + Math.floor(rare(0x400 + id) * 1.99);
-        dx /= L; dy /= L;
-        if (L < 2) { const a = rare(0x500 + id) * 6.283; dx = Math.cos(a); dy = Math.sin(a); }
-        disp.push([dx * mag, dy * mag]);
-      }
+      const corner = Math.floor(rare(0x600) * 4);
+      shard = new Int16Array(NN); crackM = new Uint8Array(NN);
+      blows.push(blowAt((corner & 1 ? 50 : 13) + (rare(0x601) - 0.5) * 6, (corner & 2 ? 49 : 13) + (rare(0x602) - 0.5) * 6, k => k === 0 ? corner / 4 + 0.01 : rare(0x600 + k), -99));
+      breakGlass();
+      // the frame: four cells of carved gilt, beaded, with a rosette at each corner
+      for (let n = 0; n < NN; n++) { const i = n % N, j = (n - i) / N, m = Math.min(i, j, N - 1 - i, N - 1 - j); if (m < 4) frameM[n] = m + 1; }
     }
     const brokenBy = t => { const k = t - reformAt; if (k > 3) return 1; if (k < 0.35) return Math.max(0, 1 - k / 0.35); if (k < 2) return 0; return (k - 2) / 1; };
-    const lighter = new Map();
-    const lift = k => { if (!lighter.has(k)) lighter.set(k, T(blend(toneHex(k), '#fff6e4', 0.36))); return lighter.get(k); };
-    const facetMode = id => (id * 5 + facetShift) % 3;   // 0 as painted, 1 a shade down, 2 a shade up
+    const glassC = legend === 'Shattered' ? new Int32Array(3 * 4096).fill(-1) : null;
+    const glassOf = (k, mode) => { const key = k * 3 + mode; let v = glassC[key]; if (v < 0) v = glassC[key] = T(blend(blend(toneHex(k), '#cfdce8', 0.3), mode === 1 ? '#1c2836' : '#f2f8ff', mode === 0 ? 0 : mode === 1 ? 0.2 : 0.28)); return v; };
+    const GILT = [T('#4a3214'), T('#c89a44'), T('#e8c46a'), T('#8a6424')], GILTHI = T('#fff0b8'), CRACKW = T('#d6e0ea'), GLINTW = T('#ffffff');
+    const glassAt = [], frameAt = [], frameK = [], underCrack = new Uint8Array(NN);
+    if (legend === 'Shattered') for (let n = 0; n < NN; n++) {
+      const m = frameM[n], i = n % N, j = (n - i) / N;
+      if (!m) { glassAt.push(n); continue; }
+      const along = Math.min(i, j) === m - 1 ? i + j : i - j;
+      let k = m === 1 ? GILT[0] : m === 4 ? GILT[3] : m === 2 ? ((along & 3) === 0 ? GILTHI : GILT[2]) : ((along + 2) & 3) === 0 ? GILT[0] : GILT[1];
+      const ci = Math.min(i, N - 1 - i), cj = Math.min(j, N - 1 - j);
+      if (ci < 6 && cj < 6 && Math.hypot(ci - 2, cj - 2) < 2.3) k = Math.hypot(ci - 2, cj - 2) < 1 ? GILTHI : GILT[2];   // a rosette in each corner
+      frameAt.push(n); frameK.push(k);
+    }
 
     // ---------- the living features: eyes, brows, mouth, moustache, glasses, props ----------
     // per mood: front brow raise and tilt, side brow raise and tilt, how far the lids come down
@@ -1052,8 +1094,64 @@ Proto.add({
     const propSpot = { Bird: [propAt[0], propAt[1] - 40, 130], Dove: [propAt[0], propAt[1] - 40, 130], Flower: [flowerAt[0], flowerAt[1], 90], Pipe: [pipeAt[0] + flip * 140, pipeAt[1] + 50, 80], Fan: [pc[0], pc[1], 170], Lemon: [pc[0], pc[1] + 40, 120], Cup: [pc[0], pc[1], 110], Guitar: [gx, gy, 170], Moon: [moonAt[0], moonAt[1], 90], Hand: [hcx - flip * 150, hcy + 300, 110] }[prop];
     // each mood has its own little phrase, in scale degrees
     const phrase = { Calm: [0, 2], Smile: [2, 4, 7], Surprised: [0, 7], Stern: [4, 0], Wry: [3, 1, 4], Pout: [2, 1], Sly: [5, 3, 4], Whistle: [7, 9, 7] };
-    let moodIx = moods.indexOf(mood0), moodAt = -9, moonGlow = -9, strumAt = -9;
+    let moodIx = moods.indexOf(mood0), moodAt = -9, moonGlow = -9, strumAt = lute ? -2.5 : -9;
+    const NOTEK = lute ? T('#c63a2c') : 0, NOTEB = lute ? T('#1e1a16') : 0;
+    let pluckAt = -9;
+    const strCols = [Math.floor((hcx - CW) / CW), Math.floor((hcx + CW) / CW)], strLo = [(mouthY + 52) / CW, (hcy + 262) / CW], strHi = [2.5, Math.min(...head.map(p => p[1])) / CW + 2.5];
+    const slots = Math.max(8, Math.floor((musX[1] - musX[0] - 4) / 3));
+    let press0 = null, holdAt = -1, lastDown = false, flipAt = -9, mirrored = 0, prevPx = -1, melody = [], flying = [], playAt = -9;
+    const toyTap = (u, v2, t) => {
+      const k0 = at(u, v2), pan = (u - 0.5) * 1.2;
+      if (legend === 'Shattered') {
+        // a new blow where you tapped (the first one stays; four more at most), its cracks running out from it
+        const i = u * N, j = v2 * N; if (i < 4 || j < 4 || i > N - 4 || j > N - 4) return true;
+        const sd = blows.length * 977 + Math.floor(i) * 61 + Math.floor(j);
+        if (blows.length > 4) blows.splice(1, 1);
+        const nb = blowAt(i, j, k => hv(sd * 17 + k), t); nb.far = 11 + hv(sd) * 7; nb.r2 = Math.min(nb.r2, nb.far * 0.7); blows.push(nb); breakGlass(); facetShift++;
+        c.sound.hit('noise', 0.3, { cutoff: 5000, dur: 0.25 }); c.sound.hit('snare', 0.2); [0, 3, 7, 10].forEach((d, q) => c.sound.note(deg(14 + d), { dur: 0.3, vel: 0.08, wave: 'sine', pan, at: 0.04 + q * 0.05 }));
+        return true;
+      }
+      if (legend === 'Plaster' && k0 >= 0 && owned[k0]) {
+        // the cast is turned about on its pedestal: it narrows to its edge and comes round the other way
+        flipAt = t; c.sound.hit('click', 0.22); c.sound.note(deg(-5), { dur: 0.5, vel: 0.12, wave: 'triangle', cutoff: 700, pan }); c.sound.note(deg(-1), { dur: 0.4, vel: 0.08, wave: 'triangle', cutoff: 700, pan, at: 0.25 });
+        return true;
+      }
+      if (lute && k0 >= 0 && musM[k0]) {
+        // the sheet music plays back the tune the strings wrote on it, note by note
+        playAt = t; melody.forEach((p, q) => c.sound.note(deg(p), { dur: 0.35, vel: 0.2, wave: 'triangle', cutoff: 2200, at: q * 0.22 }));
+        if (!melody.length) [0, 2, 4].forEach((d, q) => c.sound.note(deg(d), { dur: 0.3, vel: 0.12, wave: 'triangle', at: q * 0.15 }));
+        return true;
+      }
+      return false;
+    };
+    const toyMove = t => {
+      const inp = c.input;
+      if (inp.down && !lastDown) holdAt = t;
+      if (!inp.down) holdAt = -1;
+      if (legend === 'Shattered' && holdAt >= 0 && t - holdAt > 1) { holdAt = -1; blows.length = 1; breakGlass(); reformAt = t; c.sound.note(deg(7), { dur: 1.2, vel: 0.14, wave: 'sine' }); c.sound.note(deg(11), { dur: 1.2, vel: 0.1, wave: 'sine', at: 0.1 }); }
+      if (lute) {
+        // a finger dragged across a string plucks it: higher up the string, a higher note; each note flies to the
+        // next place on the sheet music's stave and stays there
+        const px = inp.x * N, py = inp.y * N;
+        if (inp.down && prevPx >= 0) for (let q = 0; q < 2; q++) {
+          const sc = strCols[q];
+          if ((prevPx - sc) * (px - sc) <= 0 && prevPx !== px && py >= strHi[0] && py <= strLo[1] + 2) {
+            const p = Math.max(0, Math.min(8, Math.round((strLo[1] - py) / (strLo[1] - strHi[0]) * 8)));
+            strumAt = t - 3; pluckAt = t; c.sound.note(deg(p + q * 2), { dur: 0.9, vel: 0.22, wave: 'triangle', cutoff: 2400, pan: (inp.x - 0.5) });
+            if (melody.length >= slots) { melody = []; flying = []; }
+            flying.push([px, py, t, melody.length, p]); melody.push(p + q * 2);
+          }
+        }
+        prevPx = inp.down ? px : -1;
+      }
+      // a short, still press and release is a tap (so a hold or a drag never also fires one)
+      if (inp.down && !lastDown) press0 = { x: inp.x, y: inp.y, t, moved: 0 };
+      if (press0 && inp.down) press0.moved = Math.max(press0.moved, Math.hypot(inp.x - press0.x, inp.y - press0.y) * N);
+      if (press0 && !inp.down) { if (press0.moved < 1.5 && t - press0.t < 0.45) tap(press0.x, press0.y, t); press0 = null; }
+      lastDown = inp.down;
+    };
     const tap = (u, v2, t) => {
+      if (legend !== 'None' && toyTap(u, v2, t)) return;
       const x0 = u * 1000, y0 = v2 * 1000, pan = (u - 0.5) * 1.2;
       // the head is tilted: hit-test the head and what it wears in its own frame
       const cs = Math.cos(tilt), sn = -Math.sin(tilt);
@@ -1092,6 +1190,7 @@ Proto.add({
       const i = pid[k0];
       shade[i] = (Math.max(0, shade[i]) + 1 + Math.floor(mr() * 2)) % pal.length;
       planeNow[i] = pal[shade[i]];
+      collTint = planeNow[i];
       buildBack();
       c.sound.note(deg(rank.indexOf(i)), { dur: 0.45, vel: 0.28, wave: 'triangle', cutoff: 1800, pan });
     };
@@ -1110,7 +1209,34 @@ Proto.add({
     const shadeMemo = new Map();
     const museumShade = k => { if (!shadeMemo.has(k)) shadeMemo.set(k, T(blend(toneHex(k), '#1c1a18', 0.32))); return shadeMemo.get(k); };
     const museum = k => { if (!wallMemo.has(k)) { const l = lumOf(k); wallMemo.set(k, T(toHex(70 + l * 120, 74 + l * 118, 70 + l * 110))); } return wallMemo.get(k); };
-    const owned = new Uint8Array(NN);
+    const owned = new Uint8Array(NN), castB = new Int32Array(NN), wallB = new Int32Array(NN), rowA = new Int16Array(N), rowB = new Int16Array(N);
+    let lampX = N / 2, lampY = 8;
+    const SOX = new Int16Array(4), SOY = new Int16Array(4);
+    const LVT = new Int8Array(17 * 9); for (let a = 0; a <= 16; a++) for (let b = 0; b <= 8; b++) LVT[a * 9 + b] = Math.max(0, Math.min(4, Math.floor((1.02 - 0.72 * Math.pow(a / 16, 1.4) - 0.2 * b / 8) * 5)));
+    const IVORY = legend === 'Plaster' ? ['#4a443c', '#8a8272', '#bdb4a0', '#e2dbc8', '#fbf8ee'].map(T) : [];
+    const LAMPB = T('#fffbe0'), LAMPW = T('#ffffff'), LAMPS = T('#8a6a32'), LAMPG = T('#c8a860');
+    const poolM = new Map(), darkM = new Map();
+    const poolOf = k => { if (!poolM.has(k)) poolM.set(k, T(blend(toneHex(k), '#ffe8c0', 0.16))); return poolM.get(k); };
+    const darkOf = k => { if (!darkM.has(k)) darkM.set(k, T(blend(toneHex(k), '#0a0806', 0.45))); return darkM.get(k); };
+    let flipDone = -9;
+    // the plaster cast's gallery: a wall in the palette's darkest colour under a pool of light, a dado rail and panelled
+    // wainscot below it, and a label card on the wall beside the cast
+    const GAL = legend === 'Plaster' ? new Uint16Array(NN) : null;
+    if (GAL) {
+      const wh0 = blend(pal[1], '#140e0c', 0.32), wl = rgbOf(wh0).reduce((s, v) => s + v, 0) / 765, wallHex = wl < 0.16 ? blend(wh0, '#6a4a3a', 0.4) : wh0, W0 = T(wallHex), W1 = T(blend(wallHex, '#fff0d8', 0.1)), W2 = T(blend(wallHex, '#fff0d8', 0.2));
+      const RAIL = T(blend(wallHex, '#fff0d8', 0.28)), RAILD = T(blend(wallHex, '#000000', 0.35)), PANEL = T(blend(wallHex, '#000000', 0.16)), PANELL = T(blend(wallHex, '#000000', 0.3)), CARD = T('#ece4d2'), CARDT = T('#8a8274');
+      const cx0 = hcx - flip * 360;
+      for (let n = 0; n < NN; n++) {
+        const i = n % N, j = (n - i) / N, x = (i + 0.5) * CW, y = (j + 0.5) * CW, e = Math.hypot((x - hcx) / 380, (y - 280) / 460);
+        let k = e < 0.6 ? W2 : e < 0.82 ? (dith(i, j, (0.82 - e) / 0.22) ? W2 : W1) : e < 1 ? (dith(i, j, (1 - e) / 0.18) ? W1 : W0) : W0;
+        if (y > 700 && y < 724) k = RAIL; else if (y >= 724 && y < 740) k = RAILD;
+        else if (y >= 740) { const u = ((x + 1000) % 250); k = u < CW || y < 740 + CW * 2 ? PANELL : PANEL; }
+        if (Math.abs(x - cx0) < 70 && y > 500 && y < 590) k = Math.abs(x - cx0) > 70 - CW || y < 500 + CW || y > 590 - CW ? CARDT : ((j % 2 === 0) && Math.abs(x - cx0) < 40 && hv(i * 7 + j) < 0.8 ? CARDT : CARD);
+        GAL[n] = k;
+      }
+    }
+    const GALS = GAL, wallP = new Int32Array(GAL ? NN : 0), wallD = new Int32Array(GAL ? NN : 0), wallS = new Int32Array(GAL ? NN : 0);
+    if (GAL) for (let n = 0; n < NN; n++) { wallP[n] = poolOf(GAL[n]); wallD[n] = darkOf(GAL[n]); wallS[n] = T(blend(toneHex(wallD[n]), '#000000', 0.62)); }
 
     const gap = U(3.5, 5.5);
     const third = [hcx + flip * 6, eyeY - 104 * lf];
@@ -1143,7 +1269,8 @@ Proto.add({
     const sx2 = small.getContext('2d'), img = sx2.createImageData(N, N), img32 = new Uint32Array(img.data.buffer);
     const behind = new Uint8Array(NN), broke = new Uint8Array(NN);
     const frame = t => {
-      for (const tp of c.input.taps()) tap(tp.x, tp.y, t);
+      for (const tp of c.input.taps()) if (legend === 'None') tap(tp.x, tp.y, t);   // a legendary takes its taps as short, still releases
+      if (legend !== 'None') toyMove(t);
       shown.set(backL);
       if (prop === 'Moon' && t - moonGlow < 2.5) {
         const a = Math.sin(Math.min(1, (t - moonGlow) / 2.5) * Math.PI), [mi, mj] = [moonAt[0] / CW, moonAt[1] / CW], glow = T('#fff0be');
@@ -1172,16 +1299,22 @@ Proto.add({
         // the sound hole is the mouth: a rosette that opens wider when the strings ring
         const ring = t - strumAt < 1.4;
         // two strings run up the neck and over the lower bout, broken by the face as a cubist would break them
-        const sh = t - strumAt < 1.2 ? (Math.floor((t - strumAt) * 8) % 2 ? CW : -CW) : 0, top = Math.min(...head.map(p => p[1]));
+        const sh = t - strumAt < 1.2 || t - pluckAt < 0.8 ? (Math.floor(t * 16) % 2 ? CW : -CW) : 0, top = Math.min(...head.map(p => p[1]));
         for (const q of [-1, 1]) {
           const sx0 = hcx + q * CW;
           let hov = 0;
           if (c.input.inside && Math.abs(c.input.x * 1000 - sx0) < CW * 2) hov = Math.floor(t * 6) % 2 ? q * CW : 0;
           seg(liveL, [sx0 + sh + hov, mouthY + 52], [sx0, hcy + 262], T('#e6d6ae'));
-          seg(liveL, [sx0, top + 40], [sx0 + hov, 40], T('#e6d6ae'));
+          seg(liveL, [sx0, top + 40], [sx0 + hov + (t - pluckAt < 0.8 ? sh : 0), 40], T('#e6d6ae'));
         }
         sprite(liveL, [mx, mouthY - 4], ring ? ['...ggg...', '.gg...gg.', '.g.ooo.g.', 'g.ooooo.g', 'g.ooooo.g', 'g.ooooo.g', '.g.ooo.g.', '.gg...gg.', '...ggg...'] : ['..ggg..', '.g...g.', 'g.ooo.g', 'g.ooo.g', 'g.ooo.g', '.g...g.', '..ggg..'], { g: T('#e0c27a'), o: T('#1a120c') });
         sprite(liveL, [hcx, hcy + 268], ['oooooooo', 'obbbbbbo', 'oooooooo'], { o: OL, b: T('#3a2616') });
+        // the guitar plays itself now and then (unless you're playing it), and its notes float up and drift away
+        if (t - strumAt > 3.6 && t - pluckAt > 4) strumAt = t;
+        for (let q = 0; q < 3; q++) {
+          const ph = (t - strumAt - q * 0.32) / 2.4; if (ph < 0 || ph > 1) continue;
+          sprite(liveL, [mx + flip * (q === 1 ? -1 : 1) * (230 + ph * 170 + q * 30) + Math.sin(ph * 7 + q) * 26, mouthY - 40 - ph * 420 - q * 40], q === 1 ? ['.oooo', '.o..o', '.o..o', 'oo.oo', 'oo.oo'] : ['..oo', '..o.o', '..o..', 'ooo..', 'oo...'], { o: NOTEK }, flip < 0);
+        }
       } else {
         drawMouth(m, fresh);
         drawMoustache();
@@ -1210,45 +1343,85 @@ Proto.add({
         if (to < NN) { shown[to] = k; owned[to] = 1; }
       }
       if (legend === 'Shattered') {
-        // each facet of the figure steps a shade up or down; a darker seam where facets meet; the pointer's facet catches the light
-        const k0 = c.input.inside ? at(c.input.x, c.input.y) : -1, hot = k0 >= 0 && owned[k0] ? facet[k0] : -1;
-        for (let n = 0; n < NN; n++) if (owned[n] && shown[n] !== OL) {
-          const i = n % N, j = (n - i) / N, id = facet[n];
-          const seam = (i < N - 1 && owned[n + 1] && facet[n + 1] !== id) || (j < N - 1 && owned[n + N] && facet[n + N] !== id);
-          const md = id === hot ? 2 : facetMode(id), k = shown[n];
-          shown[n] = seam ? crackOf(k) : md === 1 ? deep(k) : md === 2 ? lift(k) : k;
+        // the reflection through the broken glass: each shard samples the picture a cell askew and tinted to its angle;
+        // the cracks are bright with a dark edge; a tap mends the glass for a moment before it falls apart again, and
+        // a glint runs out along each crack from the blow
+        const b = brokenBy(t), k0 = c.input.inside ? at(c.input.x, c.input.y) : -1, hot = k0 >= 0 ? shard[k0] : -2;
+        broke.set(shown);
+        const gt = 200 + Math.floor(t * 9), shift = Math.round(b);
+        for (let q = 0; q < glassAt.length; q++) {
+          const n = glassAt[q], id = shard[n];
+          if (crackM[n] && b > 0.5 && t >= crackAt[n]) { shown[n] = CRACKW; continue; }
+          if (id < 0) continue;
+          const d = shardDisp[id], i = n % N, j = (n - i) / N, ii = i - d[0] * shift, jj = j - d[1] * shift;
+          const src = ii >= 0 && jj >= 0 && ii < N && jj < N ? broke[jj * N + ii] : broke[n];
+          // the glass's old glare: two pale streaks drifting across the mirror; the edge of a shard under a crack is in shadow
+          const gp = (i + j + gt) % 61, glare = gp < 3 || gp === 5;
+          shown[n] = glassOf(src, b > 0.5 && underC[n] && t >= crackAt[n] ? 1 : glare || id === hot ? 2 : b < 0.5 ? 0 : (shardMode[id] + facetShift) % 3);
         }
-        // then the facets come apart a cell or two: the outline, hair and body move out from the middle, leaving a
-        // mid-dark crack where they were; the face inside the outline (eyes and mouth with it) stays whole
-        const b = brokenBy(t);
-        if (b > 0.02) {
-          for (let n = 0; n < NN; n++) broke[n] = !owned[n] ? behind[n] : still[n] ? shown[n] : crackOf(shown[n]);
-          for (let n = 0; n < NN; n++) if (owned[n] && !still[n]) {
-            const i = n % N, j = (n - i) / N, d = disp[facet[n]], ii = i + Math.round(d[0] * b), jj = j + Math.round(d[1] * b);
-            if (ii >= 0 && jj >= 0 && ii < N && jj < N && !still[jj * N + ii]) broke[jj * N + ii] = shown[n];
+        // a fresh blow flashes white where it struck
+        const nb = blows[blows.length - 1];
+        if (t - nb.born < 0.25) for (let a = 0; a < 12; a++) { const r = 1 + (t - nb.born) * 30, i = Math.floor(nb.x + Math.cos(a * 0.52) * r), j = Math.floor(nb.y + Math.sin(a * 0.52) * r); if (i >= 4 && j >= 4 && i < N - 4 && j < N - 4) shown[j * N + i] = GLINTW; }
+        // holding a finger on the glass mends it: a ring of light closes in, then the glass is whole but for the first blow
+        if (holdAt >= 0 && c.input.down) { const f = Math.min(1, (t - holdAt - 0.2) / 0.8); if (f > 0) for (let a = 0; a < 40; a++) { const r = 16 * (1 - f) + 3, i = Math.floor(c.input.x * N + Math.cos(a * 0.157) * r), j = Math.floor(c.input.y * N + Math.sin(a * 0.157) * r); if (i >= 4 && j >= 4 && i < N - 4 && j < N - 4) shown[j * N + i] = GILTHI; } }
+        if (b > 0.5) for (const [ux, uy, ph, ix, iy] of rays) {
+          const r = ((t * 14 + ph * 60) % 70) - 4;
+          for (const q of [r, r - 1, r - 2]) { const i = Math.floor(ix + ux * q), j = Math.floor(iy + uy * q); if (i >= 4 && j >= 4 && i < N - 4 && j < N - 4) for (const [u, v] of [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1]]) { const n2 = (j + v) * N + i + u; if (crackM[n2]) shown[n2] = q === r ? GLINTW : CRACKW; } }
+        }
+        for (let q = 0; q < frameAt.length; q++) shown[frameAt[q]] = frameK[q];
+      }
+      if (legend === 'Plaster') {
+        // a plaster cast in a dark gallery, lit by one lamp: the lamp is wherever the pointer is (or swings slowly across
+        // the top by itself). The cast is pure ivory, modelled only by the light: bright on the side toward the lamp,
+        // falling into shade away from it, its features a faint relief; it throws a long shadow on the wall, away from
+        // the lamp and longer the lower the lamp hangs; the wall is lit in a pool round the lamp
+        if (c.input.inside) { lampX += (c.input.x * N - lampX) * 0.35; lampY += (c.input.y * N - lampY) * 0.35; }
+        else { lampX = N / 2 + Math.sin(t * 0.5 + 1) * N * 0.36; lampY = 13 + (1 - Math.cos(t * 0.5 + 1)) * 4; }
+        const lx = lampX, ly = lampY;
+        let ca = 0, cb = 0, cn = 0;
+        for (let j = 0; j < N; j++) { let a = -1, b = -1; for (let i = 0; i < N; i++) if (owned[j * N + i]) { if (a < 0) a = i; b = i; ca += i; cb += j; cn++; } rowA[j] = a; rowB[j] = b; }
+        const ccx = cn ? ca / cn : N / 2, ccy = cn ? cb / cn : N / 2, vx = ccx - lx, vy = ccy - ly, vl = Math.hypot(vx, vy) || 1, slen = 6 + Math.max(0, Math.min(16, (ly / N) * 20 + vl * 0.15));
+        const shx = vx / vl, shy = vy / vl, sox = SOX, soy = SOY; for (let q = 0; q < 4; q++) { SOX[q] = Math.round(shx * slen * (q + 1) / 4); SOY[q] = Math.round(shy * slen * (q + 1) / 4); }
+        for (let n = 0; n < NN; n++) {
+          const i = n % N, j = (n - i) / N;
+          if (owned[n]) {
+            const a = rowA[j], b = rowB[j], w = Math.max(2, b - a), near = lx < a ? a : lx > b + 1 ? b + 1 : lx, u = Math.min(1, Math.abs(i + 0.5 - near) / (w * 0.95 + 1)), up = Math.max(0, Math.min(1, (j - ly) / 44));
+            let lv = LVT[Math.floor(u * 16) * 9 + Math.floor(up * 8)];
+            const edge = (i > 0 && !owned[n - 1]) || (i < N - 1 && !owned[n + 1]) || (j > 0 && !owned[n - N]) || (j < N - 1 && !owned[n + N]);
+            if (edge) lv = Math.abs(i + 0.5 - lx) < Math.abs((i === a ? b : a) + 0.5 - lx) ? Math.min(4, lv + 1) : Math.max(0, lv - 1);
+            else if (shown[n] === OL) lv = Math.max(0, lv - 1);   // the features: a faint relief, no drawn line
+            castB[n] = IVORY[lv]; shown[n] = IVORY[lv];
+          } else {
+            const d2 = (i + 0.5 - lx) ** 2 + (j + 0.5 - ly) ** 2;
+            let k = d2 < 90 || (d2 < 220 && ((i + j) & 1)) ? wallP[n] : wallD[n];
+            for (let q = 0; q < 4; q++) { const si = i - sox[q], sj = j - soy[q]; if (si >= 0 && sj >= 0 && si < N && sj < N && owned[sj * N + si]) { k = q < 3 || ((i + j) & 1) ? wallS[n] : wallD[n]; break; } }
+            castB[n] = 0; shown[n] = k;
           }
-          shown.set(broke);
+        }
+        // turning the cast: it narrows to its edge, then comes round mirrored (the other side of the face to the front)
+        const tf = (t - flipAt) / 0.5;
+        if (tf >= 0.5 && tf < 0.6 && flipDone !== flipAt) { mirrored ^= 1; flipDone = flipAt; }
+        const sc = tf >= 0 && tf < 1 ? Math.max(0.06, Math.abs(Math.cos(tf * Math.PI))) : 1;
+        if (sc < 1 || mirrored) {
+          wallB.set(shown); const cx0 = hcx / CW;
+          for (let n = 0; n < NN; n++) if (castB[n]) shown[n] = wallD[n];
+          for (let n = 0; n < NN; n++) { const i = n % N, j = (n - i) / N, u = (i + 0.5 - cx0) / sc, si = Math.floor(cx0 + (mirrored ? -u : u)); if (si >= 0 && si < N && castB[j * N + si]) shown[n] = castB[j * N + si]; }
         }
       }
       if (legend === 'Plaster') {
-        // a cast of the sitter on a museum wall; the light comes from whichever side the pointer is on
-        const lx = c.input.inside ? c.input.x * N : (hcx - flip * 600) / CW, swap = (lx * CW - hcx) * flip > 0;
-        for (let n = 0; n < NN; n++) behind[n] = owned[n] && shown[n] !== OL ? 1 : 0;
-        for (let n = 0; n < NN; n++) {
-          const i = n % N, dir = lx > i + 0.5 ? 1 : -1;
-          if (owned[n]) {
-            let k = castOf(shown[n], swap);
-            if (behind[n] && k !== CAST[0]) {
-              const tw = i + dir, aw = i - dir;
-              if (tw < 0 || tw >= N || !behind[n + dir]) k = CAST[4];
-              else if (aw >= 0 && aw < N && !behind[n - dir]) k = CAST[1];
-            }
-            shown[n] = k;
-          } else {
-            let k = museum(shown[n]);
-            for (let s2 = 1; s2 <= 3; s2++) { const ii = i - dir * s2; if (ii >= 0 && ii < N && owned[n - dir * s2]) { k = museumShade(k); break; } }
-            shown[n] = k;
-          }
+        // the lamp itself: a little brass shade, a bright bulb, and its glow
+        const bx = Math.floor(lampX), by = Math.floor(lampY);
+        for (let a = 0; a < 24; a++) { const x = Math.floor(lampX + Math.cos(a * 0.262) * 3.2), y = Math.floor(lampY + 1 + Math.sin(a * 0.262) * 3.2); if (x >= 0 && y >= 0 && x < N && y < N && (a & 1) && !owned[y * N + x]) shown[y * N + x] = LAMPG; }
+        for (const [u, v, k] of [[-1, -1, LAMPS], [0, -1, LAMPS], [1, -1, LAMPS], [2, -1, LAMPS], [0, -2, LAMPS], [1, -2, LAMPS], [0, 0, LAMPB], [1, 0, LAMPB], [0, 1, LAMPB], [1, 1, LAMPW]]) { const x = bx + u, y = by + v; if (x >= 0 && y >= 0 && x < N && y < N) shown[y * N + x] = k; }
+      }
+      if (lute) {
+        // the notes you plucked: in flight to the stave on an arc, then written there; during playback each lights red
+        const slotAt = (q, p) => [musX[0] + 3 + q * 3, musTop + 3 + (8 - p)];
+        for (const [x0, y0, born, q, p] of flying) {
+          const f = Math.min(1, (t - born) / 0.6), [x1, y1] = slotAt(q, p), x = Math.floor(x0 + (x1 - x0) * f), y = Math.floor(y0 + (y1 - y0) * f - Math.sin(f * Math.PI) * 10);
+          const lit = t - playAt >= q * 0.22 && t - playAt < q * 0.22 + 0.3, col = f < 1 || lit ? NOTEK : NOTEB;
+          for (const [u, v] of [[0, 0], [1, 0], [0, 1], [1, 1], [1, -1], [1, -2], [1, -3]]) { const i = x + u, j = y + v; if (i >= 0 && j >= 0 && i < N && j < N) shown[j * N + i] = col; }
+          if (f >= 1 && lit) for (const [u, v] of [[-1, 0], [2, 0], [0, 1], [1, 1]]) { const i = x + u, j = y + v; if (i >= 0 && j >= 0 && i < N && j < N) shown[j * N + i] = NOTEK; }
         }
       }
       for (let n = 0; n < NN; n++) img32[n] = toneWord[shown[n]];

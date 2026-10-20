@@ -437,6 +437,368 @@ void main() {
   fragOut = vec4(pow(c, vec3(1.0 / 2.2)), 1.0);
 }`;
 
+  // ---------- the Legendaries' program ----------
+  // A Legendary draws with a program of its own: the ordinary one above with the Legendaries' sets and materials
+  // spliced in. It is compiled only when a Legendary is drawn, so every ordinary doll runs exactly the program above.
+  //   Water Gilt    an icon in its tabernacle: a dark-gold pointed arch with a cinnabar border, a lapis ground
+  //                 starred with gold, a pale punched halo round the head; carry a candle over the gold and leave
+  //                 votives burning (up to five), every flame catching in the gilt
+  //   Nesting Doll  a real set of five, each smaller than the last, on a shelf, each in the paint box shuffled;
+  //                 a tap packs the smallest into the next one up, until only the big one stands; the next tap
+  //                 unpacks them all again
+  //   Glow Paint    under a blacklight, every paint fluorescing neon, with a UV torch that finds secret ink;
+  //                 drawn as a blacklight poster by programs of its own (see Glow Paint, redesigned, below)
+  const legendEdits = [
+    ['uniform vec4 K;          // the wind-up key: x, y on the doll, turn, carried (0 or 1)\n', `uniform vec4 K;          // the wind-up key: x, y on the doll, turn, carried (0 or 1)
+uniform vec4 L, L2;      // Legendary: time, candle flicker, -, -; its set (arch, or where the family looks)
+uniform vec4 Fam[5];     // Nesting Doll: each doll's place on the shelf (x, lift, z) and size (0: packed away)
+uniform vec4 Cnd[6];     // Water Gilt: the candles (x, y, z, how bright), the first carried by the pointer
+int doll, hitDoll;
+`],
+    ['float world(vec3 p) {\n  vec3 q = toLocal(p);', 'float world1(vec3 p) {\n  vec3 q = toLocal(p);'],
+    ['float hh(vec2 p) {', `// Water Gilt: a gilt pointed arch stands in front of the doll (L2: half width, springing line, depth)
+float archOpen(vec2 q) {
+  float w = L2.x, ys = L2.y, R = w * 1.45;
+  if (q.y < ys) return abs(q.x) - w;
+  return max(length(q - vec2(w - R, ys)) - R, length(q - vec2(R - w, ys)) - R);
+}
+float giltFrame(vec3 p) {
+  float o = archOpen(p.xy);
+  float slab = max(abs(p.z - L2.z) - 0.07, -o) - 0.015;
+  float bead = length(vec2(o - 0.05, p.z - L2.z - 0.08)) - 0.04;
+  float fillet = length(vec2(o - 0.21, p.z - L2.z - 0.075)) - 0.028;
+  return min(slab, min(bead, fillet));
+}
+// Nesting Doll: five of them on a shelf, scaled from the floor, each hopping and turning on its own
+float famTurn(int i) { return 0.3 * sin(L.x * 0.37 + float(i) * 1.9) * (1.0 - L2.y) + L2.y * clamp((Fam[i].x - L2.x) * 0.5, -0.9, 0.9); }
+vec3 famLocal(vec3 p, int i) {
+  vec4 F = Fam[i];
+  vec3 q = p - F.xyz;
+  q.y += 1.7; q /= max(F.w, 1e-3); q.y -= 1.7;
+  float a = famTurn(i);
+  q.xz = mat2(cos(a), -sin(a), sin(a), cos(a)) * q.xz;
+  return q;
+}
+float family(vec3 p) {
+  vec3 b = abs(p - vec3(0.0, -1.86, 0.3)) - vec3(6.0, 0.16, 1.25);
+  float d = length(max(b, 0.0)) + min(max(b.x, max(b.y, b.z)), 0.0);
+  int hit = -1;
+  noTop = 0.0;
+  for (int i = 0; i < 5 + min(marchN, 0); i++) {   // a loop the compiler can't unroll: one copy of the lathe
+    if (Fam[i].w < 0.01) continue;   // packed away inside a bigger one
+    vec3 q = famLocal(p, i);
+    float bound = max(length(q.xz) - 0.64, abs(q.y + 0.28) - 1.5) * Fam[i].w;
+    if (bound > 0.12) { if (bound < d) { d = bound; hit = i; } continue; }
+    float dd = lathe(vec2(length(q.xz), q.y)) * Fam[i].w;
+    if (dd < d) { d = dd; hit = i; }
+  }
+  doll = hit; part = hit < 0 ? 8.0 : 0.0;
+  return d;
+}
+float world(vec3 p) {
+  if (NEST) return family(p);
+  float d = world1(p);
+  if (GILD) { float f = giltFrame(p); if (f < d) { d = f; part = 7.0; } }
+  return d;
+}
+float hh(vec2 p) {`],
+    ['vec3 shade(vec2 fc) {', `// the family's paint: each doll after the first wears the paint box's three colours shuffled round
+vec3 swapPaint(vec3 c, int i) {
+  vec3 na = i == 1 ? pB : i == 2 ? pC : i == 3 ? pC : pB;
+  vec3 nb = i == 1 ? pC : i == 2 ? pA : i == 3 ? pB : pA;
+  vec3 nd = i == 1 ? pA : i == 2 ? pB : i == 3 ? pA : pC;
+  float wa = exp(-dot(c - pA, c - pA) * 900.0), wb = exp(-dot(c - pB, c - pB) * 900.0), wd = exp(-dot(c - pC, c - pC) * 900.0);
+  return max(c + wa * (na - pA) + wb * (nb - pB) + wd * (nd - pC), 0.0);
+}
+// a paint's neon under the blacklight, by its hue (pale paints glow a UV white, dark ones not at all)
+vec3 neonOf(vec3 c) {
+  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), s = (mx - mn) / max(mx, 1e-4);
+  if (s < 0.28) return mx > 0.3 ? vec3(0.7, 0.78, 1.0) * (0.5 + 0.5 * mx) : vec3(0.0);
+  float h = mx == c.r ? mod((c.g - c.b) / (mx - mn), 6.0) : mx == c.g ? (c.b - c.r) / (mx - mn) + 2.0 : (c.r - c.g) / (mx - mn) + 4.0;
+  h /= 6.0;
+  return h < 0.04 || h > 0.93 ? vec3(1.0, 0.1, 0.32) : h < 0.11 ? vec3(1.0, 0.42, 0.02) : h < 0.19 ? vec3(1.0, 0.95, 0.08)
+       : h < 0.45 ? vec3(0.2, 1.0, 0.25) : h < 0.58 ? vec3(0.05, 0.95, 1.0) : h < 0.72 ? vec3(0.3, 0.42, 1.0) : h < 0.85 ? vec3(0.75, 0.2, 1.0) : vec3(1.0, 0.1, 0.8);
+}
+float star5(vec2 p, float r, float rf) {
+  const vec2 k1 = vec2(0.809016994375, -0.587785252292), k2 = vec2(-0.809016994375, -0.587785252292);
+  p.x = abs(p.x);
+  p -= 2.0 * max(dot(k1, p), 0.0) * k1;
+  p -= 2.0 * max(dot(k2, p), 0.0) * k2;
+  p.x = abs(p.x); p.y -= r;
+  vec2 ba = rf * vec2(-k1.y, k1.x) - vec2(0.0, 1.0);
+  float h = clamp(dot(p, ba) / dot(ba, ba), 0.0, r);
+  return length(p - ba * h) * sign(p.y * ba.x - p.x * ba.y);
+}
+// Water Gilt's ground: lapis starred with gold, and the punched halo behind the head, in candlelight
+vec3 giltWall(vec3 p, vec2 uv, float sh, float ao, float lodD) {
+  vec2 w = p.xy;
+  vec4 pd = textureLod(det, w * vec2(0.23, 0.31) + 0.37, lodD + 0.6);
+  vec3 c = vec3(0.016, 0.036, 0.25) * (0.75 + 0.4 * pd.b);
+  vec2 sg = w * 3.0 + vec2(0.5 * floor(w.y * 3.0), 0.0), si = floor(sg), sf = fract(sg) - 0.5;
+  float sd = min(abs(sf.x) + 3.5 * abs(sf.y), 3.5 * abs(sf.x) + abs(sf.y));
+  float star = step(0.45, hh(si + 7.3)) * smoothstep(0.2, 0.12, sd);
+  vec3 gold = vec3(1.0, 0.64, 0.18), pale = vec3(1.0, 0.86, 0.56);
+  vec2 hc = vec2(0.0, 0.64);
+  float HR = P[2].z * P[3].x * 1.9 + 0.08, r = length(w - hc), an = atan(w.y - hc.y, w.x - hc.x);
+  float disc = smoothstep(HR + 0.008, HR - 0.008, r);
+  float d1 = smoothstep(0.02, 0.01, length(vec2((fract(an * 36.0 / 6.2832) - 0.5) * r * 6.2832 / 36.0, r - (HR - 0.06))));
+  float d2 = smoothstep(0.014, 0.007, length(vec2((fract(an * 56.0 / 6.2832) - 0.5) * r * 6.2832 / 56.0, r - (HR - 0.13))));
+  float rays = (0.5 + 0.5 * cos(an * 28.0)) * smoothstep(HR - 0.17, HR - 0.27, r);
+  float rim = smoothstep(0.012, 0.0, abs(r - HR + 0.012) - 0.007);
+  float glint = 0.55 + 0.6 * pow(max(0.0, cos(an - 2.3 + 0.35 * L.y)), 4.0) * (0.75 + 0.5 * L.y);
+  float pol = Y.y * exp(-dot(w - X.zw, w - X.zw) * 6.0);
+  vec3 hg = pale * (glint * (0.72 + 0.28 * rays) * (1.0 - 0.55 * clamp(d1 + d2, 0.0, 1.0)) + 0.6 * rim + pol);
+  c = mix(c + gold * star * (0.45 + 0.35 * L.y), hg, disc);
+  c *= (0.4 + 0.6 * sh) * mix(0.65, 1.0, ao);
+  c *= 0.85 + 0.2 * smoothstep(-1.0, 1.0, uv.y);
+  // the candles warm the wall round them, and the halo's gold flares toward them
+  vec3 cw = vec3(0.0);
+  for (int i = 0; i < 6; i++) { vec4 cd = Cnd[i]; if (cd.w <= 0.0) continue; float d2 = dot(w - cd.xy, w - cd.xy); cw += cd.w * vec3(1.0, 0.62, 0.28) * (0.12 / (d2 * 3.0 + 0.4)) * (1.0 + 2.5 * disc); }
+  return c * (0.82 + 0.24 * L.y) + cw * (0.85 + 0.3 * L.y) * mix(vec3(0.3, 0.4, 0.9), pale, disc);
+}
+float heartSd(vec2 p) {
+  p.x = abs(p.x);
+  if (p.y + p.x > 1.0) return length(p - vec2(0.25, 0.75)) - 0.35355;
+  return sqrt(min(dot(p - vec2(0.0, 1.0), p - vec2(0.0, 1.0)), dot(p - 0.5 * max(p.x + p.y, 0.0), p - 0.5 * max(p.x + p.y, 0.0)))) * sign(p.x - p.y);
+}
+// Glow Paint's room: near black, a violet tube along the top, glow-in-the-dark stars and a moon stuck on the wall
+vec3 uvWall(vec3 p, vec2 uv, float sh, float nearest) {
+  vec2 w = p.xy;
+  float span = 12.02 / P[4].y, top = P[4].x + 0.5 * span, tube = top - 0.16 - w.y;
+  vec3 c = vec3(0.01, 0.003, 0.026);
+  c += vec3(0.26, 0.05, 0.7) * 0.2 * exp(-max(tube, 0.0) * 1.2) * (0.5 + 0.5 * sh) * (1.0 + 2.0 * Y.z);
+  c += vec3(0.62, 0.45, 1.0) * smoothstep(0.02, 0.0, abs(tube) - 0.014) * 0.9 + vec3(0.45, 0.16, 1.0) * 0.3 * exp(-abs(tube) * 12.0);
+  c = mix(c, c + vec3(0.03, 0.03, 0.035), smoothstep(0.02, 0.0, tube + 0.06) * step(tube, 0.08));   // the fitting's housing above it
+  vec2 g2 = w * 1.7, gi = floor(g2), gf = fract(g2) - 0.5;
+  vec2 o = (vec2(hh(gi + 3.1), hh(gi + 5.9)) - 0.5) * 0.36;
+  float rot = hh(gi + 9.2) * 6.28, sz = 0.13 + 0.09 * hh(gi + 2.2);
+  vec2 sp = mat2(cos(rot), -sin(rot), sin(rot), cos(rot)) * (gf - o);
+  float st = step(0.55, hh(gi + 1.7)) * smoothstep(0.015, -0.015, star5(sp, sz, 0.45));
+  vec2 mc = vec2(-0.3 * span, top - 0.5);
+  float moon = smoothstep(0.012, -0.012, max(length(w - mc) - 0.17, -(length(w - mc - vec2(0.08, 0.05)) - 0.15)));
+  float pulse = 0.5 + 0.3 * Y.w + 0.2 * sin(L.x * 1.3 + hh(gi) * 6.28);
+  c += vec3(0.5, 1.0, 0.38) * (st + moon) * pulse;
+  vec3 bl = mix(vec3(1.0, 0.1, 0.7), vec3(0.1, 0.8, 1.0), smoothstep(-1.2, 1.4, w.y));
+  c += bl * (0.45 * exp(-nearest * 12.0) + 0.16 * exp(-nearest * 3.5)) * (0.6 + 0.3 * Y.w + 0.4 * Y.y);
+  // secret UV ink, invisible until the torch finds it: hearts, smiles, spirals and stars doodled all over the wall
+  float tr = Y.y * smoothstep(0.55, 0.15, length(w - X.zw));
+  if (tr > 0.001) {
+    vec2 sg = w * 2.2, si = floor(sg), sf = (fract(sg) - 0.5) * 1.2;
+    float kind = hh(si + 11.0), ro = hh(si + 13.0) * 6.28, ink;
+    sf = mat2(cos(ro), -sin(ro), sin(ro), cos(ro)) * sf;
+    if (kind < 0.25) ink = abs(heartSd(vec2(sf.x, -sf.y) * 2.4 + vec2(0.0, 0.55))) / 2.4;   // a heart
+    else if (kind < 0.5) ink = min(abs(length(sf) - 0.3), min(length(vec2(abs(sf.x) - 0.11, sf.y + 0.08)) - 0.035, max(abs(length(sf - vec2(0.0, 0.04)) - 0.17), -sf.y + 0.04)));   // a smile
+    else if (kind < 0.75) { float an = atan(sf.y, sf.x), r = length(sf); ink = abs(fract((r - an * 0.045) / 0.09) - 0.5) * 0.09 + step(0.35, r); }   // a spiral
+    else ink = abs(star5(sf, 0.3, 0.45));   // a star
+    float line = smoothstep(0.03, 0.01, ink) * tr;
+    c += mix(vec3(0.1, 0.95, 1.0), vec3(1.0, 0.2, 0.85), step(0.5, hh(si + 17.0))) * line * 1.4;
+  }
+  return mix(c * (1.0 + tr * 0.6), wallC * 0.85, Y.z * 0.85);   // the room light shows the wall as it is
+}
+vec3 shade(vec2 fc) {`],
+    // Water Gilt's flames: a teardrop where the ray passes each candle, and a votive's red glass under the set ones
+    ['void main() {', `vec3 flames(vec2 fc) {
+  float S = P[0].x;
+  vec2 uv = (2.0 * fc - S) / S;
+  float camY = P[4].x;
+  vec3 ro = vec3(0.0, camY + 0.35, 6.0), at = vec3(0.0, camY, 0.0);
+  vec3 fw = normalize(at - ro), rt = normalize(cross(fw, vec3(0.0, 1.0, 0.0))), up = cross(rt, fw);
+  vec3 rd = normalize(fw * P[4].y + uv.x * rt + uv.y * up), c = vec3(0.0);
+  for (int i = 0; i < 6; i++) {
+    vec4 cd = Cnd[i]; if (cd.w <= 0.0) continue;
+    vec3 o = ro + rd * dot(cd.xyz - ro, rd) - cd.xyz;
+    o.x -= 0.25 * sin(L.x * 3.0 + float(i)) * max(o.y + 0.03, 0.0);
+    float r = length(vec2(o.x * (1.0 + max(o.y, 0.0) * 20.0), o.y * (o.y > 0.0 ? 0.42 : 1.1)));
+    c += cd.w * (vec3(1.0, 0.45, 0.08) * smoothstep(0.07, 0.025, r) * 1.6 + vec3(1.0, 0.92, 0.65) * smoothstep(0.04, 0.01, r) * 2.0);
+    c += cd.w * vec3(1.0, 0.6, 0.25) * 0.0018 / (dot(o, o) + 0.005);
+    if (i > 0) c += cd.w * vec3(0.7, 0.05, 0.04) * step(abs(o.x), 0.075) * step(abs(o.y + 0.11), 0.065) * (0.8 + 0.2 * L.y);   // the votive glass
+  }
+  return c;
+}
+void main() {`],
+    ['    c += shade(gl_FragCoord.xy + o);', '    c += shade(gl_FragCoord.xy + o) + (GILD ? flames(gl_FragCoord.xy + o) : vec3(0.0));'],
+    ['if (d < 0.0005 * t) { p = x; hitPart = part; stage = 1;', 'if (d < 0.0005 * t) { p = x; hitPart = part; hitDoll = doll; stage = 1;'],
+    ['  if (hitPart < -0.5) {\n', '  if (hitPart < -0.5) {\n    if (GILD) return giltWall(p, uv, sh, ao, lodD);\n    if (GLOWP) return uvWall(p, uv, sh, nearest);\n'],
+    [`  vec3 q = toLocal(p);
+  if (NEST) {
+    if (hitPart > 9.5) { q = (q - vec3(0.0, -0.434, 0.0)) / 0.62; hitPart -= 10.0; }
+    else if (q.y > -0.25 + 0.5 * Y.x * 0.95) q.y -= Y.x * 0.95;
+  }`, `  vec3 q = toLocal(p);
+  if (NEST && hitDoll >= 0 && hitPart < 7.5) q = famLocal(p, hitDoll);`],
+    ['  if (hitPart > 5.5) { col = vec3(0.92, 0.62, 0.24); metal = 1.0; gloss = 1.5; }   // brass key', `  if (hitPart > 7.5) { col = grain(p.zyx * vec3(1.0, 1.0, 0.4) + vec3(2.0, 0.0, 0.0), n, dt) * 0.9; gloss = 0.5; }   // the shelf
+  else if (hitPart > 6.5) {   // the gilt frame: leaf over red bole, rubbed through on the edges
+    float worn = smoothstep(0.8, 0.86, dt.b * 0.6 + 0.35 * smoothstep(0.02, 0.0, abs(archOpen(p.xy) - 0.05) - 0.03) * dt.r);
+    col = mix(vec3(0.8, 0.5, 0.13) * (0.9 + 0.15 * dt.r), vec3(0.45, 0.07, 0.035), worn); metal = 1.0 - worn; gloss = 1.8;
+    float ao2 = archOpen(p.xy);
+    if (ao2 > 0.1 && ao2 < 0.18 && p.z > L2.z + 0.05) { col = vec3(0.52, 0.06, 0.035); metal = 0.0; gloss = 0.9; }   // a cinnabar border
+    vec2 lp = p.xy * 13.0;   // the flat face of the frame is tooled with an incised lattice and a punched dot in each lozenge
+    float lat = max(smoothstep(0.06, 0.0, abs(fract(lp.x + lp.y) - 0.5) - 0.44), smoothstep(0.06, 0.0, abs(fract(lp.x - lp.y) - 0.5) - 0.44));
+    float pun = smoothstep(0.1, 0.05, length(vec2(fract(lp.x + lp.y) - 0.5, fract(lp.x - lp.y) - 0.5)));
+    col *= 1.0 - smoothstep(0.85, 0.95, n.z) * (0.38 * lat + 0.3 * pun);
+  }
+  else if (hitPart > 5.5) { col = vec3(0.92, 0.62, 0.24); metal = 1.0; gloss = 1.5; }   // brass key`],
+    ['    vec3 pc = pow(pt.rgb / max(pt.a, 1e-3), vec3(2.2));\n', '    vec3 pc = pow(pt.rgb / max(pt.a, 1e-3), vec3(2.2));\n    if (NEST && hitDoll > 0) pc = swapPaint(pc, hitDoll);\n'],
+    [`  if (GLOWP) {
+    // the lights are out:`, `  if (GILD) {
+    c *= vec3(1.0, 0.92, 0.8) * (0.86 + 0.26 * L.y);   // candlelight
+    for (int i = 0; i < 6; i++) {
+      vec4 cd = Cnd[i]; if (cd.w <= 0.0) continue;
+      vec3 lv = cd.xyz - p; float dd = length(lv); lv /= dd;
+      float att = cd.w * (0.8 + 0.25 * L.y) / (1.0 + dd * dd * 2.2);
+      vec3 h2 = normalize(lv - rd);
+      float sp2 = pow(max(dot(nb, h2), 0.0), mix(24.0, 70.0, metal)) * mix(0.4, 3.0, metal);
+      c += att * vec3(1.0, 0.66, 0.32) * (col * max(dot(nb, lv), 0.0) * (1.0 - 0.75 * metal) * 0.8 + mix(vec3(0.5), col * 1.6, metal) * sp2);
+    }
+  }
+  if (GLOWP) {
+    float torch = Y.y * smoothstep(0.55, 0.15, length(p.xy - X.zw));
+    float face = hitPart < 0.5 && q.y > 0.26 ? 1.0 : 0.0;
+    vec3 neon = neonOf(col);
+    if (face > 0.5 && painted > 0.5 && dot(col, vec3(0.33)) < 0.1) neon = vec3(1.0, 0.92, 0.25);   // the face's lines glow UV yellow
+    vec3 uvl = vec3(0.3, 0.12, 0.9) * (0.12 + 0.88 * sh * max(dot(nb, normalize(vec3(0.0, 1.0, 0.7))), 0.0));
+    float scan = smoothstep(0.16, 0.0, abs(q.y - (mod(L.x * 0.9, 3.6) - 1.9)));
+    float breathe = 0.85 + 0.15 * sin(L.x * 1.7);
+    vec2 fcell = floor(vec2(ang * 26.0, q.y * 34.0));
+    float fl = step(0.962, hh(fcell)) * (1.0 - face), fk = hh(fcell + 1.3);
+    vec3 flc = fk < 0.33 ? vec3(1.0, 0.1, 0.8) : fk < 0.66 ? vec3(0.05, 0.95, 1.0) : vec3(0.75, 1.0, 0.1);
+    // the face's wood takes a faint UV glow, so the face reads at any size; worn chips don't break the neon up
+    float glowPaint = max(painted, face * 0.18);
+    c = c * (0.03 + Y.z) + col * uvl * (0.35 + face * 0.6) + neon * glowPaint * (breathe + 0.45 * Y.w + 0.5 * torch + 0.8 * scan) * 1.25 * (1.0 - 0.6 * Y.z) + fl * flc * (1.0 + 0.5 * scan) * (1.0 - Y.z);
+    // secret ink on the doll too: a spiral of zigzags round it, only under the torch
+    float zz = abs(fract(ang * 0.9549 + q.y * 1.8 + 0.25 * abs(fract(q.y * 9.0) - 0.5)) - 0.5);
+    c += vec3(0.1, 0.95, 1.0) * smoothstep(0.05, 0.015, zz) * torch * 1.2;
+  }
+  if (false) {
+    // the lights are out:`],
+  ];
+  const legendSource = () => legendEdits.reduce((s, [a, b]) => { if (!s.includes(a)) throw new Error('Peg Folk legendary shader: ' + a.slice(0, 48)); return s.replace(a, () => b); }, fragmentSource);
+  function legendProgram(gl, B) {
+    if (B.lprog) return B.lprog;
+    const stage = (kind, text) => {
+      const sh = gl.createShader(kind);
+      gl.shaderSource(sh, text);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error('Peg Folk legendary: ' + gl.getShaderInfoLog(sh));
+      return sh;
+    };
+    const pr = gl.createProgram();
+    gl.attachShader(pr, stage(gl.VERTEX_SHADER, vertexSource));
+    gl.attachShader(pr, stage(gl.FRAGMENT_SHADER, legendSource()));
+    gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error('Peg Folk legendary: ' + gl.getProgramInfoLog(pr));
+    const u = {};
+    ['P', 'wLo', 'wHi', 'pA', 'pB', 'pC', 'hairC', 'wallC', 'skin', 'det', 'X', 'Y', 'K', 'L', 'L2', 'Fam', 'Cnd', 'lodB', 'marchN', 'ssN'].forEach(n => { u[n] = gl.getUniformLocation(pr, n); });
+    return (B.lprog = { pr, u });
+  }
+
+  // ---------- Glow Paint, redesigned: a UV blacklight poster ----------
+  // The doll is drawn small (one texel a cell, 120 x 120) with the Legendaries' program, giving back its flat paint
+  // colours and which part each cell is; then the poster is made from it a cell at a time: day-glo inks on black
+  // velvet, every paint turned to its nearest fluorescent ink in two tones, a black line round the doll and its
+  // parts, and three aura lines round it whose inks cycle. It hangs on the backdrop's wall by its pins (worn posters
+  // are creased, curled and faded). The pointer is a UV torch: the inks flare where it shines and secret ink shows
+  // on the velvet; a quick tap switches the room light on (the inks go pale, the velvet grey) and off.
+  const CELLS = 120;
+  const posterEdits = [
+    ['  noFlame = 0.0;' + '\n', '  noFlame = 0.0; gCode = 0.0; gShade = 0.0;' + '\n'],
+    ['    // secret ink on the doll too', '    gCode = face > 0.5 && painted > 0.3 && distance(col, hairC) > 0.02 ? (q.y > 0.5 && q.y < 0.68 ? 7.0 : 3.0) : hitPart > 1.5 && hitPart < 2.5 ? 4.0 : hitPart > 0.5 && hitPart < 1.5 ? 5.0 : hitPart > 2.5 ? 6.0 : painted > 0.5 ? 2.0 : 1.0;\n    gShade = dif * sh; gCol = col;\n    // secret ink on the doll too'],
+    ['  fragOut = vec4(pow(c, vec3(1.0 / 2.2)), 1.0);', '  fragOut = vec4(pow(gCol, vec3(1.0 / 2.2)), (gCode * 2.0 + (gShade > 0.3 ? 1.0 : 0.0) + 0.5) / 16.0);   // (the poster: flat colour, and which part, lit or not)'],
+    ['vec3 shade(vec2 fc) {', 'float gCode = 0.0, gShade = 0.0; vec3 gCol = vec3(0.0);\nvec3 shade(vec2 fc) {'],
+  ]
+  const POSTER_FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D T;   // the doll: flat colour, and (alpha) its part and whether lit
+uniform float N, time, lamp, wear, figure, wallPat;
+uniform vec3 wall, paintA, paintB, hair;
+uniform vec4 torch;    // the UV torch: x, y (cells), how much, how big
+out vec4 o;
+const vec3 INK[6] = vec3[6](vec3(1.0, 0.08, 0.6), vec3(0.72, 1.0, 0.05), vec3(1.0, 0.45, 0.02), vec3(0.05, 0.9, 1.0), vec3(1.0, 0.94, 0.08), vec3(0.6, 0.22, 1.0));
+float hh(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 15731.743); }
+int codeAt(ivec2 c) { if (c.x < 0 || c.y < 0 || c.x >= int(N) || c.y >= int(N)) return 0; return int(texelFetch(T, c, 0).a * 16.0) >> 1; }
+// the fluorescent ink a paint turns into (white stays a cool UV white; black stays black)
+vec3 inkOf(vec3 c) {
+  float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b));
+  if (mx < 0.18) return vec3(0.16, 0.03, 0.3);
+  if (mx - mn < 0.18 * mx) return mx > 0.6 ? vec3(0.9, 0.94, 1.0) : vec3(0.55, 0.3, 1.0);
+  vec3 h = (c - mn) / (mx - mn); int bi = 0; float bd = 1e9;
+  for (int k = 0; k < 6; k++) { vec3 ih = (INK[k] - min(INK[k].r, min(INK[k].g, INK[k].b))) / (max(INK[k].r, max(INK[k].g, INK[k].b)) - min(INK[k].r, min(INK[k].g, INK[k].b))); float d = dot(h - ih, h - ih); if (d < bd) { bd = d; bi = k; } }
+  return INK[bi];
+}
+void main() {
+  ivec2 ci = ivec2(gl_FragCoord.xy); vec2 c = vec2(ci);
+  vec4 tx = texelFetch(T, ci, 0);
+  int code = int(tx.a * 16.0), part = code >> 1; bool lit = (code & 1) == 1;
+  float glow = 0.8 + 0.2 * sin(time * 1.3);
+  vec2 tp = torch.xy; float tq = torch.z * step(length(c - tp), torch.w);
+  vec3 velvet = mix(vec3(0.025, 0.01, 0.045), vec3(0.15, 0.14, 0.16), lamp);
+  vec3 col = hh(c) > 0.965 ? velvet * 1.8 + 0.01 : velvet;
+  if (part > 0) {
+    vec3 ink;
+    if (part == 3) ink = vec3(0.0);   // the face's painted lines, black
+    else if (part == 7) ink = vec3(0.6, 1.0, 1.0);   // the eyes: fluorescent
+    else if (part == 1) {   // bare wood glows a warm peach, its figure drawn in the grain
+      ink = vec3(1.0, 0.62, 0.32);
+      bool g = figure < 0.5 ? mod(c.x, 7.0) < 1.0 && hh(vec2(c.x, floor(c.y / 5.0))) > 0.55 : figure < 1.5 ? mod(c.x + 2.0 * sin(c.y * 0.35), 5.0) < 1.0 : figure < 2.5 ? hh(c) > 0.9 : mod(length(c - vec2(N * 0.5, N * 0.45)) + sin(atan(c.y - N * 0.45, c.x - N * 0.5) * 5.0), 4.0) < 1.0;
+      if (g) ink *= 0.78;
+    } else if (part == 2 && distance(tx.rgb, hair) > 0.12) {   // the body's paint in two flat inks: the paint box's first two colours
+      vec3 ia = inkOf(paintA), ib = inkOf(paintB);
+      if (min(ia.r, min(ia.g, ia.b)) > 0.7) ia = distance(ib, INK[1]) < 0.1 ? INK[0] : INK[1];   // (no white on the body: a day-glo ink instead)
+      if (min(ib.r, min(ib.g, ib.b)) > 0.7 || ib.r + ib.g + ib.b < 0.8) ib = distance(ia, INK[0]) < 0.1 ? INK[3] : INK[0];
+      if (distance(ia, ib) < 0.1) ib = ia.gbr;
+      ink = distance(tx.rgb, paintA) <= distance(tx.rgb, paintB) ? ia : ib;
+    } else ink = inkOf(tx.rgb);
+    if (!lit && part != 7) ink *= 0.55;   // two tones: lit and shade
+    col = ink * glow;
+    // the black line: round the doll, and between its parts
+    for (int k = 0; k < 4; k++) { ivec2 dv = k == 0 ? ivec2(1, 0) : k == 1 ? ivec2(-1, 0) : k == 2 ? ivec2(0, 1) : ivec2(0, -1); int pk = codeAt(ci + dv); if (pk == 0 || (pk != part && (pk == 3 || pk == 7) == (part == 3 || part == 7) && k < 2)) col = vec3(0.0); }
+  } else {
+    // aura lines round the doll, their inks cycling
+    float d = 99.0;
+    for (int j = -7; j <= 7; j++) for (int i = -7; i <= 7; i++) if (codeAt(ci + ivec2(i, j)) > 0) d = min(d, length(vec2(i, j)));
+    float ring = d < 1.5 ? 0.0 : d < 2.6 ? 1.0 : d > 3.9 && d < 5.0 ? 2.0 : d > 6.1 && d < 7.05 ? 3.0 : 0.0;
+    if (ring > 0.5) col = INK[int(mod(ring + floor(time * 2.0), 6.0))] * (ring < 1.5 ? 1.0 : ring < 2.5 ? 0.8 : 0.6) * glow;
+    // a few day-glo stars on the velvet
+    vec2 sc = floor(c / 20.0), sf = c - sc * 20.0 - 10.0 - (vec2(hh(sc), hh(sc + 3.1)) - 0.5) * 10.0;
+    if (hh(sc + 7.7) > 0.72 && d > 8.0 && (abs(sf.x) < 0.5 && abs(sf.y) < 3.5 || abs(sf.y) < 0.5 && abs(sf.x) < 3.5)) col = INK[int(hh(sc + 1.9) * 6.0)] * glow;
+    // secret ink the torch finds: hearts, spirals, eyes, doodled all over
+    if (tq > 0.0 && d > 2.0) {
+      vec2 g8 = floor(c / 20.0), gf = c - g8 * 20.0 - 10.0; float kd = hh(g8 + 5.5), r = length(gf); vec2 hq = gf / 6.5 * vec2(1.0, -1.0) + vec2(0.0, 0.25); float hv = pow(dot(hq, hq) - 1.0, 3.0) - hq.x * hq.x * hq.y * hq.y * hq.y;
+      bool ink = kd < 0.33 ? hv < 0.0 && hv > -0.35 : kd < 0.66 ? abs(fract((r - atan(gf.y, gf.x) * 1.1) / 3.4) - 0.5) < 0.16 && r < 8.0 : abs(r - 6.5) < 1.0 || r < 1.6;   // big hearts, spirals and eyes
+      if (ink) col = INK[kd < 0.5 ? 3 : 0] * tq;
+    }
+  }
+  if (tq > 0.0 && part > 0 && part != 3) col = min(vec3(1.0), col * 1.35 + 0.06);   // the inks flare under the torch
+  if (lamp > 0.0) col = mix(col, part > 0 ? mix(col, vec3(1.0), 0.45) * 0.9 : (col == velvet ? velvet : mix(col, velvet, 0.6)), lamp);   // the room light: pale inks, grey velvet
+  // the wall, the pins, and wear
+  float m = min(min(c.x, N - 1.0 - c.x), min(c.y, N - 1.0 - c.y));
+  if (wear > 1.5) col *= 0.85;   // an old poster's inks faded
+  bool torn = wear > 1.5 && c.x + (N - 1.0 - c.y) < 14.0;   // a torn corner
+  bool curl = wear > 0.5 && (N - 1.0 - c.x) + (N - 1.0 - c.y) < 10.0;
+  if (m < 4.0 || torn) {
+    vec3 w = wall * mix(0.18, 0.85, lamp);
+    bool pat = wallPat > 0.5 && (wallPat < 1.5 ? mod(c.x, 4.0) < 1.0 : wallPat < 2.5 ? mod(c.x, 4.0) < 1.0 && mod(c.y, 4.0) < 1.0 : mod(floor(c.x / 3.0) + floor(c.y / 3.0), 2.0) < 1.0);
+    col = pat ? w * 0.75 : w;
+  } else if (curl) col = (N - 1.0 - c.x) + (N - 1.0 - c.y) < 7.0 ? mix(vec3(0.3, 0.28, 0.3), vec3(0.75, 0.72, 0.7), lamp) : vec3(0.0);   // its back, curling
+  vec2 pc = min(c - 6.0, N - 7.0 - c);
+  if (length(abs(c - N * 0.5 + 0.5) - (N * 0.5 - 6.5)) < 1.6 && !(curl && c.x > N * 0.5 && c.y > N * 0.5) && !(torn && c.x < N * 0.5 && c.y < N * 0.5)) col = mix(INK[0] * 0.9, vec3(0.85, 0.2, 0.3), lamp);   // the pins
+  o = vec4(col, 1.0);
+}`;
+  const BLIT_FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D T; uniform float S, N;
+out vec4 o;
+void main() { o = texelFetch(T, ivec2(min(floor(gl_FragCoord.xy / S * N), N - 1.0)), 0); }`;
+  function posterPrograms(gl, B) {
+    if (B.posterP) return B.posterP;
+    const stage = (kind, text) => { const sh = gl.createShader(kind); gl.shaderSource(sh, text); gl.compileShader(sh); if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error('Peg Folk poster: ' + gl.getShaderInfoLog(sh)); return sh; };
+    const link = frag => { const pr = gl.createProgram(); gl.attachShader(pr, stage(gl.VERTEX_SHADER, vertexSource)); gl.attachShader(pr, stage(gl.FRAGMENT_SHADER, frag)); gl.linkProgram(pr); if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error('Peg Folk poster: ' + gl.getProgramInfoLog(pr)); return pr; };
+    const scene = link(posterEdits.reduce((t, [a, b]) => { if (!t.includes(a)) throw new Error('Peg Folk poster shader: ' + a.slice(0, 48)); return t.replace(a, () => b); }, legendSource()));
+    const su = {}; ['P', 'wLo', 'wHi', 'pA', 'pB', 'pC', 'hairC', 'wallC', 'skin', 'det', 'X', 'Y', 'K', 'L', 'L2', 'Fam', 'Cnd', 'lodB', 'marchN', 'ssN'].forEach(n => { su[n] = gl.getUniformLocation(scene, n); });
+    const poster = link(POSTER_FRAG), pu = {}; ['T', 'N', 'time', 'lamp', 'wear', 'figure', 'wallPat', 'wall', 'torch', 'paintA', 'paintB', 'hair'].forEach(n => { pu[n] = gl.getUniformLocation(poster, n); });
+    const blit = link(BLIT_FRAG), bu = {}; ['T', 'S', 'N'].forEach(n => { bu[n] = gl.getUniformLocation(blit, n); });
+    return (B.posterP = { scene: { pr: scene, u: su }, poster, pu, blit, bu });
+  }
+
   // One program for every doll on a context (legendaries and the key are uniform switches), plus
   // the context's resident painted skins and the shared detail map.
   function build(gl) { return { prog: null, vao: gl.createVertexArray(), skins: [], tick: 0, det: detailMap(gl) }; }
@@ -995,6 +1357,14 @@ void main() {
         lodBase = Math.log2(span / (S * (S <= 420 ? 2 : 1)) / 0.0029);
       };
       frameFor(0);
+      // a Legendary's own framing: the icon backs off to show its arch; the family stands whole on its shelf
+      const reframe = () => {
+        if (legend === 1) { span *= 1.32; camY += span * 0.06; }
+        if (legend === 2) { span = 4.6; camY = -0.12; }
+        if (legend === 3) { span *= 1.5; camY -= span * 0.12; }   // (the poster shows the whole doll, with room for its aura)
+        focal = 2 * 6.01 / span; lodBase = Math.log2(span / (S * (S <= 420 ? 2 : 1)) / 0.0029);
+      };
+      if (legend) reframe();
 
       // The viewer's hands: a tap knocks it rocking (a wooden clonk, pitched by where it was
       // struck); a sideways drag spins it on its base with a soft ratchet tick, and it settles
@@ -1009,22 +1379,27 @@ void main() {
       // Legendary and key state; with no input these hold still (no burnish, no torch, lamp off,
       // lid shut, key at rest), so a tile shows the doll as rolled.
       let lid = 0, lidGoal = 0, burnish = 0, torch = 0, lamp = 0, charge = 0.4, keyTurn = 0.6, twirl = 0, tune = -1, tuneT = 0, ptr = [0, 0];
+      let now = 0, hopBase = -0.6, lookAmt = 0;   // the family: when the hopping wave started, how much they turn to look
+      // the family: a real set, each smaller than the last; packed counts how many are inside the bigger ones, and
+      // moves holds the ones flying in or out now
+      const famS = [1, 0.82, 0.67, 0.55, 0.45], famX = [0, -0.98, 0.94, -1.66, 1.6], famZ = [-0.2, 0.14, 0.2, 0.52, 0.56];
+      let packed = 0, moves = [];
+      const famU = new Float32Array(20), cndU = new Float32Array(24), votives = [];
+      let lightOn = false, lampPress = null, flickAt = -9;   // Glow Paint's room light, and the press that may switch it
       const toSet = (x, y) => [(x - 0.5) * span, camY + (0.5 - y) * span];
       const box = [0, 2, 4, 7, 9, 12, 11, 7, 4, 2, 4, 0];   // a little music-box tune, scale steps
       const handle = dt => {
         if (hands.inside) ptr = toSet(hands.x, hands.y);
-        if (legend === 1) burnish += ((hands.inside ? 1 : 0) - burnish) * Math.min(1, dt * 4);
-        if (legend === 2) {
-          // hovering lifts the lid a crack to peek; a tap takes it right off, another puts it back
-          const goal = Math.max(lidGoal, hands.inside ? 0.06 : 0);
-          const before = lid;
-          lid += (goal - lid) * Math.min(1, dt * (goal > lid ? 3.2 : 4.5));
-          if (before > 0.03 && lid <= 0.03 && goal === 0) xylo.note(clonkRoot - 5, { dur: 0.25, vel: 0.22, wave: 'triangle', cutoff: woodTone });
+        if (legend === 3) {   // the poster: a quick, still tap switches the room light (any longer press is the torch, or a spin)
+          if (hands.down && hands.inside) { if (!lampPress) lampPress = { t0: now, x: hands.x, y: hands.y, gone: 0 }; lampPress.gone = Math.max(lampPress.gone, Math.hypot(hands.x - lampPress.x, hands.y - lampPress.y)); }
+          else if (lampPress) { if (now - lampPress.t0 < 0.25 && lampPress.gone < 0.03) { lightOn = !lightOn; flickAt = now; xylo.hit('click', 0.25); xylo.note(clonkRoot + (lightOn ? 24 : 19), { dur: 0.6, vel: 0.08, wave: 'sine', at: 0.05 }); } lampPress = null; }
         }
-        if (legend === 3) {
+        if (legend === 1) burnish += ((hands.inside ? 1 : 0) - burnish) * Math.min(1, dt * 4);
+        if (legend === 2) lookAmt += ((hands.inside ? 1 : 0) - lookAmt) * Math.min(1, dt * 3);   // the family turn to look at a hand
+        if (legend === 3) {   // the UV torch follows the pointer; the room light, once on, charges the glow, which fades slowly in the dark
           torch += ((hands.inside ? 1 : 0) - torch) * Math.min(1, dt * 5);
-          lamp = Math.max(0, lamp - dt * 0.6);
-          charge += (Math.min(1, 0.4 + torch * 0.6 + lamp) - charge) * Math.min(1, dt * (torch + lamp > 0.3 ? 1.5 : 0.12));
+          lamp += ((lightOn ? 1 : 0) - lamp) * Math.min(1, dt * 7);
+          charge += ((lightOn ? 1 : 0.35) - charge) * Math.min(1, dt * (lightOn ? 0.8 : 0.07));
         }
         if (hasKey) {
           if (hands.inside && !hands.down && tune < 0) { // a hand near the key winds it, a click a notch
@@ -1063,22 +1438,19 @@ void main() {
         if (nn !== lastNotch) { xylo.hit('click', 0.07, { pan: 0.1 * Math.sign(nn - lastNotch) }); lastNotch = nn; }
         for (const knockAt of hands.taps()) {
           if (dragged > 0.015 && sinceGrab < 0.3) continue;
-          if (legend === 2) {
-            lidGoal = lidGoal > 0.5 ? 0 : 1;
-            xylo.hit('click', 0.22);
-            if (lidGoal) { xylo.note(clonkRoot + 12, { dur: 0.3, vel: 0.2, wave: 'triangle', cutoff: woodTone }); xylo.note(clonkRoot + 19, { dur: 0.4, vel: 0.14, wave: 'sine', at: 0.25 }); xylo.note(clonkRoot + 24, { dur: 0.5, vel: 0.12, wave: 'sine', at: 0.38 }); }
+          if (legend === 2) {   // a tap sets the family hopping, biggest to smallest, a clonk each, high to low
+            if (moves.some(m => now - m.t0 < 0.75)) continue;   // one at a time
+            if (packed < 4) { const i = 4 - packed; moves = [{ i, out: false, t0: now }]; packed++; xylo.note(clonkRoot + 12 + clonkScale[8 - i], { dur: 0.25, vel: 0.2, wave: 'triangle', cutoff: woodTone, at: 0.5 }); xylo.hit('click', 0.12, { at: 0.55 }); }
+            else { moves = [1, 2, 3, 4].map((i, k) => ({ i, out: true, t0: now + k * 0.22 })); packed = 0; [1, 2, 3, 4].forEach((i, k) => xylo.note(clonkRoot + 12 + clonkScale[3 + i], { dur: 0.2, vel: 0.18, wave: 'triangle', cutoff: woodTone, at: k * 0.22 })); }
             continue;
           }
-          if (legend === 1) { // a tap rings the gilt like a little bell
-            xylo.note(clonkRoot + 24, { dur: 1.6, vel: 0.14, wave: 'sine' });
-            xylo.note(clonkRoot + 31, { dur: 1.2, vel: 0.07, wave: 'sine', at: 0.02 });
-            xylo.note(clonkRoot + 40, { dur: 0.6, vel: 0.04, wave: 'sine', at: 0.04 });
-          }
-          if (legend === 3) { // the lamp switch: on for a moment, then dark again, the paint freshly charged
-            lamp = 1; xylo.hit('click', 0.2);
-            xylo.note(clonkRoot + 19, { dur: 0.8, vel: 0.08, wave: 'sine', at: 0.1 });
+          if (legend === 1) {   // leave a votive burning where you tapped (five at most), struck with a little ring
+            const pt = toSet(knockAt.x, knockAt.y);
+            votives.push([pt[0], Math.max(camY - span * 0.42, Math.min(camY + span * 0.4, pt[1])), now]); if (votives.length > 5) votives.shift();
+            xylo.hit('noise', 0.05, { cutoff: 3000, dur: 0.08 }); xylo.note(clonkRoot + 24, { dur: 1.6, vel: 0.12, wave: 'sine', at: 0.05 }); xylo.note(clonkRoot + 31, { dur: 1.2, vel: 0.05, wave: 'sine', at: 0.07 });
             continue;
           }
+          if (legend === 3) continue;   // (the poster's switch works on a short, still release: see above)
           if (hasKey && tune < 0 && keyTurn > 0.8) { tune = 0; tuneT = 0; xylo.hit('click', 0.15); }
           if (topper[2] === 10 && flameGoal > 0.5 && Math.abs(knockAt.x - 0.5) < 0.08 && Math.abs(knockAt.y - flameY01) < 0.09) {
             flameGoal = 0; relight = 4.5;
@@ -1108,9 +1480,20 @@ void main() {
       const beadTone = darkWood && hair[2] === 3 ? [paint[2], paint[3], paint[4]].reduce((a, b) => (lum8(b) > lum8(a) ? b : a)) : hairTone;
       const cols = [lin(wood[2]), lin(wood[3]), lin(paint[2]), lin(paint[3]), lin(paint[4]), lin(beadTone), lin(back[2])];
       const uni = new Float32Array(24), owner = {};
-      const G = program(gl, B);
+      const PP = legend === 3 ? posterPrograms(gl, B) : null;
+      const G = legend === 3 ? PP.scene : legend ? legendProgram(gl, B) : program(gl, B);
+      const poster = legend === 3 ? (() => {
+        const mk = () => {
+          const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, CELLS, CELLS, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.NEAREST], [gl.TEXTURE_MAG_FILTER, gl.NEAREST], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+          const fbo = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          return { tex, fbo };
+        };
+        const a = mk(), b = mk(); gl.bindTexture(gl.TEXTURE_2D, null);
+        const g3 = v => v.map(x => Math.pow(x, 1 / 2.2));
+        return { a, b, wall: g3(cols[6]), pa: g3(cols[2]), pb: g3(cols[3]), hair: g3(cols[5]) };
+      })() : null;
       const frame = time => {
-        if (legend === 2) frameFor(lid);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, S, S);
         for (const cap of [gl.DEPTH_TEST, gl.BLEND, gl.CULL_FACE, gl.SCISSOR_TEST]) gl.disable(cap);
         gl.useProgram(G.pr);
@@ -1135,16 +1518,71 @@ void main() {
         gl.uniform3fv(G.u.wallC, cols[6]);
         gl.uniform1i(G.u.skin, 0); gl.uniform1i(G.u.det, 1);
         gl.uniform4f(G.u.X, figure[2], legend, ptr[0], ptr[1]);
-        gl.uniform4f(G.u.Y, lid, legend === 1 ? burnish : torch, lamp, charge);
+        gl.uniform4f(G.u.Y, lid, legend === 1 ? 0 : torch, lamp, charge);
         gl.uniform4f(G.u.K, keyX, keyY, keyTurn * 2.0, hasKey);
         gl.uniform1f(G.u.lodB, lodBase);
+        if (legend) {
+          const cand = 0.55 + 0.25 * Math.sin(time * 7.3) * Math.sin(time * 3.1 + 1) + 0.2 * Math.sin(time * 13.7 + 2);
+          gl.uniform4f(G.u.L, time, cand, 0, 0);
+          if (legend === 1) gl.uniform4f(G.u.L2, span * 0.33, camY - span * 0.14, 0.78, 0);
+          else gl.uniform4f(G.u.L2, ptr[0], lookAmt, 0, 0);
+          if (legend === 2) {
+            // each doll's place: at home (hopping in a wave now and then), packed away, or flying in or out on an arc
+            const wave = ((time - hopBase) / 4.2) % 1;
+            for (let i = 0; i < 5; i++) {
+              let x = famX[i], y = 0, z = famZ[i], sc = famS[i];
+              if (i > 0 && i > 4 - packed) sc = 0;
+              const k = wave - i * 0.07; if (sc && k > 0 && k < 0.13) y = Math.sin(k / 0.13 * Math.PI) * 0.26 * famS[i];
+              for (const m of moves) if (m.i === i) {
+                const q = Math.max(0, Math.min(1, (time - m.t0) / 0.7)), f = m.out ? 1 - q : q, j = i - 1;
+                if (m.out && time < m.t0) { sc = 0; break; }
+                x = famX[i] + (famX[j] - famX[i]) * f; z = famZ[i] + (famZ[j] - famZ[i]) * f;
+                y = Math.sin(f * Math.PI) * 1.1 * famS[j] + (f > 0.7 ? (f - 0.7) / 0.3 * famS[j] * 0.9 : 0);
+                sc = famS[i] * (f > 0.7 ? 1 - (f - 0.7) / 0.3 : 1);
+                if (!m.out && q >= 1) sc = 0;
+              }
+              famU.set([x, y, z, sc], i * 4);
+            }
+            // the one that has just swallowed another gives a little jump
+            for (const m of moves) if (!m.out) { const q = (time - m.t0 - 0.7) / 0.25; if (q > 0 && q < 1) famU[(m.i - 1) * 4 + 1] += Math.sin(q * Math.PI) * 0.12; }
+            gl.uniform4fv(G.u.Fam, famU);
+          }
+          if (legend === 1) {
+            // the candle in the hand (while the pointer is over it) and the votives, burning low and steady
+            cndU.fill(0);
+            if (hands.inside) cndU.set([ptr[0], ptr[1], 0.95, 1], 0);
+            votives.forEach(([x, y, t0], k) => cndU.set([x, y, 0.95, Math.min(1, (time - t0) * 3) * 0.85], 4 + k * 4));
+            gl.uniform4fv(G.u.Cnd, cndU);
+          }
+        }
         gl.uniform1i(G.u.marchN, 100);
         gl.uniform1i(G.u.ssN, S <= 420 ? 4 : 1);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+        if (poster) {
+          // the doll, small: its flat colours and parts, a texel a cell
+          uni[0] = CELLS; uni[10] = R * 1.3; gl.uniform4fv(G.u.P, uni);   // (the poster's doll has a bigger head)
+          gl.uniform1i(G.u.ssN, 1);
+          gl.uniform1f(G.u.lodB, Math.log2(span / (CELLS * 2) / 0.0029));
+          gl.bindFramebuffer(gl.FRAMEBUFFER, poster.a.fbo); gl.viewport(0, 0, CELLS, CELLS);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+          // the poster, a cell at a time
+          gl.bindFramebuffer(gl.FRAMEBUFFER, poster.b.fbo);
+          gl.useProgram(PP.poster); const pu = PP.pu;
+          gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, poster.a.tex); gl.uniform1i(pu.T, 2);
+          const fl = time - flickAt, lampNow = fl < 0.45 && lightOn ? (Math.floor(fl * 20) % 3 === 0 ? 1 : 0) : lamp;   // a tube flickers as it comes on
+          gl.uniform1f(pu.N, CELLS); gl.uniform1f(pu.time, time); gl.uniform1f(pu.lamp, Math.min(1, Math.max(0, lampNow)));
+          gl.uniform1f(pu.wear, wear[2]); gl.uniform1f(pu.figure, figure[2]); gl.uniform1f(pu.wallPat, wallPat); gl.uniform3fv(pu.wall, poster.wall); gl.uniform3fv(pu.paintA, poster.pa); gl.uniform3fv(pu.paintB, poster.pb); gl.uniform3fv(pu.hair, poster.hair);
+          gl.uniform4f(pu.torch, hands.x * CELLS, (1 - hands.y) * CELLS, torch * (1 - lamp), 16);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+          // up to the canvas, hard edged
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, S, S);
+          gl.useProgram(PP.blit); gl.bindTexture(gl.TEXTURE_2D, poster.b.tex); gl.uniform1i(PP.bu.T, 2); gl.uniform1f(PP.bu.S, S); gl.uniform1f(PP.bu.N, CELLS);
+          gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
+          gl.bindTexture(gl.TEXTURE_2D, null); gl.activeTexture(gl.TEXTURE0);
+        } else gl.drawArrays(gl.TRIANGLE_STRIP, 0, 3);
         gl.bindVertexArray(null); // leave the shared context tidy
       };
       frame(0);
-      return (t, dt) => { handle(dt || 1 / 24); frame(t); };
+      return (t, dt) => { now = t; handle(dt || 1 / 24); frame(t); };
     },
   });
 })();

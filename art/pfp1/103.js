@@ -352,7 +352,7 @@ Proto.add({
     const crestC = garb === 'Gold' || garb === 'Sakura' ? WH : garb === 'Crimson' || garb === 'Rust' ? GLD : garb === 'Snow White' ? RED : WH;
 
     function figure(t) {
-      if (legend !== 'None') { legendFigure(t); vanish(t); return; }
+      if (legend !== 'None') { legendFigure(t); if (!(newLeg && legend === 'Ink Scroll')) vanish(t); return; }
       sp.fill(-1);
       fx.fill(-1); jk.fill(-1); hd.fill(-1);
       const u0 = t - poofAt, sealing = u0 >= POOF && u0 < POOF + 1.4;
@@ -749,6 +749,380 @@ Proto.add({
       }
     }
 
+    // ---------- the legendaries as 1/1s (2026-10-19) ----------
+    // An ordinary cartridge keeps to three colours a tile. A legendary is the one that ran on the next console: drawn
+    // free of the tile rule, with full ramps of shade, a picture of its own. Mecha: a samurai mecha bust with a scanning
+    // visor and a reactor in its chest. Ghost: a yurei of the clan, hands limp, its robe trailing into a tail of mist.
+    // Ink Scroll: the ninja painted on a hanging scroll in an alcove. Their traits (plating, visor, antenna; spirit and
+    // flames; sun, band, scenery; backdrop and weather) all still show. A type set to false here falls back to its
+    // earlier look (legendFigure and inkPaper below).
+    const NEW_LEGEND = { 'Mecha': true, 'Ghost': true, 'Ink Scroll': true };
+    const newLeg = legend !== 'None' && !!NEW_LEGEND[legend];
+    const ramp = (rgb, n) => { const out = []; for (let k = 0; k < n; k++) { const u = k / (n - 1); out.push(col(...rgb.map(v => Math.max(0, Math.min(255, Math.round(u < 0.5 ? v * (0.32 + u * 1.36) : v + (255 - v) * (u - 0.5) * 1.3)))))); } return out; };
+    const mirrorRows = rows => rows.map(r => r + r.split('').reverse().join(''));
+    let LGC = null;
+    if (newLeg) {
+      if (legend === 'Mecha') {
+        const base = { Gunmetal: [96, 106, 134], Crimson: [168, 40, 52], Gold: [200, 148, 40], Ivory: [196, 192, 176] }[plating];
+        const vis = { Red: [[150, 20, 30], [255, 60, 60], [255, 190, 180]], Green: [[20, 110, 60], [60, 230, 120], [210, 255, 220]], Blue: [[30, 70, 160], [80, 170, 255], [215, 240, 255]], Amber: [[150, 90, 10], [255, 180, 40], [255, 240, 180]] }[visor];
+        LGC = { pl: ramp(base, 5), vs: vis.map(v => col(...v)), gold: col(252, 196, 40), goldD: col(168, 112, 20), wrap: col(40, 30, 46), steam: col(226, 230, 240), steamD: col(160, 166, 184), scarfD: col(132, 18, 30) };
+      } else if (legend === 'Ghost') {
+        const base = { Blue: [70, 110, 210], Green: [50, 170, 130], Violet: [130, 80, 210], Pale: [130, 146, 180] }[spirit];
+        LGC = { sp: ramp(base, 5), face: col(226, 236, 248), faceD: col(170, 186, 212), glow: col(...base.map(v => Math.min(255, v + 130))), core: col(250, 252, 255) };
+      } else {
+        const sunC = { 'Red Sun': [214, 46, 38], 'Gold Sun': [226, 170, 50], 'Pale Moon': [150, 150, 140] }[inkSun];
+        LGC = { wall: col(200, 190, 162), wallD: col(176, 164, 136), post: col(112, 74, 44), postD: col(74, 46, 26), mat: col(186, 176, 112), matD: col(140, 128, 70),
+          rod: col(66, 38, 22), rodL: col(120, 78, 44), knob: col(232, 222, 192), silk: col(176, 136, 58), silkD: col(116, 84, 36), silkL: col(222, 186, 96),
+          paper: col(240, 232, 206), fibre: col(222, 212, 182), ink: col(26, 22, 28), wash: col(118, 112, 112), washL: col(176, 170, 162), sun: col(...sunC), seal: col(198, 40, 36), cord: col(150, 40, 40), inkHi: col(96, 104, 132) };
+      }
+    }
+
+    // ===== Mecha =====
+    const MECHA = mirrorRows([
+      '................', '................', '...........bbbbb', '.........bbccddd', '........bccdddde', '.......bccddddee',
+      '.......bcdddddee', '......bccdddddde', '...ggggbbccccccd', '..gaaaaabbbbbbbb', '......aKKKKKKKKK', '......aKvvvvvvvv',
+      '......aKvvvvvvvv', '......aKKKKKKKKK', '......abcccddddK', '......abcxcxcxcK', '.......abccccccK', '........abbbbbbb',
+      '.........aaaaaaa', '..aabbbbbaKgggKK', '.abccdddbaKbccdd', 'abcddeedbaKbcddd', 'abcdeeedbaKbcdde', 'abcddddcbaKbcrrr',
+      '.abcccccbaKbcrRR', '..aabbbaaaKbcrrr', '...abbbbaaKbbccc', '...abccbaaKbcccc', '...abccbaaKbcccc', '...abccbaaKbbbbb',
+      '...abccba.Kbcccc', '...abccba.Kbcccc',
+    ]);
+    let pdown = false, lastLT = 0, mcCharge = 0, mcWas = false, lgDown = null;
+    const mcBeams = [], mcScorch = [];
+    function mechaFigure(t) {
+      const dt = Math.max(0, Math.min(0.1, t - lastLT)); lastLT = t;
+      // ---- its toy: point to aim, tap to fire its visor beam where you point; hold to charge the reactor and let go for
+      // a full-power beam; every hit leaves a scorch on the backdrop that smoulders out ----
+      if (pdown && ptr) { if (mcCharge === 0) c.sound.note(tonic - 12 + tune[0], { dur: 0.6, vel: 0.08, wave: 'square', cutoff: 800 }); mcCharge = Math.min(1.5, mcCharge + dt); }
+      if (mcWas && !pdown) {
+        const power = mcCharge < 0.35 ? 0 : Math.min(1, (mcCharge - 0.35) / 1);
+        const tx = ptr ? ptr[0] : 16, ty = ptr ? ptr[1] : 26;
+        mcBeams.push({ t0: t, tx, ty, power }); if (mcBeams.length > 4) mcBeams.shift();
+        mcScorch.push({ x: tx, y: ty, t0: t, power }); if (mcScorch.length > 8) mcScorch.shift();
+        for (let k = 0; k < 3 + Math.round(power * 3); k++) c.sound.note(tonic + 24 + tune[(4 - k + 5) % 5] - k * 2, { at: k * 0.03, dur: 0.06, vel: 0.12 + power * 0.06, wave: 'square', cutoff: 3200 });
+        if (power > 0.3) c.sound.hit('noise', 0.2 + power * 0.25, { cutoff: 900, dur: 0.5 + power * 0.4 });
+        mcCharge = 0;
+      }
+      mcWas = pdown;
+      const charging = mcCharge > 0.35;
+      // the scorches it has left on the backdrop, smouldering out
+      for (const sc2 of mcScorch) {
+        const a = t - sc2.t0; if (a > 7) continue;
+        const r = 1 + sc2.power * 1.6;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) { const d = Math.hypot(dx, dy); if (d > r) continue; const ember = (dx * 3 + dy * 5 + Math.floor(t * 4)) % 4 === 0 && a < 4; P(bg, sc2.x + dx, sc2.y + dy, ember ? LGC.vs[1] : a < 5 || (dx + dy) % 2 ? K : bg[0]); }
+      }
+      const u0 = t - poofAt, sealing = charging, bob = Math.sin(t * 1.4 + windPh) > 0.7 ? 1 : 0;
+      const tone = { a: 0, b: 1, c: 2, d: 3, e: 4 };
+      // the katana's hilt over its left shoulder, behind it
+      for (let k = 0; k < 9; k++) { const x = 3 + Math.round(k * 0.55), y = 19 - k; P(sp, x, y + bob, k > 6 ? LGC.goldD : (k % 2 ? LGC.wrap : LGC.gold)); P(sp, x + 1, y + bob, LGC.wrap); }
+      for (let r = 0; r < N; r++) for (let x = 0; x < N; x++) {
+        const ch = MECHA[r][x]; if (ch === '.') continue;
+        const y = r + (r < 19 ? bob : 0);
+        let v;
+        if (ch in tone) v = LGC.pl[Math.max(0, tone[ch] - (x > 15 ? 1 : 0))];
+        else if (ch === 'K' || ch === 'x') v = K;
+        else if (ch === 'g') v = x > 15 ? LGC.goldD : LGC.gold;
+        else if (ch === 'v') v = LGC.vs[0];
+        else if (ch === 'r' || ch === 'R') { const pulse = Math.sin(t * (charging ? 14 : 2.4)) > 0.2; v = ch === 'R' ? LGC.vs[2] : charging ? (pulse ? LGC.vs[2] : LGC.vs[1]) : pulse ? LGC.vs[1] : LGC.vs[0]; }
+        P(sp, x, y, v);
+      }
+      // the visor: a glowing bar with a bright spot scanning along it (or following the pointer)
+      const ex = ptr ? Math.max(8, Math.min(22, Math.round(ptr[0] - 0.5))) : 8 + Math.round((Math.sin(t * 1.1) + 1) * 7);
+      for (let x = 8; x <= 23; x++) { P(sp, x, 11 + bob, Math.abs(x - ex) < 2 ? LGC.vs[2] : LGC.vs[1]); P(sp, x, 12 + bob, Math.abs(x - ex) < 1 ? LGC.vs[2] : LGC.vs[0]); }
+      if (sealing) for (let x = 8; x <= 23; x++) P(sp, x, 11 + bob, LGC.vs[2]);
+      // what it wears on its helmet, as its Antenna says
+      if (antenna === 'Twin Horns') for (const sd of [-1, 1]) for (let k = 0; k < 9; k++) { const x = 16 + sd * (1.5 + k * 1.15 + k * k * 0.04) - (sd < 0 ? 1 : 0), y = 8 - k * 1.05; P(sp, x, y + bob, sd < 0 ? LGC.gold : LGC.goldD); P(sp, x - sd, y + bob + 1, LGC.goldD); }
+      else if (antenna === 'Single Antenna') { for (let k = 0; k < 6; k++) P(sp, 22 + (k > 3 ? 1 : 0), 4 - k + bob, LGC.pl[1]); P(sp, 23, -2 + bob, Math.floor(t * 1.5) % 2 ? RED : WH); P(sp, 23, -1 + bob, LGC.pl[3]); }
+      else if (antenna === 'Crest Fin') for (let k = 0; k < 4; k++) { P(sp, 15, 1 - k + bob + 1, LGC.pl[4]); P(sp, 16, 1 - k + bob + 1, k % 2 ? RED : LGC.pl[2]); }
+      else for (const sd of [-1, 1]) { fillEl(sp, 16 + sd * 11.5, 11.5 + bob, 1.8, 2.6, LGC.pl[sd < 0 ? 3 : 2]); P(sp, 16 + sd * 11.5 - (sd < 0 ? 1 : 0), 11 + bob, K); P(sp, 16 + sd * 12.5 - (sd < 0 ? 1 : 0), 11 + bob, LGC.vs[1]); }
+      // the clan's mark on its brow plate, and the red scarf of a ninja streaming from its neck in the wind
+      P(sp, 15, 5 + bob, LGC.gold); P(sp, 16, 5 + bob, LGC.goldD); P(sp, 15, 6 + bob, LGC.goldD); P(sp, 16, 6 + bob, LGC.gold);
+      for (let k = 0; k < 11; k++) { const x = 20 + k, y = 18 + Math.round(Math.sin(t * (5 + wind * 6) - k * 0.7) * (k / 11) * 2 + k * 0.25); P(sp, x, y, k % 3 === 2 ? LGC.scarfD : RED); if (k < 8) P(sp, x, y + 1, LGC.scarfD); }
+      for (let x = 10; x <= 21; x++) P(sp, x, 18, x % 4 === 0 ? LGC.scarfD : RED);
+      // charging: sparks round the reactor, the visor flickering
+      if (charging) for (let k = 0; k < 6; k++) { const a = t * 9 + k * 1.05, r = 4 + (k % 2); P(sp, 16 + Math.cos(a) * r, 24 + Math.sin(a) * r * 0.7, k % 2 ? WH : LGC.vs[2]); }
+      // the reticle where it's aiming
+      if (ptr) { const ax = Math.round(ptr[0] - 0.5), ay = Math.round(ptr[1] - 0.5), g2 = charging ? 2 + Math.floor(t * 8) % 2 : 2; for (const [dx, dy] of [[-g2, 0], [g2, 0], [0, -g2], [0, g2], [-g2 - 1, 0], [g2 + 1, 0], [0, -g2 - 1], [0, g2 + 1]]) P(sp, ax + dx, ay + dy, LGC.vs[charging ? 2 : 1]); }
+      // the beams: from the visor to the mark, white-hot in the middle
+      for (const bm of mcBeams) {
+        const a = t - bm.t0, life = 0.22 + bm.power * 0.35; if (a > life) continue;
+        const x0 = 16, y0 = 11.5 + bob, len = Math.hypot(bm.tx - x0, bm.ty - y0), w = bm.power > 0.3 ? 1 : 0;
+        for (let k = 0; k <= len * 1.5; k++) { const u = k / (len * 1.5), x = x0 + (bm.tx - x0) * u, y = y0 + (bm.ty - y0) * u; for (let o = -w; o <= w; o++) P(sp, x + (Math.abs(bm.ty - y0) > Math.abs(bm.tx - x0) ? o : 0), y + (Math.abs(bm.ty - y0) > Math.abs(bm.tx - x0) ? 0 : o), o ? LGC.vs[1] : WH); }
+        const r = 1.5 + bm.power * 2.5 + a * 6; fillEl(sp, bm.tx, bm.ty, r, r, (x, y) => (x + y + Math.floor(t * 20)) % 3 ? LGC.vs[2] : WH);
+      }
+      // steam venting from its jaw now and then (all the time while it charges)
+      const sv = charging ? (t * 2.4) % 1.2 : (t * 0.7) % 3;
+      if (sv < 1.2) for (let k = 0; k < 5; k++) { const u = sv / 1.2, x = Math.round(7 - u * 5 - k * 0.6), y = Math.round(15 + bob - u * 4 - k * 0.5); if (x >= 0 && (k + Math.floor(t * 6)) % 3) { P(sp, x, y, k < 2 ? LGC.steam : LGC.steamD); P(sp, 31 - x, y, k < 2 ? LGC.steam : LGC.steamD); } }
+    }
+
+    // ===== Ghost =====
+    // ===== Ghost (redesign 2, 2026-10-20): a comic-book panel. A thick black panel border on a white page, the ghost inked in
+    // bold black line and flat colour, its shading and the scene behind it printed in Ben-Day dots, and a speech balloon.
+    // The yurei of the clan: black hair with a blue shine, a pale face with hollow eyes and the forehead's white triangle,
+    // the clan's mask, a robe crossed left over right that frays into mist; its Spirit is the colour of its fire and the
+    // dots of its shading; its Spirit Flames circle it; its Backdrop is the scene, in dots, and its Weather falls across the
+    // panel. Grab a flame and fling it (whoosh lines; it pops back into its circle); tap the ghost and it lunges out of the
+    // panel with a shout of BOO! in a starburst, action lines and a shaken frame. =====
+    let ghGrab = -1, ghLast = 0;
+    const ghOff = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]], ghVel = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]], ghPos = [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]];
+    const ghBack = [0, 0, 0, 0, 0], ghPops = [];
+    const GO = 64, gcan = document.createElement('canvas'); gcan.width = gcan.height = GO;
+    const gctx2 = gcan.getContext('2d'), gimg = gctx2.createImageData(GO, GO), PIX32 = new Uint32Array(gimg.data.buffer), GB = new Uint32Array(GO * GO), GK = new Uint8Array(GO * GO);
+    const c32 = (r, g2, b) => (255 << 24 | Math.max(0, Math.min(255, b | 0)) << 16 | Math.max(0, Math.min(255, g2 | 0)) << 8 | Math.max(0, Math.min(255, r | 0))) >>> 0;
+    const SPC = { Blue: [50, 130, 255], Green: [40, 210, 110], Violet: [160, 80, 250], Pale: [120, 190, 230] }[spirit] || [50, 130, 255];
+    const KINK = c32(18, 16, 26), KPAGE = c32(250, 248, 240), KFACE = c32(250, 250, 244), KPALE = c32(SPC[0] * 0.12 + 226, SPC[1] * 0.12 + 226, SPC[2] * 0.12 + 226), KSPOT = c32(...SPC), KSHINE = c32(70, 96, 170);
+    const KYEL = c32(255, 226, 40), KRED = c32(226, 34, 40), KFL = c32(SPC[0] * 0.5 + 128, SPC[1] * 0.5 + 128, SPC[2] * 0.5 + 128);
+    // the figure, cut once on the 64 grid: 1 = hair, 2 = pale, 3 = black inside the pale, 4 = pale in shade, 5 = the forehead's triangle
+    const FIG = new Uint8Array(GO * 72), FH = 72;
+    {
+      const at = (x, y, v) => { if (x >= 0 && y >= 0 && x < GO && y < FH) FIG[y * GO + x] = v; };
+      for (let y = 38; y < FH; y++) { const half = y < 44 ? 8 + (y - 38) * 2.2 : Math.min(24, 21.2 + (y - 44) * 0.25); for (let x = Math.round(32 - half); x < Math.round(32 + half); x++) at(x, y, x > 32 + half * 0.45 ? 4 : 2); }
+      for (let k = 0; k < 13; k++) { at(Math.round(26 + k * 0.62), 38 + k, 3); at(Math.round(39 - k * 0.38), 38 + k, 3); }
+      for (let y = 6; y < 62; y++) for (let x = 12; x < 52; x++) {
+        const cap = ((x + 0.5 - 32) / 12.5) ** 2 + ((y + 0.5 - 21) / 15) ** 2 < 1;
+        const dx = Math.abs(x + 0.5 - 32), end = 57 - Math.abs(dx - 10.5) * 1.3;
+        const curtain = y >= 18 && y < end && dx > 6.5 - (y > 34 ? 2 : 0) && dx < 12.5 + (y - 18) * 0.12;
+        if (cap || curtain) at(x, y, 1);
+      }
+      for (let y = 15; y < 38; y++) for (let x = 22; x < 42; x++) { const d = ((x + 0.5 - 32) / 7) ** 2 + ((y + 0.5 - 26) / 10.5) ** 2; if (d < 1) at(x, y, y >= 30 ? 3 : x >= 37 ? 4 : 2); }
+      for (let x = 25; x < 39; x++) at(x, 30, 2);
+      for (const sd of [-1, 1]) for (let y = 24; y < 28; y++) for (let x = 32 + sd * 3.5 - 2; x < 32 + sd * 3.5 + 2; x++) if (!(y === 24 && sd * (x + 0.5 - 32) < 2.5) && !(y === 27 && (x < 32 + sd * 3.5 - 1 || x >= 32 + sd * 3.5 + 1))) at(Math.floor(x), y, 3);
+      for (let y = 15; y < 20; y++) for (let x = 32 - (20 - y); x < 32 + (20 - y); x++) at(x, y, y === 15 || Math.abs(x + 0.5 - 32) > 19 - y ? 3 : 5);
+    }
+    // the panel's ground: a pale tint of the backdrop's bright colour, dotted in its sky's colour; its bright shapes stay solid
+    const GTINT = c32(BG[1][0] * 0.3 + 176, BG[1][1] * 0.3 + 170, BG[1][2] * 0.3 + 160), GDOT = c32(BG[0][0] * 1.4 + 30, BG[0][1] * 1.4 + 30, BG[0][2] * 1.4 + 40);
+    const GF = { B: ['110', '101', '110', '101', '110'], O: ['010', '101', '101', '101', '010'], '!': ['1', '1', '1', '0', '1'] };
+    function ghostScreen(t) {
+      const dt = Math.max(0, Math.min(0.1, t - ghLast)); ghLast = t;
+      backdrop(t);
+      const bob = Math.sin(t * 1.3 + windPh) * 4.5, sc = t - legAt, burst = sc < 1.2 ? Math.sin(sc / 1.2 * Math.PI) * 6 : 0;
+      if (ghGrab >= 0 && !pdown) { ghBack[ghGrab] = 1; ghGrab = -1; c.sound.note(tonic + 12 + tune[2], { dur: 0.5, vel: 0.07, wave: 'sine' }); }
+      for (let k = 0; k < wisps; k++) {
+        const a = t * 0.9 + k * 6.283 / wisps, ox = 16 + Math.cos(a) * (12 + burst), oy = 14 + bob / 4 + Math.sin(a) * (5 + burst * 0.6);
+        if (k === ghGrab && ptr) { ghOff[k] = [ptr[0] - ox, ptr[1] - oy]; ghVel[k] = [0, 0]; }
+        else for (const q of [0, 1]) { ghVel[k][q] += (-ghOff[k][q] * 70 - ghVel[k][q] * 5) * dt; ghOff[k][q] += ghVel[k][q] * dt; }
+        ghPos[k] = [ox + ghOff[k][0], oy + ghOff[k][1]];
+        if (ghBack[k] && Math.hypot(ghOff[k][0], ghOff[k][1]) < 0.8) { ghBack[k] = 0; ghPops.push([ghPos[k][0] * 2, ghPos[k][1] * 2, t]); c.sound.note(tonic + 24 + tune[k % 5], { dur: 0.3, vel: 0.08, wave: 'square', cutoff: 2600 }); }
+      }
+      const scared = sc >= 0 && sc < 0.9, zoom = !scared ? 1 : 1 + 0.55 * (sc < 0.1 ? sc / 0.1 : sc < 0.5 ? 1 : Math.max(0, 1 - (sc - 0.5) / 0.4));
+      // ---- the scene behind, printed in Ben-Day dots: each colour of the backdrop as a pale tint with a grid of its own dots ----
+      for (let y = 0, i = 0; y < GO; y++) for (let x = 0; x < GO; x++, i++) {
+        const cc = COL[bg[(y >> 1) * N + (x >> 1)]], dot = (y % 3 === 1) && ((x + (((y / 3) | 0) & 1) * 1.5) % 3 < 1.2);
+        const lum = (cc[0] * 0.3 + cc[1] * 0.55 + cc[2] * 0.15) / 255;
+        GB[i] = lum < 0.32 ? (dot ? GDOT : GTINT) : c32(cc[0] * 1.1 + 12, cc[1] * 1.1 + 12, cc[2] * 1.1 + 12); GK[i] = 0;
+      }
+      // action lines, radiating from behind the ghost in the scare
+      if (scared && sc < 0.7) for (let k = 0; k < 24; k++) { const a = k * 0.2618 + 0.1, r0 = 14 + (k % 3) * 3; for (let r = r0; r < 46; r++) { const x = Math.round(32 + Math.cos(a) * r), y = Math.round(28 + Math.sin(a) * r); if (x >= 0 && y >= 0 && x < GO && y < GO) GB[y * GO + x] = KINK; } }
+      const by = Math.round(bob / 2), sway = t * 1.5;
+      // a flame: a teardrop of the Spirit's fire with a white heart and a black line round it
+      const flame = (k, front) => {
+        const a = t * 0.9 + k * 6.283 / wisps; if ((Math.sin(a) > 0 || k === ghGrab) !== front) return;
+        const fx = ghPos[k][0] * 2, fy = ghPos[k][1] * 2, fl = Math.sin(t * 9 + k) * 0.8, sp = Math.hypot(ghVel[k][0], ghVel[k][1]);
+        // whoosh: three short ink lines behind a flame on the move
+        if (sp > 8) { const ux = ghVel[k][0] / sp, uy = ghVel[k][1] / sp; for (let m = -1; m <= 1; m++) for (let r = 6; r < 12; r++) { const x = Math.round(fx - ux * r - uy * m * 2.5), y = Math.round(fy - uy * r + ux * m * 2.5); if (x >= 0 && y >= 0 && x < GO && y < GO && GK[y * GO + x] === 0) GB[y * GO + x] = KINK; } }
+        for (let y = Math.floor(fy - 10); y <= fy + 6; y++) for (let x = Math.floor(fx - 6); x <= fx + 6; x++) {
+          if (x < 0 || y < 0 || x >= GO || y >= GO) continue;
+          const dx = x + 0.5 - fx - (y < fy ? fl * (fy - y) / 6 : 0), dy = y + 0.5 - fy, d = Math.hypot(dx, dy > 0 ? dy : dy * 0.42), i = y * GO + x;
+          if (d < 1.5) { GB[i] = KFACE; GK[i] = 6; } else if (d < 3) { GB[i] = KFL; GK[i] = 6; } else if (d < 4.4) { GB[i] = KSPOT; GK[i] = 6; } else if (d < 5.4) { GB[i] = KINK; GK[i] = 6; }
+        }
+      };
+      for (let k = 0; k < wisps; k++) flame(k, false);
+      // the ghost, inked: hair black with a shine, the pale in flat tint, its shade in the Spirit's dots, black line round it all
+      const look = ghGrab >= 0 ? ghPos[ghGrab] : ptr, lx = look ? Math.max(-1, Math.min(1, Math.round((look[0] - 16) / 5))) : 0, ly = look ? (look[1] > 15 ? 1 : 0) : 0;
+      const blink = ((t + blinkOff) % blinkGap) < 0.15;
+      for (let y = 0; y < GO; y++) {
+        const fy = zoom === 1 ? y - by : Math.round((y - by - 26) / zoom + 26); if (fy < 0 || fy >= FH) continue;
+        const drift = fy > 52 ? Math.round(Math.sin(sway - fy * 0.3) * (fy - 52) * 0.12) : 0;
+        for (let x = 0; x < GO; x++) {
+          const fx = (zoom === 1 ? x : Math.round((x - 32) / zoom + 32)) - drift; if (fx < 0 || fx >= GO) continue;
+          let v = FIG[fy * GO + fx]; if (!v) continue;
+          if (fy > 58 && (fx + fy * 2 + Math.floor(t * 4)) % 5 < fy - 58) continue;   // the robe frays into mist at the foot
+          if (scared && sc < 0.75 && v === 3 && fy >= 30 && fy < 38) v = ((fx + 0.5 - 32) / 3.2) ** 2 + ((fy + 0.5 - 33.5) / 3.4) ** 2 < 1 ? 3 : 2;
+          const i = y * GO + x;
+          GK[i] = v === 1 ? 1 : 2;
+          GB[i] = v === 1 ? (fy > 10 && fy < 44 && Math.abs(Math.abs(fx + 0.5 - 32) - 9.5 - Math.sin(fy * 0.25) * 0.8) < 0.6 ? KSHINE : KINK)
+            : v === 3 ? KINK : v === 5 ? KFACE : v === 4 ? ((fx % 2 === 0 && fy % 2 === 0) ? KSPOT : KPALE) : (fy < 38 ? KFACE : KPALE);
+        }
+      }
+      if (!blink && !scared) for (const sd of [-1, 1]) { const x = Math.round(32 + sd * 3.5 - 0.5 + lx * 0.5 + (lx > 0 ? 0.5 : 0)), y = 25 + ly + by; if (y >= 0 && y < GO) GB[y * GO + x] = KFACE; }
+      // the ink line round the figure
+      for (let y = 1; y < GO - 1; y++) for (let x = 1; x < GO - 1; x++) { const i = y * GO + x; if (GK[i] === 0 && (GK[i - 1] === 2 || GK[i + 1] === 2 || GK[i - GO] === 2 || GK[i + GO] === 2)) { GB[i] = KINK; GK[i] = 7; } }
+      for (let k = 0; k < wisps; k++) flame(k, true);
+      // pops where a flung flame comes home: a little star of ink lines
+      for (let j = ghPops.length - 1; j >= 0; j--) { const [px2, py2, p0] = ghPops[j], a = t - p0; if (a > 0.35 || a < 0) { if (a > 0.35) ghPops.splice(j, 1); continue; } for (let k = 0; k < 8; k++) { const an = k * 0.785; for (let r = 5 + a * 14; r < 8 + a * 14; r++) { const x = Math.round(px2 + Math.cos(an) * r), y = Math.round(py2 + Math.sin(an) * r); if (x >= 0 && y >= 0 && x < GO && y < GO) GB[y * GO + x] = KINK; } } }
+      // its Weather across the panel
+      if (weather !== 'Clear') motes.forEach((m, j) => {
+        let x, y;
+        if (weather === 'Snow') { y = (m[1] + t * m[2] * 2.2) % N; x = (m[0] + Math.sin(t * 0.9 + m[3]) * 1.5 + wind * t * 3 + N) % N; }
+        else if (weather === 'Rain') { y = (m[1] + t * (14 + m[2] * 6)) % N; x = (m[0] - y * 0.3 - wind * 3 + N * 2) % N; }
+        else if (weather === 'Falling Leaves') { if (j > 9) return; y = (m[1] + t * m[2] * 1.6) % N; x = (m[0] + Math.sin(t * 1.3 + m[3]) * 2.5 + wind * 4 + N) % N; }
+        else if (weather === 'Fireflies') { if (j > 8 || Math.sin(t * 1.4 + m[3] * 3) < 0.2) return; x = (m[0] + Math.sin(t * 0.5 + m[3]) * 2 + N) % N; y = 14 + (m[1] % 16) + Math.sin(t * 0.7 + m[3] * 2) * 1.5; }
+        else { if (j > 2) return; const ph = (t * 0.4 + m[3]) % 4; if (ph > 0.5) return; x = m[0] + ph * 14; y = m[1] * 0.4 + ph * 6; }
+        const X = Math.floor(x * 2), Y = Math.floor(y * 2), colr = weather === 'Snow' ? KFACE : weather === 'Falling Leaves' ? c32(240, 120, 30) : weather === 'Fireflies' ? KYEL : weather === 'Rain' ? c32(40, 70, 160) : KFACE;
+        for (const [a, b] of weather === 'Rain' ? [[0, 0], [-1, 1], [-1, 2]] : weather === 'Shooting Stars' ? [[0, 0], [-1, -1], [-2, -1], [-3, -2]] : [[0, 0], [1, 0], [0, 1], [1, 1]]) { const xx = X + a, yy = Y + b; if (xx >= 0 && yy >= 0 && xx < GO && yy < GO && GK[yy * GO + xx] === 0) GB[yy * GO + xx] = colr; }
+      });
+      // the speech balloon: a quiet "..." most of the time; in the scare a yellow starburst shouting BOO!
+      const glyphs = (str, x0, y0, s2, colr) => { let x = x0; for (const ch of str) { const gl = GF[ch]; gl.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '1') for (let b = 0; b < s2; b++) for (let a = 0; a < s2; a++) { const X = x + i * s2 + a, Y = y0 + j * s2 + b; if (X >= 0 && Y >= 0 && X < GO && Y < GO) GB[Y * GO + X] = colr; } }); x += (gl[0].length + 1) * s2; } };
+      if (scared && sc < 0.85) {
+        const cx = 32, cy = 12, rx = 22, ry = 9;
+        for (let y = 0; y < 26; y++) for (let x = 4; x < 61; x++) { const a = Math.atan2((y + 0.5 - cy) / ry, (x + 0.5 - cx) / rx), r = Math.hypot((x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry), edge = 1 + (Math.floor((a + 3.1416) / 6.283 * 18) % 2) * 0.22; if (r < edge) GB[y * GO + x] = r > edge - 0.12 ? KINK : KYEL; }
+        glyphs('BOO!', 15, 7, 2, KRED);
+      } else {
+        const cx = 13, cy = 9, rx = 8, ry = 4.6;
+        for (let y = 3; y < 18; y++) for (let x = 3; x < 24; x++) { const r = Math.hypot((x + 0.5 - cx) / rx, (y + 0.5 - cy) / ry), tail = y >= 12 && y < 17 && Math.abs(x + 0.5 - (15 + (y - 12) * 1.3)) < (17 - y) * 0.35; if (r < 1 || tail) GB[y * GO + x] = r > 0.86 && !(tail && r > 1) || (tail && r >= 1 && Math.abs(x + 0.5 - (15 + (y - 12) * 1.3)) > (17 - y) * 0.35 - 1) ? KINK : KFACE; }
+        for (const dx of [-3, 0, 3]) GB[9 * GO + cx + dx] = KINK;
+      }
+      // the panel: shaken in the scare, inside a thick black border on the white page
+      const shk = scared && sc < 0.4 ? Math.round(Math.sin(sc * 70) * 2) : 0;
+      for (let y = 0, i = 0; y < GO; y++) for (let x = 0; x < GO; x++, i++) {
+        if (x < 2 || y < 2 || x > 61 || y > 61) { PIX32[i] = KPAGE; continue; }
+        if (x < 4 || y < 4 || x > 59 || y > 59) { PIX32[i] = KINK; continue; }
+        const sx = Math.max(0, Math.min(GO - 1, x - shk)), sy = Math.max(0, Math.min(GO - 1, y + (shk >> 1)));
+        PIX32[i] = GB[sy * GO + sx];
+      }
+      gctx2.putImageData(gimg, 0, 0);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false;
+      g.drawImage(gcan, 0, 0, S, S);
+    }
+    function ghostFigure() {}
+
+    function legendTap(x, y, t, phase) {
+      if (legend === 'Ghost') {
+        let best = -1, bd = 3.6;
+        for (let k = 0; k < wisps; k++) { const d = Math.hypot(ghPos[k][0] - x, ghPos[k][1] - y); if (d < bd) { bd = d; best = k; } }
+        if (phase === 'down') { if (best >= 0) { ghGrab = best; c.sound.note(tonic + 24 + tune[best % 5], { dur: 0.3, vel: 0.07, wave: 'sine' }); } }
+        else if (best < 0 && ghGrab < 0 && Math.abs(x - 16) < 8 && y > 3 && t - legAt > 1.2) { legAt = t; for (let k = 0; k < 3; k++) c.sound.note(tonic + 12 + tune[4 - k * 2], { at: k * 0.28, dur: 0.6, vel: 0.08, wave: 'sine' }); }
+      }
+    }
+
+    // ===== Ink Scroll (redesign 2, 2026-10-20): a neon sign on a brick wall at night. Bent-glass tubes on a 64-cell grid,
+    // each with a hot white core, its colour round it and a stepped halo thrown on the bricks; unlit glass shows grey. The
+    // ninja is a pink tube leaping, blade raised, its Band a ribbon tube that flaps in two lit frames; its Sun is a red or
+    // gold neon sun with rays, or a pale crescent moon; its Scenery is a peak, waves or bamboo in a tube of its own, and
+    // NINJA buzzes underneath with one letter on the blink. Tap anywhere and the ninja leaps there as neon does, lit pose by
+    // lit pose along an arc (every third leap the whole sign surges and the sun bursts in sparks); drag across the tubes
+    // and they spit sparks and stutter where you touch. =====
+    const NS = 64, nsc = document.createElement('canvas'); nsc.width = nsc.height = NS;
+    const nsx = nsc.getContext('2d'), nsi = nsx.createImageData(NS, NS), NP32 = new Uint32Array(nsi.data.buffer);
+    const NT = new Uint8Array(NS * NS), NH1 = new Uint8Array(NS * NS), NH2 = new Uint8Array(NS * NS), NWALL = new Uint32Array(NS * NS);
+    const rgb32 = (r, g2, b) => (255 << 24 | Math.max(0, Math.min(255, b | 0)) << 16 | Math.max(0, Math.min(255, g2 | 0)) << 8 | Math.max(0, Math.min(255, r | 0))) >>> 0;
+    // the tubes' colours (index 1..): ninja pink, the sun's, the scenery's, the band's, the sign's yellow, the blade's ice, the glass when it's off
+    const TUBE = [null, [255, 60, 200], inkSun === 'Gold Sun' ? [255, 176, 30] : inkSun === 'Pale Moon' ? [170, 210, 255] : [255, 50, 40],
+      inkScene === 'Mountains' ? [40, 240, 210] : inkScene === 'Waves' ? [60, 140, 255] : [70, 255, 110], inkBand === 'Grey Band' ? [170, 160, 210] : [240, 244, 255], [255, 230, 60], [170, 240, 255]];
+    const WALLC = [[64, 26, 26], [74, 30, 28], [56, 22, 24], [36, 20, 24]];
+    // the brick wall, laid once: courses of 8 x 4 bricks, offset every other course, each brick its own shade; mortar between
+    for (let y = 0; y < NS; y++) for (let x = 0; x < NS; x++) {
+      const row = y >> 2, bx = x + (row & 1) * 4, mortar = (y & 3) === 3 || (bx & 7) === 7, sh = ((row * 7 + (bx >> 3) * 13) % 3);
+      const cc = mortar ? WALLC[3] : WALLC[sh], dk = 0.72 + 0.28 * Math.min(1, (64 - Math.hypot(x - 32, y - 28)) / 44);   // a little darker toward the corners
+      NWALL[y * NS + x] = rgb32(cc[0] * dk, cc[1] * dk, cc[2] * dk);
+    }
+    // the ninja's silhouette (24 x 16, leaping right): the tube runs round its edge; w is the eye slit, h the hand
+    const NJW = ['..............kkkk......', '.............kkkkkk.....', '.............kkkkkk.....', '.............kwwwwk.....', '..............kkkk......',
+      '...........kkkkkkkk.....', '.........kkkkkkkkkkkh...', '.......kkkkkkkkkkk......', '.....kkkkkkkkkkk........', '...kkkkkkkkkkk..........',
+      '.kkkkk...kkkkkk.........', 'kkk.......kkkkk.........', 'kk.........kkkk.........', '............kkk.........', '............kkkk........', '.............kkk........'];
+    const NJE = [], NJI = [];   // the edge cells, and the eye slit
+    for (let j = 0; j < 16; j++) for (let i = 0; i < 24; i++) {
+      const ink = q => q[0] >= 0 && q[1] >= 0 && q[1] < 16 && q[0] < 24 && NJW[q[1]][q[0]] !== '.';
+      if (NJW[j][i] === 'w') NJI.push([i, j]);
+      else if (ink([i, j]) && (!ink([i - 1, j]) || !ink([i + 1, j]) || !ink([i, j - 1]) || !ink([i, j + 1]))) NJE.push([i, j]);
+    }
+    const FONT = { N: ['1001', '1101', '1011', '1001', '1001'], I: ['1', '1', '1', '1', '1'], J: ['0011', '0001', '0001', '1001', '0110'], A: ['0110', '1001', '1111', '1001', '1001'] };
+    let nsAt = [5, 16], nsFrom = null, nsT = -9, nsFace = 1, nsLeaps = 0, nsSurge = -9, nsDown = null, nsMoved = 0, nsLast = 0, nsLastP = null, nsBuzz = -9;
+    const nsSparks = [], nsStutter = new Float32Array(8).fill(-9);
+    function woodblock(t) {
+      const dt = Math.max(0, Math.min(0.1, t - nsLast)); nsLast = t;
+      const q = ptr ? [ptr[0] * 2, ptr[1] * 2] : null;
+      // ---- the touch: a short, still tap sends the ninja leaping there; a drag over the tubes makes them spark and stutter ----
+      if (pdown && q) {
+        if (!nsDown) { nsDown = [q[0], q[1], t]; nsMoved = 0; nsLastP = q; }
+        nsMoved = Math.max(nsMoved, Math.hypot(q[0] - nsDown[0], q[1] - nsDown[1]));
+        if (nsMoved > 2.5) {
+          const xi = Math.round(q[0]), yi = Math.round(q[1]);
+          let hit = 0; for (let dy = -1; dy <= 1 && !hit; dy++) for (let dx = -1; dx <= 1 && !hit; dx++) { const x = xi + dx, y = yi + dy; if (x >= 0 && y >= 0 && x < NS && y < NS && NT[y * NS + x]) hit = NT[y * NS + x]; }
+          if (hit) { nsStutter[hit] = t; if (t - nsBuzz > 0.12) { nsBuzz = t; c.sound.hit('noise', 0.08, { cutoff: 5200, dur: 0.08 }); c.sound.note(tonic + 24 + tune[hit % 5], { dur: 0.05, vel: 0.04, wave: 'square', cutoff: 2400 }); } for (let k = 0; k < 3; k++) nsSparks.push({ x: q[0], y: q[1], vx: Math.sin(t * 37 + k * 2.1) * 18, vy: -10 - ((k * 7 + Math.floor(t * 53)) % 9) * 2, t0: t }); }
+          if (nsSparks.length > 120) nsSparks.splice(0, nsSparks.length - 120);
+        }
+        nsLastP = q;
+      } else if (nsDown) {
+        if (nsMoved <= 2.5 && t - nsDown[2] < 0.3) {
+          const to = [Math.max(1, Math.min(39, Math.round(nsDown[0] - 12))), Math.max(2, Math.min(32, Math.round(nsDown[1] - 8)))];
+          if (to[0] !== nsAt[0]) nsFace = to[0] > nsAt[0] ? 1 : -1;
+          nsFrom = nsAt.slice(); nsAt = to; nsT = t; nsLeaps++;
+          if (nsLeaps % 3 === 0) nsSurge = t + 0.55;
+          for (let k = 0; k < 4; k++) c.sound.hit('click', 0.12, { at: k * 0.14 });
+          c.sound.note(tonic + 12 + tune[1], { at: 0.42, dur: 0.25, vel: 0.08, wave: 'square', cutoff: 1800 });
+          if (nsLeaps % 3 === 0) { c.sound.hit('noise', 0.3, { at: 0.55, cutoff: 7000, dur: 0.5 }); for (let k = 0; k < 4; k++) c.sound.note(tonic + 12 + tune[k % 5] + (k > 2 ? 12 : 0), { at: 0.6 + k * 0.07, dur: 0.3, vel: 0.08, wave: 'square', cutoff: 3000 }); }
+        }
+        nsDown = null;
+      }
+      // ---- bend the glass: every tube's cells, with its colour, and whether it is lit ----
+      NT.fill(0);
+      const lit = new Uint8Array(8).fill(1);
+      const surge = t - nsSurge;
+      for (let k = 1; k < 8; k++) if (t - nsStutter[k] < 0.35 && Math.floor(t * 30 + k) % 3 === 0) lit[k] = 0;
+      if (surge >= 0 && surge < 0.5 && Math.floor(surge * 16) % 2 === 1) lit.fill(0);
+      const put = (x, y, id) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < NS && y < NS) NT[y * NS + x] = id; };
+      const lineT = (x0, y0, x1, y1, id) => { const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); for (let k = 0; k <= n; k++) put(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, id); };
+      const arc = (cx, cy, r, a0, a1, id) => { const n = Math.ceil(Math.abs(a1 - a0) * r * 1.4) + 2; for (let k = 0; k <= n; k++) { const a = a0 + (a1 - a0) * k / n; put(cx + Math.cos(a) * r, cy + Math.sin(a) * r, id); } };
+      // the sun (or the moon), high on the right
+      const SX = 48, SY = 13;
+      if (inkSun === 'Pale Moon') { arc(SX, SY, 9, -2.2, 2.2, 2); arc(SX - 4.5, SY - 1, 7.2, -1.15, 1.25, 2); }
+      else { arc(SX, SY, 7.5, 0, 6.283, 2); for (let k = 0; k < 8; k++) { const a = k * 0.785 + 0.39; lineT(SX + Math.cos(a) * 10, SY + Math.sin(a) * 10, SX + Math.cos(a) * 12.5, SY + Math.sin(a) * 12.5, 2); } }
+      // the scenery, low on the sign
+      if (inkScene === 'Mountains') { lineT(4, 48, 20, 36, 3); lineT(20, 36, 30, 43, 3); lineT(30, 43, 42, 31, 3); lineT(42, 31, 60, 48, 3); lineT(38, 35, 42, 38, 3); lineT(42, 38, 46, 35, 3); lineT(16, 39, 20, 41, 3); lineT(20, 41, 23, 39, 3); }
+      else if (inkScene === 'Waves') { for (let w = 0; w < 5; w++) { const x0 = 4 + w * 11; arc(x0 + 4, 43, 4, 3.3, 6.3, 3); arc(x0 + 5.5, 42.5, 1.6, 0, 3.3, 3); } lineT(4, 48, 60, 48, 3); }
+      else { for (const [bx, top] of [[52, 27], [58, 31]]) { lineT(bx, top, bx, 47, 3); for (let y = top + 5; y < 47; y += 6) { put(bx - 1, y, 3); put(bx + 1, y, 3); } lineT(bx, top + 4, bx - 5, top + 1, 3); lineT(bx, top + 10, bx + 4, top + 7, 3); } }
+      // NINJA, buzzing underneath, its J on the blink
+      let lx = 21;
+      for (const ch of 'NINJA') { const gl = FONT[ch]; const id = ch === 'J' && (Math.floor(t * 2.3) % 7 === 0 || Math.floor(t * 9) % 13 === 0) ? 7 : 5; gl.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '1') put(lx + i, 54 + j, id); }); lx += gl[0].length + 2; }
+      // the ninja: lit pose by lit pose along the arc while it leaps, then where it landed; its blade, its eye, its band
+      const pu = t - nsT, poses = [];
+      if (nsFrom && pu >= 0 && pu < 0.56) { const step = Math.min(3, Math.floor(pu / 0.14)); if (step < 3) { const u = step / 3; poses.push([nsFrom[0] + (nsAt[0] - nsFrom[0]) * u, nsFrom[1] + (nsAt[1] - nsFrom[1]) * u - Math.sin(u * Math.PI) * 10, step === 0 ? 7 : 1]); } else poses.push([nsAt[0], nsAt[1], 1]); }
+      else poses.push([nsAt[0], nsAt[1], 1]);
+      if (nsFrom && pu >= 0 && pu < 0.42) poses.push([nsFrom[0], nsFrom[1], 7]);   // the pose it left, dark glass
+      const flap = Math.floor(t * 3.2) % 2;
+      for (const [px0, py0, id] of poses.reverse()) {
+        const X = i => px0 + (nsFace > 0 ? i : 23 - i);
+        for (const [i, j] of NJE) put(X(i), py0 + j, id);
+        for (const [i, j] of NJI) put(X(i), py0 + j, id === 7 ? 7 : 4);
+        for (let k = 1; k < 9; k++) put(X(20 + k * 0.6), py0 + 6 - k, id === 7 ? 7 : 6);
+        if (inkBand !== 'No Band') for (let k = 1; k < 9; k++) put(X(13 - k), py0 + 2 + Math.round((flap ? 1 : -1) * Math.sin(k * 0.9) * k * 0.18) + (k > 5 ? 1 : 0), id === 7 ? 7 : 4);
+      }
+      // ---- light it: the bricks, two steps of halo round lit glass, the tubes' colour and their white-hot cores ----
+      for (let i = 0; i < NS * NS; i++) { NH1[i] = 0; NH2[i] = 0; }
+      for (let y = 0; y < NS; y++) for (let x = 0; x < NS; x++) {
+        const id = NT[y * NS + x]; if (!id || id === 7 || !lit[id]) continue;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+          const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= NS || Y >= NS) continue;
+          const j = Y * NS + X, d = Math.max(Math.abs(dx), Math.abs(dy));
+          if (d === 1 && Math.abs(dx) + Math.abs(dy) < 2) NH1[j] = id; else if (!NH2[j] && Math.abs(dx) + Math.abs(dy) < 4) NH2[j] = id;
+        }
+      }
+      const hum = 0.92 + (Math.floor(t * 11) % 5 === 0 ? 0.08 : 0);
+      for (let i = 0; i < NS * NS; i++) {
+        const id = NT[i], w = NWALL[i], wr = w & 255, wg = (w >> 8) & 255, wb = (w >> 16) & 255;
+        if (id) {
+          if (id === 7 || !lit[id]) { NP32[i] = rgb32(92, 84, 96); continue; }
+          const tc = TUBE[id], bright = surge >= 0.5 && surge < 1.1 ? 1 : hum;
+          NP32[i] = rgb32((tc[0] * 0.45 + 255 * 0.55) * bright, (tc[1] * 0.45 + 255 * 0.55) * bright, (tc[2] * 0.45 + 255 * 0.55) * bright);
+        } else if (NH1[i]) { const tc = TUBE[NH1[i]]; NP32[i] = rgb32(tc[0] * 0.8 + wr * 0.2, tc[1] * 0.8 + wg * 0.2, tc[2] * 0.8 + wb * 0.2); }
+        else if (NH2[i]) { const tc = TUBE[NH2[i]]; NP32[i] = rgb32(tc[0] * 0.26 + wr * 0.74, tc[1] * 0.26 + wg * 0.74, tc[2] * 0.26 + wb * 0.74); }
+        else NP32[i] = w;
+      }
+      // the surge: the sun bursts in a shower of sparks
+      if (surge >= 0 && surge < 0.05 && nsSparks.length < 200) for (let k = 0; k < 40; k++) { const a = k * 2.399; nsSparks.push({ x: SX + Math.cos(a) * 8, y: SY + Math.sin(a) * 8, vx: Math.cos(a) * (14 + (k % 5) * 6), vy: Math.sin(a) * (14 + (k % 5) * 6) - 8, t0: t }); }
+      // sparks: white-hot, cooling to yellow and orange as they fall
+      for (let k = nsSparks.length - 1; k >= 0; k--) {
+        const s2 = nsSparks[k], a = t - s2.t0; if (a > 0.9) { nsSparks.splice(k, 1); continue; }
+        s2.vy += 60 * dt; s2.x += s2.vx * dt; s2.y += s2.vy * dt;
+        const x = Math.round(s2.x), y = Math.round(s2.y); if (x < 0 || y < 0 || x >= NS || y >= NS) continue;
+        const sc2 = a < 0.25 ? rgb32(255, 255, 230) : a < 0.55 ? rgb32(255, 220, 80) : rgb32(255, 120, 40), x2 = Math.round(s2.x - s2.vx * 0.03), y2 = Math.round(s2.y - s2.vy * 0.03);
+        NP32[y * NS + x] = sc2; if (x2 >= 0 && y2 >= 0 && x2 < NS && y2 < NS) NP32[y2 * NS + x2] = sc2;
+      }
+      nsx.putImageData(nsi, 0, 0);
+      g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false;
+      g.drawImage(nsc, 0, 0, S, S);
+    }
+
     // ---------- the legendaries, under the same three-colours-a-tile rule ----------
     function inkPaper(t) {
       // rice paper, a red sun, a wash of far mountains and the artist's seal
@@ -781,6 +1155,7 @@ Proto.add({
     function legendFigure(t) {
       sp.fill(-1);
       fx.fill(-1); ez.fill(-1);
+      if (newLeg) { if (legend === 'Mecha') mechaFigure(t); else if (legend === 'Ghost') ghostFigure(t); return; }
       const blinkG = tt => ((tt + blinkOff) % blinkGap) < 0.15;
       const u0 = t - poofAt, sealing = u0 >= POOF && u0 < POOF + 1.4;
       const bob = Math.sin(t * 1.4 + windPh) > 0.7 ? 1 : 0, hy = 12 + bob, eyeY = hy + 1;
@@ -909,6 +1284,8 @@ Proto.add({
     const k = Math.ceil(S / N), off = Math.floor((S - k * N) / 2);
 
     function frame(t) {
+      if (newLeg && legend === 'Ghost') return ghostScreen(t);
+      if (newLeg && legend === 'Ink Scroll') return woodblock(t);
       if (legend === 'Ink Scroll') inkPaper(t); else backdrop(t);
       if (familiar === 'Storm Dragon' && t - poofAt < 0.45) {
         // the dragon's lightning, down the right side of the sky
@@ -967,7 +1344,11 @@ Proto.add({
       const close = !!ptr && Math.hypot(ptr[0] - 16, ptr[1] - 14) < 7;
       if (close && !sizing && t - sizedAt > 1.2 && legend === 'None') { sizedAt = t; c.sound.hit('noise', 0.07, { cutoff: 6500, dur: 0.25 }); c.sound.note(tonic + 24 + tune[4], { at: 0.05, dur: 0.4, vel: 0.05, wave: 'sine' }); }
       sizing = close;
+      pdown = inp.inside && inp.down;
+      // a legendary hears a press as it lands (to grab), and a tap only on a short, still release
+      const legTaps = [];
       for (const poke of inp.taps()) { // each tap
+        if (newLeg) { const q = [poke.x * N, poke.y * N]; legendTap(q[0], q[1], t, 'down'); if (!inp.down) legTaps.push(q); else lgDown = [q[0], q[1], t, 0]; continue; }
         if (t - poofAt < POOF + 1.4) continue;
         const pan = (poke.x - 0.5) * 0.5;
         legAt = t;
@@ -995,6 +1376,11 @@ Proto.add({
         c.sound.note(tonic - 12 + tune[2], { at: 0.42, dur: 0.12, vel: 0.16, wave: 'triangle', cutoff: 900 });
         for (let k = 0; k < 4; k++) c.sound.note(tonic + tune[(k + Math.floor(xr() * 2)) % 5] + (k === 3 ? 12 : 0), { at: 1.05 + k * 0.06, dur: k === 3 ? 0.2 : 0.05, vel: 0.22, wave: 'square', cutoff: 2600 });
       }
+      if (lgDown) {
+        if (inp.down) lgDown[3] = Math.max(lgDown[3], Math.hypot(inp.x * N - lgDown[0], inp.y * N - lgDown[1]));
+        else { if (t - lgDown[2] < 0.25 && lgDown[3] < 1) legTaps.push([lgDown[0], lgDown[1]]); lgDown = null; }
+      }
+      for (const [x, y] of legTaps) legendTap(x, y, t, 'tap');
       wind += ((inp.inside && inp.down ? 1 : 0) - wind) * Math.min(1, (dt || 0.033) * 4);
       if (!inp.inside && !inp.down && wind < 0.001) wind = 0;
       frame(t);

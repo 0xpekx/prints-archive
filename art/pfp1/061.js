@@ -631,6 +631,289 @@ void main() {
     return { prog, u, tri: gl.createVertexArray() };
   }
 
+  // ---------- the Legendaries' program ----------
+  // Bronze and Mid-Shot draw with a program of their own: FRAG with their sets, materials and camera spliced in.
+  // It is compiled only when one of them is drawn, so every ordinary folk (and Scrap Clay) runs exactly the program above.
+  //   Bronze      a cast bust on a turned socle and a marble plinth with a brass plaque, in a dark gallery under
+  //               one spotlight, its cone hazy with drifting dust; rub it for luck and the patina wears through to
+  //               gold where you rub (rub enough and it blinks at you); tap to take a flash photo
+  //   Mid-Shot    behind the scenes: on the animator's set before a green screen with tracking marks, held up by
+  //               a rig arm, seen through the camera's viewfinder, moving on twos and talking; you're the animator:
+  //               drag to pose it, let go to shoot the frame, tap the red light to play your shots back
+  //   Scrap Clay  is drawn by the folk's own program again (uLeg = 3), as before v=283: every leftover scrap
+  //               kneaded into one figure, knead it with a tap (a member asked for it back; the founder, 2026-10-20).
+  //               The uLeg.x > 2.5 parts spliced in below (the coil, the scrap balls, the cutting mat) are no longer
+  //               drawn; they stay so Bronze's and Mid-Shot's program is the one that shipped.
+  const legendEdits = [
+    ['uniform vec4 uFlame;  // the flame\'s centre on the set, and how lit it is\n', `uniform vec4 uFlame;  // the flame's centre on the set, and how lit it is
+uniform vec4 uLeg2;   // Legendary: time, camera lift, zoom, the camera's frame counter
+uniform vec4 uLeg3;   // its toys: a flash; the scrap flying in (which, how far) or the playback; the scraps caught (bits)
+uniform vec4 uRub[16];   // Bronze: where it has been rubbed (x, y on the set, radius, how fresh: under 1 it still sparkles)
+uniform vec4 uShot;      // Mid-Shot: shots taken, the newest's slot, the slot playing (or -1), the clapper (0 to 1)
+uniform sampler2D uShots;   // Mid-Shot: the shots, small, side by side (six slots)
+float sid;            // which orbiting scrap was hit
+// Scrap Clay: a rope of clay coiled round and round (a helix up the head or body), grooves pressed between the turns
+float coilPhase(vec3 q, float k) { return q.y * k + atan(q.z, q.x) * 0.159155 + uLeg2.x * 0.3; }
+float coil(float h, vec3 q, float k) { return (h + 0.02 * (1.0 - abs(sin(3.14159 * coilPhase(q, k))))) * 0.85; }
+`],
+    ['  float d = p.z + 1.25, m = 0.0;\n', '  float d = 1e3, m = 0.0;   // the set wall goes in last, after the figure is cut and set up\n'],
+    ['  if (cloth < d) { d = cloth; m = 5.0; }\n', '  if (uLeg.x > 2.5) cloth = coil(cloth, p - vec3(0.0, -0.2, 0.0), 6.0);\n  if (cloth < d) { d = cloth; m = 5.0; }\n'],
+    ['  bool midShot = uLeg.x > 1.5 && uLeg.x < 2.5;\n', '  bool midShot = false;   // (this program\'s Mid-Shot is the whole set, below)\n'],
+    ['  h = smax(h, -cut, 0.03);\n', `  h = smax(h, -cut, 0.03);
+  if (uLeg.x > 2.5) h = coil(h, q, 8.0);
+  if (uLeg.x > 1.5 && uLeg.x < 2.5) h = smax(h, -max(abs(q.y + 0.005) - 0.007, 0.05 - q.z), 0.006);   // the replacement face's seam
+`],
+    ['  mat_ = m;\n', `  if (uLeg.x > 0.5 && uLeg.x < 1.5) {
+    // the bust: the body cut off in a curve under the chest, on a turned socle, a marble plinth, a brass plaque
+    d = smax(d, -1.5 + 0.34 * min(1.0, p.x * p.x / 1.3) - p.y, 0.05);
+    vec3 sq = p - vec3(0.0, -1.68, -0.1);
+    float soc = max(length(sq.xz) - (0.24 + 0.16 * smoothstep(0.12, -0.24, sq.y)) + 0.03 * smoothstep(0.03, 0.0, abs(sq.y + 0.1)), abs(sq.y) - 0.26);
+    vec3 bb = abs(p - vec3(0.0, -2.0, -0.1)) - vec3(0.42, 0.06, 0.42);
+    soc = min(soc, length(max(bb, 0.0)) + min(max(bb.x, max(bb.y, bb.z)), 0.0) - 0.01);
+    if (soc < d) { d = soc; m = 18.0; }   // cast with the bust
+    vec3 pb = abs(p - vec3(0.0, -3.56, -0.1)) - vec3(0.95, 1.5, 0.62);
+    float pl = length(max(pb, 0.0)) + min(max(pb.x, max(pb.y, pb.z)), 0.0) - 0.02;
+    if (pl < d) { d = pl; m = 19.0; }
+    vec3 qb = abs(p - vec3(0.0, -2.42, 0.54)) - vec3(0.34, 0.09, 0.012);
+    float plq = length(max(qb, 0.0)) + min(max(qb.x, max(qb.y, qb.z)), 0.0) - 0.006;
+    if (plq < d) { d = plq; m = 20.0; }
+    for (int k = 0; k < 8 + min(uSteps, 0); k++) {   // the luck: coins stacked on the plinth, one for every few rubs
+      if (float(k) >= uLeg2.w) break;
+      vec3 cq = p - vec3((k & 1) == 0 ? 0.6 : -0.62, -2.03 + float(k >> 1) * 0.058, (k & 1) == 0 ? 0.2 : 0.16);
+      cq.xz += 0.012 * vec2(sin(float(k) * 2.3), cos(float(k) * 1.7));   // stacked a little crooked
+      float cn = max(length(cq.xz) - 0.15, abs(cq.y) - 0.024) - 0.006;
+      if (cn < d) { d = cn; m = 20.0; }
+    }
+  }
+  if (uLeg.x > 1.5 && uLeg.x < 2.5) {
+    // the rig arm: a steel rod in from the right, a clamp on it, a ball joint into the puppet's back
+    float rg = rod(p, vec3(2.8, -0.2, -0.95), vec3(0.6, -0.55, -0.6), 0.045);
+    rg = min(rg, length(p - vec3(0.6, -0.55, -0.6)) - 0.1);
+    vec3 cb = abs(p - vec3(1.45, -0.38, -0.79)) - vec3(0.1, 0.13, 0.1);
+    rg = min(rg, length(max(cb, 0.0)) + min(max(cb.x, max(cb.y, cb.z)), 0.0) - 0.02);
+    if (rg < d) { d = rg; m = 17.0; }
+    // a light stand at the edge of the set, a softbox on it glaring at the puppet
+    float ls = rod(p, vec3(-1.42, -3.0, -0.75), vec3(-1.42, 1.0, -0.75), 0.035);
+    if (ls < d) { d = ls; m = 17.0; }
+    vec3 sbx = p - vec3(-1.22, 1.05, -0.62); sbx.xz = rot(-0.6) * sbx.xz; sbx.xy = rot(0.35) * sbx.xy;
+    vec3 sbq = abs(sbx) - vec3(0.34, 0.27, 0.12);
+    float sbd = length(max(sbq, 0.0)) + min(max(sbq.x, max(sbq.y, sbq.z)), 0.0) - 0.02;
+    if (sbd < d) { d = sbd; m = 22.0; }
+  }
+  if (uLeg.x > 2.5) {
+    // the last scraps, rolled into balls, going round the head on a tilted ring
+    // (only looked at near their ring, so the march pays for them only there)
+    float ringB = length(vec2(length(p.xz * vec2(1.0, 1.27)) - 1.08, p.y - 0.32)) - 0.5;
+    int caught = int(uLeg3.w + 0.5), fly = int(uLeg3.y + 0.5);
+    if (ringB < d || uLeg3.z > 0.0) for (int j = 0; j < 6 + min(uSteps, 0); j++) {
+      bool flying = j == fly && uLeg3.z > 0.0;
+      if (((caught >> j) & 1) != 0 && !flying) continue;   // caught into the coil
+      float a = uLeg2.x * 0.55 + float(j) * 1.0472;
+      vec3 c = vec3(cos(a) * 1.08, 0.32 + 0.32 * sin(a + 0.7), sin(a) * 0.85);
+      if (flying) c = mix(c, vec3(0.0, 0.2, 0.35), uLeg3.z);
+      float b = length(p - c) - (0.075 + 0.035 * fract(float(j) * 0.618)) * (flying ? 1.0 - 0.7 * uLeg3.z : 1.0);
+      if (b < d) { d = b; m = 21.0; sid = float(j); }
+    }
+  }
+  float setWall = p.z + 1.25;
+  if (setWall < d) { d = setWall; m = 0.0; }
+  mat_ = m;
+`],
+    ['  vec3 ro = vec3(0.0, -0.15 + 0.6 * hatLift(), 6.0);\n  vec3 rd = normalize(vec3(uv * 0.25, -1.0));', '  vec3 ro = vec3(0.0, -0.15 + 0.6 * hatLift() + uLeg2.y, 6.0);\n  vec3 rd = normalize(vec3(uv * 0.25 * uLeg2.z, -1.0));\n  if (uLeg.x > 0.5 && uLeg.x < 1.5) { mat2 orb = rot(0.24 * sin(uLeg2.x * 0.33)); ro.xz = orb * ro.xz; rd.xz = orb * rd.xz; }   // the visitor walks slowly round the bust'],
+    ['  if (m < 0.5) { // the set wall: painted card, sometimes papered\n', `  if (m < 0.5 && uLeg.x > 0.5) {
+    vec2 w = p.xy;
+    if (uLeg.x < 1.5) {   // the gallery: dark green-black, a dado rail, the spotlight's pool
+      alb = uWall * 0.55 * (0.9 + 0.1 * vnoise(p * 5.0));
+      alb *= 1.0 - 0.35 * smoothstep(0.012, 0.0, abs(w.y + 1.75) - 0.02);
+      alb *= 0.25 + 0.75 * exp(-dot(w - vec2(0.0, 0.2), w - vec2(0.0, 0.2)) * 0.45);
+    } else if (uLeg.x < 2.5) {   // the green screen, creased, with tracking marks
+      alb = vec3(0.03, 0.42, 0.07) * (0.86 + 0.14 * vnoise(vec3(w * vec2(1.5, 5.0), 1.0)));
+      vec2 g = fract(w * 1.6 + 0.5) - 0.5;
+      float mk = max(step(abs(g.x), 0.014) * step(abs(g.y), 0.075), step(abs(g.y), 0.014) * step(abs(g.x), 0.075));
+      alb = mix(alb, vec3(0.75, 0.78, 0.7), mk);
+    } else {   // a green self-healing cutting mat: a fine grid, heavier every fifth line, a diagonal and a circle guide
+      alb = vec3(0.025, 0.14, 0.075) * (0.9 + 0.1 * vnoise(p * 9.0));
+      vec2 f1 = abs(fract(w * 8.0) - 0.5), f5 = abs(fract(w * 1.6) - 0.5);
+      float ln = max(smoothstep(0.47, 0.5, max(f1.x, f1.y)) * 0.6, smoothstep(0.485, 0.5, max(f5.x, f5.y)));
+      ln = max(ln, smoothstep(0.012, 0.0, abs(abs(w.x - 0.1) - abs(w.y - 0.2)) - 0.004) * 0.7);
+      ln = max(ln, smoothstep(0.012, 0.0, abs(length(w - vec2(-1.1, 1.2)) - 0.62) - 0.004) * 0.7);
+      alb = mix(alb, vec3(0.32, 0.52, 0.3), ln);
+    }
+  } else
+  if (m < 0.5) { // the set wall: painted card, sometimes papered
+`],
+    ['  } else if (m > 14.5) { // Mid-Shot:', `  } else if (m > 17.5) {   // the Legendaries' props
+    if (m < 18.5) { alb = vec3(0.05, 0.045, 0.04); spec = 0.6; }                                         // the socle: black stone, polished
+    else if (m < 19.5) {                                                                                    // the plinth: dark veined marble
+      float v = abs(sin(p.x * 3.0 + p.y * 1.4 + 3.5 * vnoise(p * 1.7))), v2 = abs(sin(p.x * 7.0 - p.y * 3.0 + 2.0 * vnoise(p * 4.0 + 3.0)));
+      alb = vec3(0.03, 0.045, 0.04) + vec3(0.16, 0.18, 0.17) * (smoothstep(0.06, 0.0, v) * 0.8 + smoothstep(0.04, 0.0, v2) * 0.35); spec = 0.9;
+    } else if (m < 20.5) { alb = vec3(0.75, 0.52, 0.2) * (1.0 - 0.6 * step(0.5, fract(p.x * 30.0)) * step(abs(p.y + 2.42), 0.03) * step(abs(p.x), 0.25)); spec = 1.5; }   // the plaque, its engraved line
+    else if (m > 21.5) { alb = vec3(0.02); emit = vec3(1.0, 0.97, 0.9) * 1.6 * smoothstep(0.2, 0.8, dot(n, normalize(vec3(0.75, -0.3, 0.6)))); }   // the softbox
+    else { alb = scrapCol(h31(vec3(sid, 4.0, 9.0))); bump = 1.0; }                                         // a scrap ball
+  } else if (m > 14.5) { // Mid-Shot:`],
+    ['  if (uLeg.x > 2.5 && (m > 0.5 && m < 1.5 || m > 4.5 && m < 8.5 || m > 9.5 && m < 11.5)) {\n', `  if (uLeg.x > 2.5 && (m > 0.5 && m < 1.5 || m > 4.5 && m < 5.5 || m > 10.5 && m < 11.5)) {
+    // each turn of the coil is a different scrap, marbled a little where two were kneaded together
+    vec3 cq = m < 1.5 ? q : p - vec3(0.0, -0.2, 0.0);
+    float cp = coilPhase(cq, m < 1.5 ? 8.0 : 6.0), id = floor(cp);
+    // a few scraps only (four, picked by the clay), and any caught scrap's colour wound into its own turns
+    int ci = int(mod(id, 6.0));
+    alb = ((int(uLeg3.w + 0.5) >> ci) & 1) != 0 ? scrapCol(h31(vec3(float(ci), 4.0, 9.0))) : scrapCol(h31(vec3(mod(id, 4.0), floor(uSkin.r * 97.0), m < 1.5 ? 2.0 : 5.0)));
+    alb = mix(alb, scrapCol(h31(vec3(id + 9.0, 3.0, 1.0))), 0.12 * smoothstep(0.5, 0.8, vnoise(cq * 7.0)));
+    alb *= 0.7 + 0.3 * pow(abs(sin(3.14159 * cp)), 0.5);
+    emit = vec3(0.0);
+  } else
+  if (uLeg.x > 2.5 && (m > 6.5 && m < 8.5 || m > 9.5 && m < 10.5)) {
+`],
+    ['  if (uLeg.x > 0.5 && uLeg.x < 1.5 && m > 0.5) {\n', '  if (uLeg.x > 1.5 && uLeg.x < 2.5 && m > 0.5) col += alb * vec3(0.06, 0.5, 0.1) * rim * 1.4 * ao;   // green spill from the screen\n  if (uLeg.x > 0.5 && uLeg.x < 1.5 && m > 0.5 && m < 18.5) {\n'],
+    ['    float pol = max(uLeg.w * smoothstep(0.32, 0.0, length(p.xy - uLeg.yz)), smoothstep(0.17, 0.07, length(q - vec3(0.0, -0.04, 0.62))));', `    float pol = max(uLeg.w * smoothstep(0.32, 0.0, length(p.xy - uLeg.yz)), smoothstep(0.17, 0.07, length(q - vec3(0.0, -0.04, 0.62))));
+    for (int r = 0; r < 16; r++) { vec4 rb = uRub[r]; if (rb.w > 0.0) pol = max(pol, rb.w * smoothstep(rb.z, rb.z * 0.35, length(p.xy - rb.xy))); }   // rubbed for luck`],
+    ['    float pat = smoothstep(0.32, 0.8,', '    float pat = smoothstep(0.18, 0.62,'],
+    ['    vec3 brz = mix(vec3(0.3, 0.15, 0.06), vec3(0.85, 0.58, 0.24), pol);', '    vec3 brz = mix(vec3(0.17, 0.1, 0.05), vec3(1.0, 0.74, 0.3), pol);   // dull old bronze, rubbed to bright gold'],
+    ['    vec3 ab = mix(brz, vec3(0.12, 0.3, 0.25), pat * (1.0 - pol));', '    vec3 ab = mix(brz, vec3(0.1, 0.24, 0.19), pat * (1.0 - pol));'],
+    ['    float lidLine = mix(r * 1.3, -r * 1.1, uBlink);', '    float lidLine = mix(r * 1.3, -r * 1.1, max(uBlink, uLeg.x > 0.5 && uLeg.x < 1.5 && sx > 0.0 ? uLeg3.y : 0.0));   // a bronze winks one eye'],
+    ['  col += emit;\n', `  col += emit;
+  if (uLeg.x > 0.5 && uLeg.x < 1.5) {
+    if (m > 0.5 && m < 18.5) col += uKeyC * vec3(0.9, 0.6, 0.3) * pow(1.0 - clamp(dot(n, -rd), 0.0, 1.0), 3.0) * 0.35;   // a warm rim on the metal
+    col += vec3(1.0, 0.97, 0.92) * uLeg3.x * (m > 0.5 ? 1.0 * max(dot(n, -rd), 0.0) : 0.25);   // the camera's flash
+    if (m > 0.5 && m < 18.5) for (int r = 0; r < 16; r++) {   // a fresh rub sparkles, a four-point star on the metal
+      vec4 rb = uRub[r]; if (rb.w <= 0.0 || rb.w >= 1.0) continue;
+      vec2 dv = abs(p.xy - rb.xy); float k = 1.0 - rb.w;
+      col += vec3(1.0, 0.92, 0.7) * k * (smoothstep(0.05, 0.0, length(dv)) * 3.0 + smoothstep(0.012, 0.0, min(dv.x, dv.y)) * smoothstep(0.22 * k, 0.0, max(dv.x, dv.y)) * 2.0);
+    }
+    if (uLeg3.z > -2.5 && uLeg3.z < 2.5 && m > 0.5 && m < 18.5) { float pol2 = 0.0; for (int r = 0; r < 16; r++) { vec4 rb = uRub[r]; if (rb.w > 0.0) pol2 = max(pol2, rb.w * smoothstep(rb.z, rb.z * 0.35, length(p.xy - rb.xy))); } col += vec3(1.0, 0.9, 0.6) * pol2 * smoothstep(0.18, 0.0, abs(p.x * 0.8 + p.y * 0.6 - uLeg3.z)) * 2.5; }   // the gleam
+  }
+  if (uLeg.x > 0.5 && uLeg.x < 1.5) {
+    // the spotlight's cone, hazy where the ray crosses it in front of whatever it hit, and dust drifting in it
+    float tb = (0.3 - ro.z) / rd.z;
+    if (tb < t) {
+      vec3 bp = ro + rd * tb;
+      float rr = 0.3 + (2.9 - bp.y) * 0.27, inB = smoothstep(rr, rr * 0.5, abs(bp.x)) * smoothstep(-2.4, -1.2, bp.y);
+      col += vec3(1.0, 0.86, 0.62) * inB * 0.045 * uKeyC;
+      vec2 dg = vec2(bp.x * 9.0, bp.y * 9.0 + uLeg2.x * 0.6), di = floor(dg), df = fract(dg) - 0.5;
+      vec2 jo = vec2(h31(vec3(di, 1.0)), h31(vec3(di, 2.0))) - 0.5;
+      float mote = step(0.86, h31(vec3(di, 3.0))) * smoothstep(0.09, 0.0, length(df - jo * 0.7)) * (0.6 + 0.4 * sin(uLeg2.x * 3.0 + h31(vec3(di, 4.0)) * 6.28));
+      col += vec3(1.0, 0.9, 0.7) * mote * inB * 0.9;
+    }
+  }
+`],
+    ['  pix = vec4(col * (1.0 - 0.35 * dot(vg, vg)), 1.0);', `  col *= 1.0 - 0.35 * dot(vg, vg);
+  if (uLeg.x > 1.5 && uLeg.x < 2.5 && uLeg3.w < 0.5) col = viewfinder(col, gl_FragCoord.xy / uS);
+  if (uLeg.x > 0.5 && uLeg.x < 1.5 && uLeg3.w > 0.0) col = polaroid(col, gl_FragCoord.xy / uS, uLeg3.w);
+  pix = vec4(col, 1.0);`],
+    ['void main() {\n  vec3 acc', `// Mid-Shot: the camera's viewfinder over the frame: corner marks, a centre cross, a blinking REC light and the
+// frame counter in seven-segment figures
+float seg7(vec2 p, int dg) {
+  int b = dg == 0 ? 63 : dg == 1 ? 6 : dg == 2 ? 91 : dg == 3 ? 79 : dg == 4 ? 102 : dg == 5 ? 109 : dg == 6 ? 125 : dg == 7 ? 7 : dg == 8 ? 127 : 111;
+  float r = 0.0, t = 0.16;
+  if ((b & 1) != 0) r = max(r, step(abs(p.y - 2.0), t) * step(abs(p.x - 0.5), 0.45));
+  if ((b & 64) != 0) r = max(r, step(abs(p.y - 1.0), t) * step(abs(p.x - 0.5), 0.45));
+  if ((b & 8) != 0) r = max(r, step(abs(p.y), t) * step(abs(p.x - 0.5), 0.45));
+  if ((b & 32) != 0) r = max(r, step(abs(p.x), t) * step(abs(p.y - 1.5), 0.45));
+  if ((b & 2) != 0) r = max(r, step(abs(p.x - 1.0), t) * step(abs(p.y - 1.5), 0.45));
+  if ((b & 16) != 0) r = max(r, step(abs(p.x), t) * step(abs(p.y - 0.5), 0.45));
+  if ((b & 4) != 0) r = max(r, step(abs(p.x - 1.0), t) * step(abs(p.y - 0.5), 0.45));
+  return r;
+}
+// Bronze: the flash photo, a polaroid that slides out and away, developing as it goes
+vec3 polaroid(vec3 col, vec2 u, float age) {
+  float q = clamp(age / 2.4, 0.0, 1.0), an = -0.12 - q * 0.35;
+  vec2 c0 = vec2(0.82 + q * q * 0.3, 0.62 + q * 0.12), d = mat2(cos(an), -sin(an), sin(an), cos(an)) * (u - c0);
+  vec2 bx = abs(d - vec2(0.0, -0.012)) - vec2(0.12, 0.145);
+  float card = max(bx.x, bx.y), photo = max(abs(d.x) - 0.1, abs(d.y - 0.012) - 0.1);
+  if (card > 0.0) return mix(col, col * 0.6, smoothstep(0.02, 0.0, card - 0.01) * 0.6);   // its shadow
+  if (photo > 0.0) return vec3(0.95, 0.94, 0.9);
+  vec2 pu = (d - vec2(0.0, 0.012)) / 0.1;
+  float dev = smoothstep(0.0, 0.9, age), fig = smoothstep(0.42, 0.38, length(pu * vec2(1.0, 1.1) - vec2(0.0, 0.25))) + smoothstep(0.1, 0.0, max(abs(pu.x) - 0.75 + pu.y * 0.4, pu.y + 0.15) * 2.0) * step(pu.y, 0.0);
+  vec3 img = mix(vec3(0.95, 0.9, 0.8), vec3(0.85, 0.55, 0.22), clamp(fig, 0.0, 1.0)) * (0.85 + 0.15 * pu.y);
+  return mix(vec3(0.08, 0.07, 0.06), img, dev);
+}
+float hash12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+vec3 viewfinder(vec3 col, vec2 u) {
+  int ns = int(uShot.x + 0.5), last = int(uShot.y + 0.5), play = int(uShot.z + 0.5);
+  // onion skin: the last shot, faint over the live view
+  if (ns > 0 && uShot.z < -0.5) col = mix(col, texture(uShots, vec2((float(last) + u.x) / 6.0, u.y)).rgb, 0.24);
+  if (uShot.z > -0.5) {   // playing back: a film gate's flicker, weave and scratches
+    float fr = floor(uLeg2.x * 12.0);
+    col *= 0.86 + 0.14 * hash12(vec2(fr, 3.0));
+    col += 0.5 * step(abs(u.x - hash12(vec2(fr, 7.0))), 0.0015) * step(0.6, hash12(vec2(fr, 9.0)));
+    col *= 1.0 - 0.6 * dot(u - 0.5, u - 0.5);
+  }
+  col *= 1.0 - 0.4 * step(0.82, u.y);   // the read-out strip along the top
+  // the strip of shots along the foot of the frame, the newest on the right
+  if (u.y < 0.15 && ns > 0) {
+    for (int k = 0; k < 6; k++) {
+      if (k >= ns) break;
+      int slot = int(mod(float(last - k) + 6.0, 6.0));
+      vec2 c0 = vec2(0.86 - float(k) * 0.135, 0.03), lo = (u - c0) / vec2(0.12, 0.1);
+      if (lo.x > -0.05 && lo.x < 1.05 && lo.y > -0.06 && lo.y < 1.06) {
+        bool inside = lo.x > 0.0 && lo.x < 1.0 && lo.y > 0.0 && lo.y < 1.0;
+        col = inside ? texture(uShots, vec2((float(slot) + lo.x) / 6.0, lo.y)).rgb : (slot == play ? vec3(0.2, 0.95, 0.35) : vec3(0.92));
+      }
+    }
+  }
+  float lw = max(2.6 / uS, 0.007);
+  vec2 a = abs(u - 0.5), e = a - vec2(0.43);
+  float br = (step(-lw, e.x) * step(e.x, 0.0) * step(-0.07, e.y) * step(e.y, 0.0)) + (step(-lw, e.y) * step(e.y, 0.0) * step(-0.07, e.x) * step(e.x, 0.0));
+  float cr = max(step(a.x, lw * 0.5) * step(a.y, 0.022), step(a.y, lw * 0.5) * step(a.x, 0.022)) * step(lw * 1.5, max(a.x, a.y));
+  col = mix(col, vec3(0.92), clamp(br + cr, 0.0, 1.0) * 0.85);
+  vec2 rq = u - vec2(0.115, 0.885);
+  if (uLeg3.y > 0.5) { float tri = max(abs(rq.y) * 1.7 + rq.x * 0.9 - 0.018, -rq.x - 0.016); col = mix(col, vec3(0.2, 0.95, 0.35), step(tri, 0.0)); }   // playing back
+  else col = mix(col, vec3(0.95, 0.08, 0.05), smoothstep(0.024, 0.019, length(rq)) * step(0.5, fract(uLeg2.x * 0.8)));
+  col = mix(col, vec3(1.0), uLeg3.x * 0.85);   // the shutter
+  // the frame counter, top right: four figures
+  vec2 c0 = vec2(0.73, 0.865);
+  float n = uLeg2.w, dig = 0.0;
+  for (int k = 0; k < 4; k++) {
+    vec2 p = (u - c0 - vec2(float(k) * 0.04, 0.0)) / 0.0125;
+    if (p.x > -0.4 && p.x < 1.4 && p.y > -0.4 && p.y < 2.4) dig = max(dig, seg7(p, int(mod(floor(n / pow(10.0, float(3 - k))), 10.0))));
+  }
+  col = mix(col, vec3(0.92), dig * 0.9);
+  if (uShot.w > 0.0) {   // the clapperboard, snapping shut before the playback
+    vec2 cb = u - vec2(0.5, 0.45);
+    if (abs(cb.x) < 0.2 && cb.y > -0.13 && cb.y < 0.09) {
+      col = vec3(0.06);
+      if (abs(cb.y + 0.02) < 0.004 || (abs(cb.y + 0.07) < 0.004 && cb.x < 0.05)) col = vec3(0.85);   // chalk lines
+      vec2 dp = (cb - vec2(0.08, -0.1)) / 0.012;
+      for (int k = 0; k < 2; k++) { vec2 pk = dp - vec2(float(k) * 1.6, 0.0); if (pk.x > -0.4 && pk.x < 1.4 && pk.y > -0.4 && pk.y < 2.4) col = mix(col, vec3(0.85), seg7(pk, k == 0 ? 6 : 1)); }
+    }
+    vec2 h0 = cb - vec2(-0.2, 0.09); float an = (1.0 - uShot.w) * 0.55; h0 = mat2(cos(an), sin(an), -sin(an), cos(an)) * h0;
+    if (h0.x > 0.0 && h0.x < 0.4 && h0.y > 0.0 && h0.y < 0.045) col = step(0.5, fract((h0.x + h0.y) * 18.0)) > 0.5 ? vec3(0.92) : vec3(0.06);
+  }
+  return col;
+}
+void main() {
+  vec3 acc`],
+  ];
+  const legendFrag = () => legendEdits.reduce((s, [a, b]) => { if (!s.includes(a)) throw new Error('Clay Folk legendary shader: ' + a.slice(0, 48)); return s.replace(a, () => b); }, FRAG);
+  const builtLegend = new WeakMap();
+  function setupLegend(gl, src) {
+    const compile = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Clay Folk legendary shader: ' + gl.getShaderInfoLog(s));
+      return s;
+    };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, src ? src() : legendFrag()));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('Clay Folk legendary link: ' + gl.getProgramInfoLog(prog));
+    const u = {};
+    const count = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < count; i++) { const info = gl.getActiveUniform(prog, i); u[info.name] = gl.getUniformLocation(prog, info.name); }
+    for (const n of ['uLeg', 'uMid', 'uCandle', 'uFlame', 'uLeg2', 'uLeg3', 'uShot', 'uShots']) if (!u[n]) u[n] = null;
+    u.uRub = gl.getUniformLocation(prog, 'uRub');
+    // the animator's camera keeps its shots: the frame is copied out and drawn small into a strip of six slots
+    const bs = (type, src) => { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh; };
+    const blit = gl.createProgram();
+    gl.attachShader(blit, bs(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(blit, bs(gl.FRAGMENT_SHADER, '#version 300 es\nprecision highp float;\nuniform sampler2D T;\nuniform vec4 V;\nout vec4 o;\nvoid main() { o = texture(T, (gl_FragCoord.xy - V.xy) / V.zw); }'));
+    gl.linkProgram(blit);
+    const blitU = { T: gl.getUniformLocation(blit, 'T'), V: gl.getUniformLocation(blit, 'V') };
+    return { prog, u, tri: gl.createVertexArray(), blit, blitU };
+  }
+
   Proto.add({
     num: 61,
     name: 'Clay Folk',
@@ -813,9 +1096,16 @@ void main() {
       // Legendary and candle state. With no input these hold still: the bronze shows only its rubbed
       // nose, the Mid-Shot stays half sculpted, the scraps lie as kneaded, and the candle burns.
       let polish = 0, knead = 0, kneadTo = 0, lit = 1, lean = 0;
+      // Bronze's and Mid-Shot's toys: the bronze's rubs and flash; the animator's shots and playback. They have sets and
+      // cameras of their own (ownSet); Scrap Clay is drawn and handled as at v=282, like an ordinary folk with its scraps
+      const ownSet = legend === 1 || legend === 2;
+      let nowT = 0, flash = 0, rubbed = 0, winkAt = -9, lastRub = null, shotFlash = 0, playAt = -9, dragFrom = null, dragGone = 0;
+      const rubs = [], shots = [], rubU = new Float32Array(64);
+      let pressT0 = 0, pressFrom = null, pressMoved = 0, rubTime = 0, luck = 0, gleamAt = -9, photoAt = -9, pendingShot = false, nShots = 0;   // the bronze's luck; the camera's shots
       const midStops = [-0.02, -0.2, -0.38, -0.56, -0.8];
       let midStage = 0, midCut = midStops[0], press = 0, waggle = 0;
-      const pointerOnSet = () => [(hands.x - 0.5) * 2.75, camY + (0.5 - hands.y) * 2.75];
+      const playLen = () => shots.length ? 0.45 + Math.max(2.4, shots.length * 0.125 * 3) : 0;
+      const pointerOnSet = () => ownSet ? [(hands.x - 0.5) * 2.75 * legCam[1], camY + legCam[0] + (0.5 - hands.y) * 2.75 * legCam[1]] : [(hands.x - 0.5) * 2.75, camY + (0.5 - hands.y) * 2.75];
       let ptr = [0, -0.2];
       // a point on the head, placed on the set: the head's pose undone (see headLocal in the shader)
       const toSet = (fx, fy, fz, turn, tilt) => {
@@ -826,7 +1116,45 @@ void main() {
       let flameW = toSet(candleX, candleY + 0.39, 0.02, 0, 0);
       const pressHands = dt => {
         if (hands.inside) ptr = pointerOnSet();
-        if (legend === 1) polish += ((hands.inside ? 1 : 0) - polish) * Math.min(1, dt * 3);
+        if (legend === 1) {   // rubbing: a pressed, moving finger wears the patina through where it goes
+          if (hands.down && hands.inside && !pressT0) { pressT0 = nowT; pressFrom = [hands.x, hands.y]; pressMoved = 0; }
+          if (hands.down && pressFrom) pressMoved = Math.max(pressMoved, Math.hypot(hands.x - pressFrom[0], hands.y - pressFrom[1]));
+          if (!hands.down && pressT0) {
+            if (nowT - pressT0 < 0.25 && pressMoved < 0.03) {   // a flash photo: the bulb pops, the bronze leaps out of the dark, a polaroid slides out
+              flash = 1; photoAt = nowT; voiceOut.hit('click', 0.4); voiceOut.hit('noise', 0.06, { cutoff: 6000, dur: 0.06, at: 0.02 }); voiceOut.hit('noise', 0.04, { cutoff: 2500, dur: 0.6, at: 0.3 });
+            }
+            pressT0 = 0; pressFrom = null;
+          }
+          if (hands.down && hands.inside && pressMoved > 0.02) {
+            // each rub wears a bright patch (rubbing near one makes it grow), sparkles, and rings a note a step higher;
+            // every so many, a coin of luck lands on the plinth; three seconds of rubbing and it winks at you
+            const p = pointerOnSet();
+            if (!lastRub || Math.hypot(p[0] - lastRub[0], p[1] - lastRub[1]) > 0.05) {
+              let near = null, nd = 0.1;
+              for (const r of rubs) { const d = Math.hypot(r[0] - p[0], r[1] - p[1]); if (d < nd) { nd = d; near = r; } }
+              if (near) { near[2] = Math.min(0.32, near[2] + 0.012); near[0] += (p[0] - near[0]) * 0.2; near[1] += (p[1] - near[1]) * 0.2; }
+              else { if (rubs.length >= 16) { rubs.sort((a, b) => b[2] - a[2]); rubs.pop(); } rubs.push([p[0], p[1], 0.15, 0]); }
+              if (lastRub) rubTime += Math.min(0.1, dt * 3);
+              lastRub = p; rubbed++;
+              if (rubbed % 3 === 0) voiceOut.note(voiceRoot + 12 + mode[Math.floor(rubbed / 3) % 5] + 12 * (Math.floor(rubbed / 15) % 2), { dur: 0.35, vel: 0.06, wave: 'sine' });
+              if (rubbed % 10 === 0 && luck < 8) { luck++; voiceOut.note(voiceRoot + 24 + mode[luck % 5], { dur: 0.15, vel: 0.12, wave: 'triangle' }); voiceOut.hit('click', 0.12, { at: 0.05 }); }
+              if (rubTime >= 3) { rubTime = 0; winkAt = nowT; gleamAt = nowT + 0.5; [0, 4, 7, 12].forEach((k, i) => voiceOut.note(voiceRoot + 12 + k, { dur: 1.2, vel: 0.12, wave: 'sine', at: 0.25 + i * 0.1 })); }
+            }
+          } else lastRub = null;
+          for (const r of rubs) if (r[3] < 1) r[3] = Math.min(1, r[3] + dt * 2) || 0.001;
+          for (const r of rubs) r[3] = Math.min(1, r[3] + dt * 2.5);
+          flash = Math.max(0, flash - dt * 3.5);
+        }
+        if (legend === 2) {   // the animator: a drag poses it; letting go shoots the frame
+          if (hands.down && hands.inside) { if (!dragFrom) { dragFrom = [hands.x, hands.y]; dragGone = 0; } dragGone = Math.max(dragGone, Math.hypot(hands.x - dragFrom[0], hands.y - dragFrom[1])); }
+          else if (dragFrom) {
+            if (dragGone > 0.03 && nowT - playAt > playLen()) { shots.push([yaw, roll, peer, swap]); if (shots.length > 6) shots.shift(); pendingShot = true; voiceOut.hit('click', 0.4); voiceOut.hit('noise', 0.05, { cutoff: 5000, dur: 0.05, at: 0.03 }); }
+            dragFrom = null;
+          }
+          if (hands.down && hands.inside && dragFrom && dragGone > 0.03 && dragGone < 0.06 && !shots.pose) { swap = (Math.max(0, swap) + 1) % mouthSet.length; shots.pose = true; }   // a fresh face for each pose
+          if (!hands.down) shots.pose = false;
+          shotFlash = Math.max(0, shotFlash - dt * 6);
+        }
         if (legend === 2) { // the next frame is thumbed on toward its stop; a hand near the set makes the tool twitch
           midCut += (midStops[midStage] - midCut) * Math.min(1, dt * 4);
           press = Math.max(0, press - dt * 2.5);
@@ -838,24 +1166,17 @@ void main() {
           lean += ((hands.inside && near < 0.6 ? Math.sign(flameW[0] - ptr[0]) * (0.6 - near) * 0.9 : 0) - lean) * Math.min(1, dt * 5);
         }
         for (const poke of hands.taps()) {
-          const tp = [(poke.x - 0.5) * 2.75, camY + (0.5 - poke.y) * 2.75];
+          const tp = ownSet ? [(poke.x - 0.5) * 2.75 * legCam[1], camY + legCam[0] + (0.5 - poke.y) * 2.75 * legCam[1]] : [(poke.x - 0.5) * 2.75, camY + (0.5 - poke.y) * 2.75];
           if (candle && Math.hypot(tp[0] - flameW[0], tp[1] - flameW[1]) < 0.22) {
             // blow the candle out, or strike a match and light it again
             if (lit > 0.5) { lit = 0; voiceOut.hit('noise', 0.08); voiceOut.note(voiceRoot + 12 + mode[3], { dur: 0.5, vel: 0.14, wave: 'sine' }); voiceOut.note(voiceRoot + 12 + mode[1], { dur: 0.6, vel: 0.12, wave: 'sine', at: 0.14 }); }
             else { lit = 1; voiceOut.hit('click', 0.25); [0, 2, 4].forEach((k, i) => voiceOut.note(voiceRoot + 12 + mode[k], { dur: 0.35, vel: 0.13, wave: 'triangle', at: 0.05 + i * 0.09 })); }
             continue;
           }
-          if (legend === 1) { // a bronze bell, struck
-            voiceOut.note(voiceRoot - 12, { dur: 2.6, vel: 0.26, wave: 'sine', pan: (poke.x - 0.5) * 0.5 });
-            voiceOut.note(voiceRoot - 12 + 19, { dur: 1.8, vel: 0.1, wave: 'sine' });
-            voiceOut.note(voiceRoot + 12 + 3, { dur: 0.9, vel: 0.05, wave: 'sine' });
-            polish = 1; ptr = tp;
+          if (legend === 1) continue;   // (a bronze's flash fires on a short, still release: see pressHands)
+          if (legend === 2 && poke.x < 0.24 && poke.y < 0.24) {   // the red light: the clapper, then the shots played back
+            if (shots.length) { playAt = nowT; voiceOut.hit('click', 0.5, { at: 0.38 }); voiceOut.hit('noise', 0.08, { cutoff: 4000, dur: 0.05, at: 0.38 }); }
             continue;
-          }
-          if (legend === 2) { // press on the next frame: the finished clay creeps across the raw lump, then it's squashed back for a new shot
-            midStage = (midStage + 1) % midStops.length; press = 1;
-            if (midStage) { voiceOut.hit('click', 0.3); voiceOut.note(voiceRoot + mode[midStage], { dur: 0.18, vel: 0.16, wave: 'triangle', at: 0.04 }); }
-            else { voiceOut.hit('noise', 0.12); voiceOut.note(voiceRoot + 12, { dur: 0.3, vel: 0.12, wave: 'sine' }); voiceOut.note(voiceRoot, { dur: 0.4, vel: 0.12, wave: 'sine', at: 0.12 }); }
           }
           if (legend === 3) { // knead the scraps: the bands slide round to new colours
             kneadTo += 1.7;
@@ -869,12 +1190,13 @@ void main() {
           voiceOut.note(voiceRoot + mode[(swap + 3) % mode.length] - 12, { dur: 0.22, vel: 0.22, wave: 'sine', at: 0.09 });
           if (top[2] === 13) { propV += 9; voiceOut.note(voiceRoot + 12 + mode[2], { dur: 0.4, vel: 0.12, wave: 'sine', at: 0.05 }); }
         }
-        if (hands.down && hands.inside) {
-          const ty = (hands.x - 0.5) * 0.9, tr = -(hands.x - 0.5) * 0.18 + (0.5 - hands.y) * 0.1;
+        if (hands.down && hands.inside && legend !== 1) {   // (a bronze can't turn its head)
+          const big = legend === 2 ? 2 : 1;   // the animator's pose goes much further
+          const ty = Math.max(-0.65, Math.min(0.65, (hands.x - 0.5) * 0.9 * big)), tr = -(hands.x - 0.5) * 0.18 * big + (0.5 - hands.y) * 0.1 * (legend === 2 ? 2.8 : 1);
           const ease = Math.min(1, dt * 6);
           yaw += (ty - yaw) * ease; roll += (tr - roll) * ease;
           peer += ((hands.y - 0.5) * 0.4 - peer) * ease;
-          hold = 1.2;
+          hold = legend === 2 ? 1e9 : 1.2;   // an animator's pose stays put
           if (!wasDown) voiceOut.hit('blip', 0.12, { freq: 520 });
         } else if (hold > 0) hold = Math.max(0, hold - dt);
         else {
@@ -892,11 +1214,26 @@ void main() {
       const irisLin = lin(hex(iris[2])), iris2Lin = lin(hex(iris2)), palLin = lin(hex(palCol));
       // a flat cap's tweed (from the voice's word, so no other roll moves): browns, greys, greens, never white
       const capLin = lin(hex(['#7a4a28', '#77736c', '#66702e', '#4a6a44', '#9a7442', '#3e3f45', '#8c4a2c', '#50606c'][(tailWord >>> 9) % 8]));
-      let G = built.get(gl);
-      if (!G) built.set(gl, G = setup(gl));
-      const draw = t => {
+      let G = ownSet ? builtLegend.get(gl) : built.get(gl);
+      if (!G) { if (ownSet) builtLegend.set(gl, G = setupLegend(gl)); else built.set(gl, G = setup(gl)); }
+      // a Legendary's camera (lift, zoom) and light: the bronze backs off to show its plinth, under one spotlight
+      const legCam = legend === 1 ? [-0.8, 1.3] : [0, 1];
+      // the animator's shots: a full-size copy of the frame and a strip of six small ones (only a Mid-Shot makes these)
+      const shotFx = legend === 2 ? (() => {
+        const tex = (w, h) => { const t2 = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t2); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v); return t2; };
+        const full = tex(S, S), atlas = tex(768, 128), fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, atlas, 0);
+        gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        return { full, atlas, fbo };
+      })() : null;
+      const shotTex = () => shotFx.atlas;
+      const spotN = (() => { const v = [0.12, 0.96, 0.42], l = Math.hypot(...v); return v.map(x => x / l); })();
+      const draw = t0 => {
+        // the Mid-Shot moves on twos (a pose held for two frames, ten a second), with a little boil between poses
+        const t = legend === 2 ? Math.floor(t0 * 10) / 10 : t0, pose = Math.floor(t0 * 10);
+        const boil = legend === 2 ? (Math.sin(pose * 12.9898) * 43758.5453 % 1) * 0.012 : 0;
         const ph = ((t + blinkPhase) % blinkEvery) / 0.18;
-        const blink = ph < 1 ? Math.sin(ph * Math.PI) : 0;
+        const wk = (t0 - winkAt) / 0.5, blink = legend === 1 ? (wk > 0 && wk < 1 ? Math.sin(wk * Math.PI) : 0) : ph < 1 ? Math.sin(ph * Math.PI) : 0;   // a bronze never blinks, until it's been rubbed enough
         gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, S, S); // the shared canvas, bottom-left square
         [gl.DEPTH_TEST, gl.BLEND, gl.CULL_FACE, gl.SCISSOR_TEST].forEach(f => gl.disable(f));
         gl.colorMask(true, true, true, true);
@@ -910,15 +1247,23 @@ void main() {
         gl.uniform3fv(u.uCloth, cloth1); gl.uniform3fv(u.uCloth2, cloth2);
         gl.uniform3fv(u.uHairC, hairLin);
         gl.uniform3fv(u.uIris, irisLin); gl.uniform3fv(u.uIris2, iris2Lin); gl.uniform3fv(u.uPal, palLin); gl.uniform3fv(u.uCap, capLin);
-        gl.uniform3fv(u.uKey, keyN); gl.uniform3fv(u.uKeyC, keyC); gl.uniform3fv(u.uFillC, fillC);
+        if (legend === 1) { gl.uniform3fv(u.uKey, spotN); gl.uniform3f(u.uKeyC, 1.5, 1.32, 1.08); gl.uniform3f(u.uFillC, 0.05, 0.06, 0.07); }
+        else { gl.uniform3fv(u.uKey, keyN); gl.uniform3fv(u.uKeyC, keyC); gl.uniform3fv(u.uFillC, fillC); }
         const sq = squish > 0 ? 0.05 * Math.sin(squish * Math.PI) : 0;
         gl.uniform4f(u.uHead, sq ? sculptW * (1 + sq) : sculptW, sq ? sculptH * (1 - sq) : sculptH, jaw, noseKind);
         gl.uniform4fv(u.uJaw, jawLin); gl.uniform4fv(u.uCarve, carve);
         gl.uniform4f(u.uEye, eyeKind, eyeSize, peer || yaw ? lookX + yaw * 0.5 : lookX, peer ? lookY - peer : lookY);
-        if (swap < 0) gl.uniform4f(u.uMouth, mouthKind, mouthW, mouthCurve, mouthOpen);
+        // the Mid-Shot talks: its replacement mouths swapped in a little phrase, a new one every few poses
+        // playing back: the shots, a pose every two frames, twice through
+        const pt0 = t0 - playAt - 0.45, play = legend === 2 && shots.length && pt0 >= 0 && t0 - playAt < playLen() ? shots[Math.floor(pt0 * 8) % shots.length] : null;
+        if (play) { yaw = play[0]; roll = play[1]; peer = play[2]; swap = play[3]; }
+        const talk = legend === 2 && swap < 0 && !shots.length ? [0, 2, 0, 4, 1, 3, 2, 0, 0, 0][Math.floor(t0 * 3.3) % 10] : -1;
+        if (talk >= 0) gl.uniform4f(u.uMouth, mouthSet[talk][0], mouthW, mouthSet[talk][1], mouthSet[talk][2]);
+        else if (swap < 0) gl.uniform4f(u.uMouth, mouthKind, mouthW, mouthCurve, mouthOpen);
         else gl.uniform4f(u.uMouth, mouthSet[swap][0], mouthW, mouthSet[swap][1], mouthSet[swap][2]);
         gl.uniform4f(u.uMisc, { Rolled: 0, Monobrow: 1, None: 2 }[brows[0]], browTilt, top[2], knitKind);
-        const idleTurn = 0.12 * Math.sin(t * 0.35 + sway), idleTilt = 0.04 * Math.sin(t * 0.5 + sway * 1.3);
+        const still = legend === 1 ? 0 : 1;   // a bronze holds its pose
+        const idleTurn = still * 0.12 * Math.sin(t * 0.35 + sway) + boil, idleTilt = still * 0.04 * Math.sin(t * 0.5 + sway * 1.3) - boil * 0.5;
         gl.uniform4f(u.uMore, ears, finish, yaw ? idleTurn + yaw : idleTurn, roll ? idleTilt + roll : idleTilt);
         gl.uniform4f(u.uFace, beard[2], acc[2], pal[2], cheeks);
         const turnNow = yaw ? idleTurn + yaw : idleTurn, tiltNow = roll ? idleTilt + roll : idleTilt;
@@ -930,10 +1275,38 @@ void main() {
         gl.uniform4f(u.uFlame, flameW[0], flameW[1], flameW[2], candle ? lit * flick : 0);
         gl.uniform4f(u.uLook, light[2], paper[2], propSpin + prop, darkClay);
         gl.uniform4fv(u.uBuild, buildU); gl.uniform4fv(u.uBuild2, build2U);
-        gl.drawArrays(gl.TRIANGLES, 0, 3); gl.bindVertexArray(null);
+        if (ownSet) {
+          gl.uniform4f(u.uLeg2, t0, legCam[0] + (play ? (Math.sin(pose * 7.1) * 0.006) : 0), legCam[1], legend === 1 ? luck : nShots ? nShots : 140 + pose);
+          const playing = !!play, wk = (t0 - winkAt) / 0.9, gl0 = (t0 - gleamAt) / 0.8;
+          gl.uniform4f(u.uLeg3, legend === 1 ? flash : shotFlash, legend === 1 ? (wk > 0 && wk < 1 ? Math.sin(wk * Math.PI) : 0) : playing ? 1 : 0, legend === 1 ? (gl0 > 0 && gl0 < 1 ? -2.5 + gl0 * 5 : -9) : 0, legend === 1 ? (t0 - photoAt < 2.6 ? t0 - photoAt : 0) : pendingShot ? 1 : 0);
+          if (legend === 1) { rubU.fill(0); rubs.forEach((r, i) => rubU.set(r, i * 4)); gl.uniform4fv(u.uRub, rubU); }
+          if (legend === 2) {
+            const clap = t0 - playAt < 0.45 && shots.length ? (t0 - playAt) / 0.45 : 0;
+            gl.uniform4f(u.uShot, Math.min(6, nShots), (nShots + 5) % 6, play ? (nShots - shots.length + Math.floor(pt0 * 8) % shots.length) % 6 : -1, clap);
+            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shotTex()); gl.uniform1i(u.uShots, 0);
+          }
+        }
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (legend === 2 && pendingShot) {
+          // the shot just taken (drawn without the viewfinder): copied out, drawn small into the next slot of the strip,
+          // then the frame drawn again with the viewfinder and the shutter
+          const fx = shotFx;
+          gl.bindTexture(gl.TEXTURE_2D, fx.full); gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, S, S);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fx.fbo); gl.viewport((nShots % 6) * 128, 0, 128, 128);
+          gl.useProgram(G.blit); gl.uniform1i(G.blitU.T, 0); gl.uniform4f(G.blitU.V, (nShots % 6) * 128, 0, 128, 128);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, S, S); gl.useProgram(G.prog);
+          nShots++; pendingShot = false; shotFlash = 1;
+          gl.uniform4f(u.uLeg2, t0, legCam[0], legCam[1], nShots);
+          gl.uniform4f(u.uLeg3, 1, 0, 0, 0);
+          gl.uniform4f(u.uShot, Math.min(6, nShots), (nShots + 5) % 6, -1, 0);
+          gl.bindTexture(gl.TEXTURE_2D, fx.atlas);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+        }
+        gl.bindVertexArray(null);
       };
       draw(0);
-      return (t, dt) => { const step = dt || 0.05; pressHands(step); prop += propV * step; draw(t); };
+      return (t, dt) => { const step = dt || 0.05; nowT = t; pressHands(step); prop += propV * step; draw(t); };
     },
   });
 })();

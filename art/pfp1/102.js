@@ -307,7 +307,241 @@ Proto.add({
     let moonAt = -9, legAt = -9, legTap = [16, 16], nodes = null, lastNear = -1, nearAt = -9, wasIn = false;
     const sparks = [];
     const moonAt0 = [5.3, 6.2], moonNow = [5.3, 6.2];
+    // ---------- the legendaries as 1/1s (2026-10-19) ----------
+    // Each is a picture of its own drawn dot by dot, not the night-perch lemur remade: the dead panel's stuck sub-pixels
+    // tracing a neon lemur, the panel's own test card with a lemur as its test picture, and the panel pressed into negative
+    // as an X-ray of a lemur. The glass faults (Screen) still show over them. A type set to false here falls back to its
+    // earlier look (legendPaint).
+    const NEW_LEGEND = { 'Dead Pixel': true, 'Test Card': true, 'Inverted': true };
+    const newLeg = legend !== 'None' && !!NEW_LEGEND[legend];
+    const plot = (x, y, fn) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < N && y < N) fn(x, y); };
+    const seg = (x0, y0, x1, y1, fn) => { const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 1.5)); for (let k = 0; k <= n; k++) plot(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n, fn); };
+    const oval = (cx, cy, rx, ry, a0, a1, fn) => { const n = Math.ceil(Math.max(rx, ry) * Math.abs(a1 - a0) * 1.4) + 2; for (let k = 0; k <= n; k++) { const a = a0 + (a1 - a0) * k / n; plot(cx - 0.5 + Math.cos(a) * rx, cy - 0.5 + Math.sin(a) * ry, fn); } };
+    // the 3 x 5 dot glyphs the panel writes with
+    const GLYPH = { 0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111', 4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001010010', 8: '111101111101111', 9: '111101111001111', R: '110101110101101', ':': '000010000010000' };
+    const glyph = (ch, x0, y0, col) => { const g = GLYPH[ch]; for (let k = 0; k < 15; k++) if (g[k] === '1') dot(x0 + k % 3, y0 + ((k / 3) | 0), col); };
+
+    // ===== Dead Pixel: the panel is dead but for one stuck channel, and the stuck sub-pixels trace a neon sign: a lemur's
+    // face over the word LEMUR, its ringed tail curling up the side (beside a pole, if its Pose is Clinging), buzzing,
+    // lighting the brick wall behind it. Its toy: tap any tube or letter to switch it off or on, and drag across the sign
+    // to sweep the stuck colour through red, green and blue. Switch every tube off and the sign relights itself. =====
+    const NEON = new Int8Array(N * N).fill(-1), NEAR = new Float32Array(N * N).fill(99), NID = new Int16Array(N * N).fill(-1);
+    const GL5 = { L: '100100100100111', E: '111100111100111', M: '101111101101101', U: '101101101101111', R: '110101110101101' };
+    let tubes = 0;
+    if (newLeg && legend === 'Dead Pixel') {
+      const tube = s => (x, y) => { NEON[y * N + x] = s; };
+      seg(8, 9, 5, 1.6, tube(0)); seg(5, 1.6, 12.4, 6.2, tube(0)); seg(23, 9, 26, 1.6, tube(0)); seg(26, 1.6, 18.6, 6.2, tube(0));
+      oval(15.5, 10.6, 4.4, 4.4, 3.75, 5.67, tube(0));
+      for (const [a, b, c2, d] of [[8, 9, 4.4, 12.6], [4.4, 12.6, 5.4, 16.4], [5.4, 16.4, 11.2, 20.4], [11.2, 20.4, 15.5, 22.2]]) { seg(a, b, c2, d, tube(1)); seg(31 - a, b, 31 - c2, d, tube(1)); }
+      oval(11.2, 13, 2.6, 2.6, 0, 6.2832, tube(5)); oval(20.8, 13, 2.6, 2.6, 0, 6.2832, tube(5));
+      for (const [x, y] of [[10, 12], [11, 12], [10, 11], [11, 11], [20, 12], [21, 12], [20, 11], [21, 11]]) NEON[y * N + x] = 6;
+      for (const [x, y] of [[15, 18], [16, 18], [15, 19], [16, 19]]) NEON[y * N + x] = 0;
+      seg(8.2, 9.2, 13, 9.4, tube(2)); seg(22.8, 9.2, 18, 9.4, tube(2));
+      ['L', 'E', 'M', 'U', 'R'].forEach((ch, q) => { for (let k = 0; k < 15; k++) if (GL5[ch][k] === '1') NEON[(25 + ((k / 3) | 0)) * N + 6 + q * 4 + k % 3] = 7; });
+      for (let k = 0; k <= 30; k++) { const u = k / 30, x = 28 + Math.sin(u * 2.6) * 1.6, y = 24 - u * 16; if (Math.floor(k / 3) % 2 === 0) plot(x, y, tube(3)); }
+      for (let k = 0; k <= 10; k++) { const a = -1.6 - k * 0.5, r = 2.2 - k * 0.12; if (k % 3 !== 2) plot(27.5 + Math.cos(a) * r, 6.5 + Math.sin(a) * r, tube(3)); }
+      if (pose !== 'Sun Salute') for (let y = 0; y < N; y++) plot(1, y, tube(4));
+      for (let i = 0; i < N * N; i++) if (NEON[i] >= 0) { const x = i % N, y = (i / N) | 0; for (let b = -7; b <= 7; b++) for (let a = -7; a <= 7; a++) { const xx = x + a, yy = y + b; if (xx >= 0 && yy >= 0 && xx < N && yy < N) NEAR[yy * N + xx] = Math.min(NEAR[yy * N + xx], Math.hypot(a, b)); } }
+      // each tube is its own run of glass (the tail's dashes all one tube): number them
+      let tailId = -1;
+      for (let i = 0; i < N * N; i++) {
+        if (NEON[i] < 0 || NID[i] >= 0) continue;
+        if (NEON[i] === 3 && tailId >= 0) { NID[i] = tailId; continue; }
+        const id = tubes++, stack = [i]; NID[i] = id; if (NEON[i] === 3) tailId = id;
+        while (stack.length) { const j = stack.pop(), x = j % N, y = (j / N) | 0; for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const xx = x + a, yy = y + b; if (xx < 0 || yy < 0 || xx >= N || yy >= N) continue; const k2 = yy * N + xx; if (NEON[k2] >= 0 && NID[k2] < 0 && (NEON[k2] === 3) === (NEON[i] === 3) && (NEON[k2] === 7) === (NEON[i] === 7)) { NID[k2] = id; stack.push(k2); } } }
+      }
+    }
+    const tubeOff = new Uint8Array(Math.max(1, tubes)), tubeAt = new Float32Array(Math.max(1, tubes)).fill(-9);
+    let neonCh = -1, relightAt = -9, dpDown = null, dpMoved = 0, lgDown = null;
+    function neonLemur(t) {
+      // a press dragged across the sign sweeps the colour (a short tap toggles a tube: legendTap)
+      if (press && !dpDown) { dpDown = press.slice(); dpMoved = 0; }
+      if (press && dpDown) { dpMoved = Math.max(dpMoved, Math.hypot(press[0] - dpDown[0], press[1] - dpDown[1])); if (dpMoved > 2) { const nc = Math.min(2, Math.floor(press[0] / N * 3)); if (nc !== neonCh) { neonCh = nc; c.sound.note(callRoot + 12 + callScale[nc * 2], { dur: 0.06, vel: 0.06, wave: 'square', cutoff: 3000 }); } } }
+      if (!press && dpDown) dpDown = null;
+      // all dark: after a beat the sign relights itself, tube by tube
+      if (relightAt > 0 && t >= relightAt) for (let k = 0; k < tubes; k++) if (tubeOff[k] && t >= relightAt + k * 0.09) { tubeOff[k] = 0; tubeAt[k] = t; if (k === tubes - 1) relightAt = -9; c.sound.note(callRoot + callScale[k % 5] + 12, { dur: 0.05, vel: 0.05, wave: 'square', cutoff: 2600 }); }
+      const ch = neonCh >= 0 ? neonCh : (dpCh + dpRot) % 3, ch2 = (ch + 1) % 3, pure = k => k === 2 ? [50, 70, 255] : [k === 0 ? 255 : 0, k === 1 ? 255 : 0, 0];
+      const hue = pure(ch), eyeHue = pure(ch2);
+      // which tubes are lit: each buzzes off now and then; one just switched sputters before it settles
+      const buzz = (id, s) => { const n = Math.floor(t * 12) + id * 7; let z = Math.imul(n ^ 0x5bd1e995, 0x2c1b3c6d) >>> 0; z = (z ^ (z >>> 15)) >>> 0; return s === 3 ? z % 23 > 2 : z % 61 > 0; };
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const j = y * N + x, s = NEON[j], id = NID[j];
+        if (s >= 0) {
+          const sp = t - tubeAt[id] < 0.35 ? Math.floor((t - tubeAt[id]) * 40) % 3 === 0 : false;
+          const lit = (tubeOff[id] ? sp : !sp) && buzz(id, s);
+          if (lit) { dot(x, y, s === 6 ? [255, 255, 255] : s === 5 ? eyeHue : s === 4 ? hue.map(v => v * 0.55) : hue); continue; }
+        }
+        // the wall behind the sign: bricks lit only as far as the glow of the lit tubes reaches
+        const d = NEAR[j], row = y >> 2, mortar = y % 4 === 3 || (x + (row % 2) * 3) % 6 === 0;
+        const dark = tubes ? tubeOff.reduce((a, v) => a + v, 0) / tubes : 0;
+        const g = (Math.max(0, 1 - d / 5) ** 1.5 * (mortar ? 0.06 : 0.26) + (d < 1.5 ? 0.16 : 0)) * (1 - dark * 0.8);
+        const st = ((Math.imul(x + 1, 0x9e3779b1) ^ Math.imul(y + 7, 0x85ebca6b)) >>> 26) === 0 && d > 6;
+        dot(x, y, s >= 0 ? [hue[0] * 0.08 + 6, hue[1] * 0.08 + 6, hue[2] * 0.08 + 8] : st ? pure((x + y) % 3) : [hue[0] * g + 3, hue[1] * g + 3, hue[2] * g + 6]);
+      }
+    }
+
+    // ===== Test Card: the panel's own line-up card, a ring-tailed lemur sitting for it in the centre circle. Its toy: a
+    // tuner. Drag across the picture to tune it: off station the picture tears, rolls, loses its colour and fills with
+    // snow; find the station and it locks clean (the channel number is in the box under the sitter). =====
+    const BARS7 = [[236, 236, 236], [236, 236, 20], [20, 236, 236], [20, 236, 20], [236, 20, 236], [236, 20, 20], [20, 20, 236]];
+    // the sitter, cell by cell: g grey cap and ears, w white face and ear fringe, k black eye patches and nose, a amber eye,
+    // p pupil, m muzzle grey, s shade under the jaw
+    const SITTER = [
+      '.....gg..............gg.....', '.....gwg............gwg.....', '.....gwwgggggggggggggwwg....', '......ggggggggggggggggg.....',
+      '.......gggggggggggggggg.....', '......wwwwwggggggwwwwww.....', '.....wwkkkwwwggwwwkkkww.....', '.....wkkaakwwwwwwkaakkw.....',
+      '.....wkkapkwwwwwwkpakkw.....', '......wkkkwwwwwwwwkkkw......', '.......wwwwwwmmwwwwww.......', '.........wwwmmmmwww.........',
+      '..........wwmkkmww..........', '...........wwkkww...........', '............swws............', '.............ss.............',
+    ];
+    const station = 0.18 + (parseInt(c.hash.slice(58, 62), 16) % 640) / 1000;
+    let tune = station, tuneRoll = 0;
+    function testCard(t) {
+      if (press) { const nt = Math.max(0, Math.min(1, press[0] / N)); if (Math.abs(nt - station) < 0.03 && Math.abs(tune - station) >= 0.03) c.sound.note(83, { dur: 0.5, vel: 0.06, wave: 'sine' }); tune = nt; }
+      const off = Math.abs(tune - station), locked = off < 0.03, bad = locked ? 0 : Math.min(1, (off - 0.03) * 3.2);
+      tuneRoll = locked ? Math.round(tuneRoll * 0.8) : tuneRoll + bad * 0.9;
+      const since = t - legAt, roll = (since < 0.9 ? Math.round((1 - since / 0.9) ** 2 * 32) : 0) + Math.floor(tuneRoll);
+      const tmp = new Array(N * N), blink = (t + blinkOff) % blinkEvery < 0.14;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const d = Math.hypot(x + 0.5 - 16, y + 0.5 - 16.5);
+        let col;
+        if (x === 0 || x === 31) col = (y >> 1) % 2 ? [236, 236, 236] : [14, 14, 18];                      // castellations up the sides
+        else if (d < 13) {
+          if (y < 7) col = BARS7[Math.min(6, Math.floor((x - 3) * 7 / 26))];                                    // colour bars across the top of the circle
+          else if (y > 25) col = [[16, 16, 16], [70, 70, 70], [128, 128, 128], [186, 186, 186], [240, 240, 240]][Math.min(4, Math.max(0, Math.floor((x - 9) / 3)))];   // grey steps
+          else col = [32, 30, 40];
+        } else col = (x % 4 === 2 || y % 4 === 2) ? [168, 168, 174] : [112, 112, 118];                         // the grid
+        if (Math.abs(d - 13.4) < 0.55) col = [250, 250, 250];
+        tmp[y * N + x] = col;
+      }
+      const TC = { g: [124, 122, 132], w: [244, 242, 236], k: [22, 18, 26], a: [255, 156, 18], p: [40, 16, 10], m: [168, 164, 174], s: [92, 88, 100] };
+      SITTER.forEach((row, r) => { for (let q = 0; q < row.length; q++) { let ch = row[q]; if (ch === '.') continue; if (blink && (ch === 'a' || ch === 'p')) ch = r === 8 ? 'k' : 'w'; const x = q + 2, y = r + 8; if (x < N && y < N) tmp[y * N + x] = TC[ch]; } });
+      // locked on: a glint in its eyes
+      if (locked && !blink && Math.sin(t * 3) > 0) { tmp[15 * N + 8] = [255, 255, 255]; tmp[15 * N + 21] = [255, 255, 255]; }
+      for (let y = 0; y < N; y++) {
+        const sy = ((y + roll) % N + N) % N, tear = Math.round(Math.sin(y * 0.9 + t * 17) * bad * 5 + Math.sin(y * 0.23 - t * 3) * bad * 3);
+        for (let x = 0; x < N; x++) {
+          let col = tmp[sy * N + ((x - tear) % N + N) % N];
+          if (bad > 0) {
+            const gy = col[0] * 0.3 + col[1] * 0.59 + col[2] * 0.11, lose = Math.min(1, bad * 1.6);
+            col = col.map(v => v + (gy - v) * lose);
+            let n = Math.imul(x * 0x9e37 ^ y * 0x7f4b ^ Math.floor(t * 30) * 0x3c6e, 0x2c1b3c6d) >>> 0; n = ((n ^ (n >>> 15)) >>> 0) / 4294967296;
+            if (n < bad * 0.85) { const v = 40 + ((n * 1e4) % 1) * 200; col = [v, v, v]; }
+          }
+          dot(x, y, col);
+        }
+      }
+      // the box under the sitter: the channel it's on, and a lamp that lights when it's locked
+      const chn = Math.round(2 + tune * 67), by = 24;
+      for (let y = by; y < by + 7 && y < N; y++) for (let x = 9; x < 23; x++) dot(x, y, [10, 10, 14]);
+      glyph(String(Math.floor(chn / 10)), 11, by + 1, [240, 240, 240]); glyph(String(chn % 10), 15, by + 1, [240, 240, 240]);
+      for (const [x, y] of [[20, by + 2], [20, by + 3], [19, by + 2], [19, by + 3]]) dot(x, y, locked ? [40, 255, 90] : [90, 20, 20]);
+    }
+
+    // ===== Inverted: pressed into negative, the panel shows the lemur as a photo negative (a pale night, a dark-masked
+    // face, blue eyes, its ringed tail flipped), and under the scanner's beam as an X-ray: its bones, its heart. Its toy:
+    // drag the scanner across it to see what's under the fur, and tap its heart to make it race. =====
+    const XB = new Uint8Array(N * N), XS = new Uint8Array(N * N), XT = new Float32Array(N * N);
+    if (newLeg && legend === 'Inverted') {
+      const soft = (x, y) => { XS[y * N + x] = 1; }, bone = v => (x, y) => { XB[y * N + x] = Math.max(XB[y * N + x], v); };
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const hd = ((x + 0.5 - 15.5) / 5.4) ** 2 + ((y + 0.5 - 8) / 5.2) ** 2, bd = ((x + 0.5 - 15.5) / 6.6) ** 2 + ((y + 0.5 - 20.5) / 7.8) ** 2;
+        if (hd < 1 || bd < 1) soft(x, y);
+      }
+      for (const [x0, y0, x1, y1] of [[10.5, 5, 9, 1.5], [11.5, 4, 9.5, 1.5], [20.5, 5, 22, 1.5], [19.5, 4, 21.5, 1.5]]) seg(x0, y0, x1, y1, soft);
+      const tailAt = u => { const a = 1.6 - u * 5.2, r = 8.5 - u * 5; return [23 + Math.cos(a) * r * 0.7 + u * 2, 22 - u * 8 + Math.sin(a) * r * 0.5]; };
+      for (let k = 0; k <= 60; k++) { const [x, y] = tailAt(k / 60); for (const dx of [0, 1]) plot(x + dx, y, (xx, yy) => { if (!XS[yy * N + xx]) XT[yy * N + xx] = k / 60 + 0.001; XS[yy * N + xx] = 1; }); }
+      oval(15.5, 6.8, 3.9, 3.2, 3.3, 6.12, bone(2));
+      oval(13.6, 8.4, 1.6, 1.6, 0, 6.2832, bone(2)); oval(17.4, 8.4, 1.6, 1.6, 0, 6.2832, bone(2));
+      seg(14.4, 10.2, 15.2, 13, bone(2)); seg(16.6, 10.2, 15.8, 13, bone(2)); seg(15.5, 10.4, 15.5, 12.4, bone(1));
+      seg(11.8, 8, 11.6, 10, bone(1)); seg(19.2, 8, 19.4, 10, bone(1));
+      for (let y = 14; y <= 26; y++) plot(15.5, y, bone(y % 2 ? 2 : 1));
+      for (let r = 0; r < 3; r++) { const y = 15.8 + r * 2.2, w = 4.4 - Math.abs(r - 1) * 0.7; for (const sd of [-1, 1]) for (let k = 0; k <= 8; k++) { const u = k / 8; plot(15.5 + sd * (0.8 + u * w), y + Math.sin(u * 2.4) * 1.4 - 0.3, bone(1)); } }
+      oval(15.5, 26.4, 3.4, 1.6, 3.4, 6.0, bone(2));
+      seg(11, 14.6, 9.4, 19.6, bone(2)); seg(9.4, 19.6, 11.2, 23.6, bone(1)); seg(20, 14.6, 21.6, 19.6, bone(2)); seg(21.6, 19.6, 19.8, 23.6, bone(1));
+      for (const [x, y] of [[11.6, 24.4], [12.4, 24.6], [19.4, 24.4], [18.6, 24.6]]) plot(x, y, bone(1));
+      seg(12.6, 27, 10.2, 29.6, bone(2)); seg(10.2, 29.6, 14, 30.6, bone(1)); seg(18.4, 27, 20.8, 29.6, bone(2)); seg(20.8, 29.6, 17, 30.6, bone(1));
+      for (let k = 0; k <= 32; k++) if (k % 2 === 0) { const [x, y] = tailAt(k / 32); plot(x + 0.5, y, bone(k % 4 ? 1 : 2)); }
+    }
+    let raceAt = -9, beatPh = 0, lastXT = 0, ringsAt = [];
+    const xStars = []; for (let i = 0; i < 18; i++) { const z = (Math.imul(i + 1, 0x9e3779b1) ^ parseInt(c.hash.slice(10, 18), 16)) >>> 0, z2 = Math.imul(z ^ (z >>> 15), 0x2c1b3c6d) >>> 0; xStars.push([z2 % 32, (z2 >>> 8) % 30, ((z2 >>> 16) % 628) / 100]); }
+    function xray(t) {
+      const dt = Math.max(0, Math.min(0.1, t - lastXT)); lastXT = t;
+      const racing = t - raceAt < 3.5, rate = racing ? 15 : 7.2; beatPh += dt * rate;
+      const since = t - legAt, flash = since < 0.7 ? 1 - since / 0.7 : 0, beat = Math.max(0, Math.sin(beatPh)) ** 6 + Math.max(0, Math.sin(beatPh - 0.9)) ** 8 * 0.6;
+      // the scanner: where the pointer is, or sweeping slowly by itself; the tube's flash shows the whole skeleton at once
+      const sx = torch ? torch[0] : 16 + Math.sin(t * 0.5) * 11, half = 6.5, scan = (t * 9) % 48 - 8;
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const i = y * N + x, ins = Math.abs(x + 0.5 - sx) < half || flash > 0.25, grain = (Math.imul(x * 73856093 ^ y * 19349663 ^ Math.floor(t * 8) * 83492791, 0x2c1b3c6d) >>> 28) / 16;
+        let col;
+        if (ins) {
+          // under the scanner: the X-ray, black film, the body a faint blue ghost, the bones glowing white
+          const vig = 1 - Math.hypot(x + 0.5 - 16, y + 0.5 - 16) / 30;
+          col = [4 + 8 * vig + grain * 6, 8 + 12 * vig + grain * 6, 20 + 24 * vig + grain * 8];
+          if (XS[i]) { const edge = !XS[i - 1] || !XS[i + 1] || !XS[i - N] || !XS[i + N]; col = edge ? [70, 110, 160] : [30, 54, 92]; }
+          if (XB[i]) col = XB[i] === 2 ? [246, 252, 255] : [186, 222, 250];
+          const sl = Math.abs(y + 0.5 - scan); if (sl < 1.5) col = col.map((v, k) => Math.min(255, v + (k === 2 ? 60 : 40) * (1 - sl / 1.5)));
+        } else {
+          // the negative: a deep blue-black night, the fur glowing pale, the white face and belly gone dark, the black
+          // patches and nose gone bright white, the amber eyes blue, the tail's rings swapped
+          col = [8 + grain * 6, 12 + grain * 6, 38 + grain * 10];
+          if (XS[i]) {
+            const hx = x + 0.5 - 15.5, hy = y + 0.5, edge = !XS[i - 1] || !XS[i + 1] || !XS[i - N] || !XS[i + N];
+            col = edge ? [150, 170, 214] : [204, 216, 242];
+            if (XT[i] > 0) col = Math.floor(XT[i] * 9) % 2 ? [252, 252, 255] : [34, 42, 86];
+            else if (hy < 14) {
+              const patch = Math.hypot(x + 0.5 - 13.4, hy - 8.6) < 1.9 || Math.hypot(x + 0.5 - 17.6, hy - 8.6) < 1.9;
+              if (patch) col = [255, 255, 255]; else if (Math.abs(hx) < 4.2 - (hy - 6) * 0.3 && hy > 6) col = [26, 32, 70];
+              if (Math.hypot(x + 0.5 - 13.4, hy - 8.6) < 0.8 || Math.hypot(x + 0.5 - 17.6, hy - 8.6) < 0.8) col = [30, 150, 255];
+              if (Math.abs(hx) < 1 && hy > 11.5 && hy < 13) col = [255, 255, 255];
+            } else if (((x + 0.5 - 15.5) / 3.6) ** 2 + ((hy - 21) / 5.6) ** 2 < 1) col = [56, 66, 120];
+          } else {
+            // a soft glow round the pale body, and a few stars
+            if ((x > 0 && XS[i - 1]) || (x < N - 1 && XS[i + 1]) || (y > 0 && XS[i - N]) || (y < N - 1 && XS[i + N])) col = [44, 58, 112];
+          }
+        }
+        if (flash > 0) col = col.map(v => v + (255 - v) * Math.max(0, flash - 0.6) * 2);
+        dot(x, y, col);
+      }
+      for (const [x, y, ph] of xStars) if (!XS[y * N + x] && Math.abs(x + 0.5 - sx) >= half && Math.sin(t * 1.3 + ph) > 0.2) dot(x, y, [150, 170, 230]);
+      // the scanner's rails, ticking down their length
+      if (flash < 0.25) for (const ex of [Math.round(sx - half - 0.5), Math.round(sx + half - 0.5)]) for (let y = 0; y < N; y++) if (ex >= 0 && ex < N) dot(ex, y, (y + Math.floor(t * 8)) % 4 ? [0, 220, 255] : [220, 255, 255]);
+      // the heart, beating pink in the ribs (wherever the scanner shows it), and its beat traced along the foot of the film
+      if (Math.abs(16.5 - sx) < half + 0.5 || flash > 0.25) for (const [x, y, k] of [[16, 18, 1], [17, 18, 1], [16, 19, 1], [17, 19, 1], [15, 18, 0.6], [18, 18, 0.6], [16, 20, 0.7], [17, 17, 0.5], [15, 17, 0.5]]) tint((y * N + x) * 3, [255, 70, 140], Math.min(1, 0.5 + beat * 0.5) * k);
+      for (let x = 0; x < N; x++) { const ph = beatPh - (N - x) * 0.18, b2 = Math.max(0, Math.sin(ph)) ** 12; dot(x, 30 - Math.round(b2 * 3), [20, 220, 100]); }
+      for (const ex of [13, 17]) if (Math.abs(ex - sx) < half) tint((8 * N + ex) * 3, [120, 255, 220], 0.35 + 0.25 * Math.sin(t * 2));
+      // the film itself: its R marker, a clip at the top edge, and edge numbers down the side
+      for (let y = 1; y < 8; y++) for (let x = 1; x < 6; x++) dot(x, y, [230, 236, 240]);
+      glyph('R', 2, 2, [10, 14, 30]);
+      for (let x = 13; x < 19; x++) { dot(x, 0, [120, 124, 136]); dot(x, 1, x === 13 || x === 18 ? [80, 84, 96] : [176, 180, 192]); }
+      for (const [d, y0] of [['1', 10], ['0', 16], ['2', 22]]) glyph(d, 28, y0, [70, 80, 110]);
+      // pressing the glass: thin rainbow rings running out from the finger and fading
+      if (press && pressK > 0.02 && (!ringsAt.length || t - ringsAt[ringsAt.length - 1][2] > 0.35)) { ringsAt.push([press[0], press[1], t]); if (ringsAt.length > 5) ringsAt.shift(); }
+      for (const [rx, ry, r0] of ringsAt) { const a = t - r0; if (a > 1.4) continue; const rad = a * 14; for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const d = Math.hypot(x + 0.5 - rx, y + 0.5 - ry); if (Math.abs(d - rad) < 0.6) tint((y * N + x) * 3, rainbow(Math.atan2(y - ry, x - rx) * 2 + a * 6), 0.8 * (1 - a / 1.4)); } }
+    }
+    // the taps each picture reads (the panel's own call is the lemur's, so a legendary doesn't make it)
+    function legendTap(x, y, t) {
+      if (legend === 'Dead Pixel') {
+        let best = -1, bd = 2.3;
+        for (let i = 0; i < N * N; i++) if (NID[i] >= 0) { const d = Math.hypot((i % N) + 0.5 - x, ((i / N) | 0) + 0.5 - y); if (d < bd) { bd = d; best = NID[i]; } }
+        if (best >= 0) { tubeOff[best] ^= 1; tubeAt[best] = t; c.sound.hit('click', 0.2); c.sound.note(callRoot + (tubeOff[best] ? -12 : 12) + callScale[best % 5], { dur: 0.12, vel: 0.07, wave: 'square', cutoff: 2400, at: 0.03 }); }
+        if (tubes && tubeOff.every(v => v)) relightAt = t + 1.2;
+      } else if (legend === 'Inverted') {
+        if (Math.hypot(x - 16.5, y - 18.5) < 3.2) { raceAt = t; c.sound.note(callRoot + 24, { dur: 0.08, vel: 0.08, wave: 'square', cutoff: 3000 }); c.sound.note(callRoot + 24, { dur: 0.08, vel: 0.06, wave: 'square', cutoff: 3000, at: 0.14 }); }
+        else if (t - legAt > 0.8) { legAt = t; c.sound.hit('noise', 0.16, { cutoff: 5200, dur: 0.18 }); c.sound.note(callRoot + 12 + callScale[4], { at: 0.12, dur: 0.9, vel: 0.07, wave: 'sine' }); }
+      } else if (legend === 'Test Card' && t - legAt > 0.8 && Math.abs(tune - station) < 0.03) { legAt = t; c.sound.note(83, { dur: 0.8, vel: 0.07, wave: 'sine' }); c.sound.hit('noise', 0.12, { cutoff: 1800, dur: 0.6 }); }
+    }
+
+    function legendScene(t) {
+      own.fill(0);
+      if (legend === 'Dead Pixel') neonLemur(t);
+      else if (legend === 'Test Card') { testCard(t); own.fill(1); }
+      else { xray(t); own.fill(1); }
+      // the glass faults show over the picture (on the dead panel only, round a neon sign's lit tubes)
+      if (legend === 'Dead Pixel') { glowBuf.set(rgb); screenFault(t); for (let i = 0; i < N * N; i++) if (NEON[i] >= 0) { rgb[i * 3] = glowBuf[i * 3]; rgb[i * 3 + 1] = glowBuf[i * 3 + 1]; rgb[i * 3 + 2] = glowBuf[i * 3 + 2]; } }
+      else screenFault(t);
+    }
+
     function scene(t) {
+      if (newLeg) return legendScene(t);
       own.fill(0);
       // sky
       for (let y = 0; y < N; y++) {
@@ -803,7 +1037,7 @@ Proto.add({
         let changed = false;
         for (let i = 0; i < N * N; i++) {
           const x = i % N, y = (i / N) | 0;
-          split[i] = all || (!zone[i] && !(bleedOn && bleed[i] > 0.2)) || own[i] === 2 || (legend !== 'Inverted' && (Math.hypot(x + 0.5 - 12.5, y + 0.5 - EY) < 2.4 || Math.hypot(x + 0.5 - 19.5, y + 0.5 - EY) < 2.4)) ? 1 : 0;
+          split[i] = all || (!zone[i] && !(bleedOn && bleed[i] > 0.2)) || own[i] === 2 || (legend !== 'Inverted' && !newLeg && (Math.hypot(x + 0.5 - 12.5, y + 0.5 - EY) < 2.4 || Math.hypot(x + 0.5 - 19.5, y + 0.5 - EY) < 2.4)) ? 1 : 0;
           if (split[i] !== lastSplit[i]) changed = true;
         }
         // the frame's mask is only rebuilt when the split dots change (the pocket moon bobs)
@@ -821,7 +1055,7 @@ Proto.add({
         }
         out.globalCompositeOperation = 'multiply'; // the stripes darken the gaps
         out.drawImage(comp, 0, 0);
-        if (torch) {
+        if (torch && !newLeg) {
           // in the torch beam every dot splits into red, green and blue
           const x0 = Math.max(0, Math.floor(torch[0] - 5)), y0 = Math.max(0, Math.floor(torch[1] - 5)), x1 = Math.min(N, Math.ceil(torch[0] + 5)), y1 = Math.min(N, Math.ceil(torch[1] + 5));
           if (x1 > x0 && y1 > y0) {
@@ -842,7 +1076,10 @@ Proto.add({
       now = t;
       const step = Math.min(0.1, dt || 0.033);
       const inp = c.input;
+      // a legendary's tap acts on a short, still release, so a press that becomes a drag or a hold doesn't fire it too
+      const legTaps = [];
       for (const touch of inp.taps()) {
+        if (newLeg) { const q = [touch.x * N, touch.y * N]; if (!inp.down) legTaps.push(q); else lgDown = [q[0], q[1], t, 0]; continue; }
         call(touch.x);
         const pan = (touch.x - 0.5) * 0.6;
         if (extra === 'Pocket Moon' && legend === 'None' && t - moonAt > 1.2) {
@@ -867,6 +1104,11 @@ Proto.add({
           c.sound.note(callRoot + 24 + callScale[1], { at: 0.36, dur: 1.2, vel: 0.05, wave: 'sine', pan: -pan });
         }
       }
+      if (lgDown) {
+        if (inp.down) lgDown[3] = Math.max(lgDown[3], Math.hypot(inp.x * N - lgDown[0], inp.y * N - lgDown[1]));
+        else { if (t - lgDown[2] < 0.25 && lgDown[3] < 1) legTaps.push([lgDown[0], lgDown[1]]); lgDown = null; }
+      }
+      for (const [x, y] of legTaps) legendTap(x, y, t);
       if (inp.inside && !wasIn && legend !== 'None') {
         // stepping up to a legendary: the screen notices you
         if (legend === 'Dead Pixel') c.sound.note(callRoot + 24, { dur: 0.06, vel: 0.06, wave: 'square', cutoff: 3000 });

@@ -774,24 +774,6 @@ Proto.add({
       }
     }
 
-    // ---------- the Sun (legendary): rays round a disc head, reaching for the pointer ----------
-    let flareAt = -9;
-    function sunRays(t, u, v) {
-      // a full ring of sixteen solid wedge rays, long and short by turns, a cell clear of the disc; the
-      // ones below go behind the shoulders. They breathe long-short in turn, stretch toward the pointer,
-      // and a tap on the face flares the whole ring outward a step at a time
-      const pulse = Math.floor(t * 0.9) % 2, flare = t - flareAt < 0.9 ? Math.ceil(3 * (1 - (t - flareAt) / 0.9)) : 0;
-      const toward = c.input.inside ? Math.atan2(c.input.y - v, c.input.x - u) : null;
-      pen(headC);
-      for (let i = 0; i < 16; i++) {
-        const an = i / 16 * Math.PI * 2 + tilt - Math.PI / 2, long = (i + pulse) % 2 === 0, ca = Math.cos(an), sa = Math.sin(an);
-        let near = 0;
-        if (toward !== null) { let da = Math.abs(an - toward) % (Math.PI * 2); if (da > Math.PI) da = Math.PI * 2 - da; near = da < 0.3 ? 2 : da < 0.6 ? 1 : 0; }
-        const rim = 0.25 * sx + (1.6 + flare * 2) / G, len = ((long ? 6.5 : 3.6) + near) / G, hw = long ? 0.105 : 0.085;
-        tri([u + Math.cos(an - hw) * rim, v + Math.sin(an - hw) * rim], [u + Math.cos(an + hw) * rim, v + Math.sin(an + hw) * rim], [u + ca * (rim + len), v + sa * (rim + len)]);
-      }
-    }
-
     // ---------- the balloon (the coveted item) ----------
     const BALLOON = ['...aaa...', '.aaaaaaa.', '.ahaaaaa.', 'ahhaaaaaa', 'ahaaaaaaa', 'aaaaaaaaa', '.aaaaaaa.', '..aaaaa..', '...aaa...', '....a....'];
     const bnX = comp === 'Little One' ? 0.5 - side * 0.37 + side * 0.06 : 0.5 - side * 0.33, bnY0 = comp === 'Little One' ? 0.86 : shoulderAt(0.5 - side * 0.33) + 0.03;
@@ -815,7 +797,7 @@ Proto.add({
     function draw(t) {
       M = [1, 0, 0, 1, 0, 0]; clips.length = 0; saved.length = 0; sitter = 0;
       pen(bg); grid.fill(cur); mine.fill(0); layer.fill(0); shapeN = 0;
-      backdropDraw();
+      if (!skipBack) backdropDraw();
       const hp = t - hopAt;
       // a one-cell breath now and then, and a two-cell hop when the primaries pass round
       const breath = Math.sin(t * 1.3 + blinkOff) > 0.82 ? 1 : 0;
@@ -831,12 +813,6 @@ Proto.add({
 
       if (comp === 'Moon') moon(t, false);
       sitter = 1;
-      if (legend === 'Sun') {
-        // the rays go down first, so the shoulders cover the lower ones
-        keep(); shift(cx, chinY - (breath + hop) / G); spin(tilt); shift(0, -gBot * sy);
-        const [hu, hv] = spot(0, 0); back();
-        keep(); M = [1, 0, 0, 1, 0, 0]; sunRays(t, hu, hv); back();
-      }
       pen(skin(headC)); box(0.5 - nw / 2, cy, nw, 0.5 - cy + 0.4);
       pen(bodyC); paint(bodyIn, 0, 0.68, 1, 1.05);
       outfitDraw();
@@ -870,62 +846,338 @@ Proto.add({
       if (balloon) balloonAt = balloonDraw(t);
     }
 
-    // ---------- legendary finishes, laid over the finished grid ----------
-    const lum = hex => { const v = parseInt(hex.slice(1), 16); return ((v >> 16) * 0.3 + ((v >> 8) & 255) * 0.59 + (v & 255) * 0.11) / 255; };
-    const FOIL = ['#4a2f0b', '#9a6a1c', '#cf962c', '#eec35a', '#fde5a0'].map(slot), FOIL_GLINT = slot('#fffbea');
-    const VELVET = [slot('#15120e'), slot('#2c251b')];
-    const PAPER = slot('#f3eee2'), PENCIL = slot('#8db7da');
+    // ---------- the finished grid, as pixels ----------
     const PASS = { [RED]: 0, [YEL]: 1, [GLD]: 1, [BLU]: 2, [INK]: 3, [UMBER]: 3, [LIP]: 3, [CRM]: -1, [GRY]: -1 };
-    let printed = 0, sparks = [];
+    let printed = 0;
     const out = new Uint32Array(G * G);
-    function finish(t) {
+    function finish() {
       for (let n = 0; n < G * G; n++) out[n] = words[grid[n]];
-      if (legend === 'Gold Foil') {
-        // the sitter struck in gold leaf: its inks ranked by lightness onto five golds, on black velvet
-        const seen = [];
-        for (let n = 0; n < G * G; n++) if (mine[n] && !seen.includes(grid[n])) seen.push(grid[n]);
-        // the face's own ink is struck in bright gold; darker inks step down from it, lighter ones up
-        seen.sort((p, q) => lum(inkList[p]) - lum(inkList[q]));
-        const hp = Math.max(0, seen.indexOf(slot(skin(headC))));
-        const rank = new Map(seen.map((q, i) => [q, FOIL[lum(inkList[q]) < 0.16 ? 0 : i < hp ? (hp - i === 1 ? 2 : 1) : i === hp ? 3 : 4]]));
-        const bgSlot = slot(bg), gp = c.input.inside ? (c.input.x + c.input.y) * G : (t * 7) % (G * 3.2) - G * 0.4;
-        for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
-          const n = j * G + i;
-          if (!mine[n]) { out[n] = words[VELVET[grid[n] === bgSlot ? 0 : 1]]; continue; }
-          const d = i + j - gp;
-          if (d > -1.5 && d < 1.5) { out[n] = words[FOIL_GLINT]; continue; }
-          // a one-cell bevel: lit where a shape meets something above or to its left, shadowed below and right
-          let f = FOIL.indexOf(rank.get(grid[n]));
-          const g0 = grid[n], diff = m => !mine[m] || grid[m] !== g0;
-          if (f > 0) {
-            if ((j > 0 && diff(n - G)) || (i > 0 && diff(n - 1))) f = Math.min(4, f + 1);
-            else if ((j < G - 1 && diff(n + G)) || (i < G - 1 && diff(n + 1))) f = Math.max(1, f - 1);
-          }
-          out[n] = words[d > -3.5 && d < 3.5 ? FOIL[Math.min(4, f + 1)] : FOIL[f]];
-        }
-        sparks = sparks.filter(s => t - s[2] < 0.9);
-        for (const [si, sj, s0] of sparks) {
-          const age = (t - s0) / 0.9, arm = age < 0.5 ? 2 : 1;
-          for (let k2 = -arm; k2 <= arm; k2++) for (const [i, j] of [[si + k2, sj], [si, sj + k2]]) if (i >= 0 && j >= 0 && i < G && j < G) out[j * G + i] = words[FOIL_GLINT];
-        }
-      } else if (legend === 'Unprinted') {
-        // the bare key: paper with blue guide lines, each tap pulls the next colour (red, yellow, blue, black)
-        const pass = n => { const p = PASS[inkList[grid[n]]]; return p === undefined ? 3 : p; };
-        for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
-          const n = j * G + i, p = pass(n);
-          if (p >= 0 && p < printed) continue;
-          // a guide line sits on the edge of whichever shape lies on top of a different ink
-          const g0 = grid[n], l0 = layer[n];
-          let edge = false;
-          for (const m of [i > 0 ? n - 1 : -1, i < G - 1 ? n + 1 : -1, j > 0 ? n - G : -1, j < G - 1 ? n + G : -1]) if (m >= 0 && grid[m] !== g0 && layer[m] < l0) edge = true;
-          out[n] = words[edge ? PENCIL : p < 0 ? grid[n] : PAPER];
-        }
-        // crop marks in the corners and a colour bar showing the passes pulled so far
-        for (const [i0, j0, di, dj] of [[0, 0, 1, 1], [G - 1, 0, -1, 1], [0, G - 1, 1, -1], [G - 1, G - 1, -1, -1]]) { out[(j0 + dj * 2) * G + i0] = words[PENCIL]; out[(j0 + dj * 2) * G + i0 + di] = words[PENCIL]; out[j0 * G + i0 + di * 2] = words[PENCIL]; out[(j0 + dj) * G + i0 + di * 2] = words[PENCIL]; }
-        [RED, YEL, BLU, INK].forEach((q, i) => { out[(G - 2) * G + 4 + i] = words[i < printed ? slot(q) : PENCIL]; });
-      }
       return out;
     }
+
+    // ---------- the legendaries: each one a picture of its own (2026-10-19, pass 2 the same day) ----------
+    // Gold Foil: a big gold medal hung on a ribbon in the poster's three primaries, on quilted black velvet under
+    // a spotlight: beaded rim, laurel, and the sitter struck in relief (its own head, hair and hat). Grab it and
+    // swing it on its ribbon; fling it hard and it spins over to show its back (a Bauhaus emblem); tap to turn it.
+    // Unprinted: a blind-embossed proof: the sitter pressed into white paper with no ink, read only by a raking
+    // light (the pointer is the lamp), inside a plate mark, signed 1/1 in pencil. Roll ink over it with a brayer:
+    // drag to ink, let go to load the next colour, tap to choose one, hold still to wash the sheet clean.
+    // Sun: a sunrise poster: the sun's own glyph face on a disc with turning rays over rings of sky, a stepped sea
+    // with its reflection. Drag the sun across the sky: high it's noon, low it's a purple dusk, below the sea it's
+    // night with stars and a moon; tap the sun to make it flare.
+    let skipBack = false;
+    const LG = legend === 'None' ? null : (() => {
+      const word = hex => { const v = parseInt(hex.slice(1), 16); return (0xff000000 | ((v & 0xff) << 16) | (v & 0xff00) | (v >>> 16)) >>> 0; };
+      const mixW = (a, b, u) => { const p = parseInt(a.slice(1), 16), q = parseInt(b.slice(1), 16); const ch = s => Math.round(((p >> s) & 255) * (1 - u) + ((q >> s) & 255) * u); return word('#' + [16, 8, 0].map(s => ch(s).toString(16).padStart(2, '0')).join('')); };
+      const out = new Uint32Array(G * G), u1 = 1 / G;
+      const hsh = (i, j, s) => { let h = Math.imul(i * 374761393 + j * 668265263 + s * 2246822519, 0x27d4eb2d); h ^= h >>> 15; return (h >>> 0) / 4294967296; };
+      const reset = (hex) => { M = [1, 0, 0, 1, 0, 0]; clips.length = 0; saved.length = 0; sitter = 0; pen(hex); grid.fill(cur); mine.fill(0); layer.fill(0); shapeN = 0; };
+      // the pointer as gestures: press, drag, hold, release; a tap the runtime saw between two frames counts as a click
+      const g = { down: false, t0: 0, x0: 0, y0: 0, x: 0.5, y: 0.5, px: 0.5, py: 0.5, moved: 0, last: 0, dt: 1 / 30, click: null, press: false, release: false };
+      const track = (t) => {
+        const i = c.input;
+        g.dt = Math.max(0.001, Math.min(0.1, t - g.last)); g.last = t; g.press = g.release = false;
+        g.px = g.x; g.py = g.y;
+        if (i.inside || i.down) { g.x = i.x; g.y = i.y; }
+        if (i.down && !g.down) { g.down = true; g.press = true; g.t0 = t; g.x0 = g.px = g.x; g.y0 = g.py = g.y; g.moved = 0; }
+        else if (!i.down && g.down) { g.down = false; g.release = true; }
+        if (g.down) g.moved = Math.max(g.moved, Math.hypot(g.x - g.x0, g.y - g.y0));
+      };
+      let pend = null;
+      const tapped = (u, v) => { if (!c.input.down) pend = [u, v]; };
+      const takeClick = () => { const p = pend; pend = null; if (p) return p; return g.release && g.moved < 0.03 && g.last - g.t0 < 0.5 ? [g.x, g.y] : null; };
+      if (legend === 'Gold Foil') {
+        const code = n => slot('#0a00' + n.toString(16).padStart(2, '0'));
+        const VEL = code(0), SHADOW = code(1), RIB = [code(2), code(3), code(4)], CLASP = code(5), RINGC = code(6), RIMC = code(7), BEADC = code(8), FLD = code(9), INC = code(10), LEAF = code(11);
+        const GOLD = ['#4a2f0b', '#94651a', '#c98f29', '#ebbd55', '#fde4a0'].map(word), GLINT = word('#fffbea');
+        const VW = [word('#110f0d'), word('#1c1814'), word('#2b241c'), word('#070605'), word('#171310'), word('#1f1a15')];
+        const RW = [RED, YEL, BLU].map(h => [mixW(h, '#000000', 0.32), word(h), mixW(h, '#ffffff', 0.25)]);
+        const STRIPE = [0, 0, 1, 1, 2, 2, 2, 2, 1, 1, 0, 0];
+        const base = new Map([[CLASP, 3], [RINGC, 3], [RIMC, 3], [BEADC, 4], [FLD, 2], [INC, 0], [LEAF, 3]]);
+        const tw = []; for (let k = 0; k < 4; k++) tw.push(nr());
+        const PX = 24, PY = -3, L = 33, R = 16.2;   // the pivot (above the top edge), the ribbon's length to the medal's middle, its radius
+        let th = 0, om = 0, ph = 0, phv = 0, phGoal = 0, grab = false;
+        const medalAt = () => [PX + Math.sin(th) * L, PY + Math.cos(th) * L];
+        return {
+          tap: tapped,
+          frame(t) {
+            track(t);
+            const dt = g.dt, [mx0, my0] = medalAt();
+            // grab it and swing it; let go and it swings on, a hard fling spins it over
+            if (g.press && Math.hypot(g.x * G - mx0, g.y * G - my0) < R + 3) grab = true;
+            if (grab && g.down) {
+              const nt = Math.max(-0.42, Math.min(0.42, Math.atan2(g.x * G - PX, Math.max(4, g.y * G - PY))));
+              om = om * 0.5 + (nt - th) / dt * 0.5; th = nt;
+            } else {
+              if (grab && g.release) { grab = false; if (Math.abs(om) > 2.2) { phv = om * 5.5; c.sound.note(tonic + 24, { dur: 0.9, vel: 0.1, wave: 'sine' }); } }
+              om += (-6.3 * Math.sin(th) - 0.45 * om + 0.35 * Math.sin(t * 2.4)) * dt;
+              th = Math.max(-0.42, Math.min(0.42, th + om * dt));
+              if (Math.abs(th) >= 0.42) om *= -0.4;
+            }
+            const click = takeClick();
+            if (click && !grab) { phGoal = Math.round(ph / Math.PI) * Math.PI + Math.PI; phv = 0; [0, 4, 7].forEach((n, i) => c.sound.note(tonic + 24 + n, { dur: 0.4, vel: 0.07, wave: 'triangle', at: i * 0.08 })); }
+            if (Math.abs(phv) > 1.5) { ph += phv * dt; phv *= Math.exp(-1.4 * dt); phGoal = Math.round(ph / Math.PI) * Math.PI; }
+            else { phv = 0; ph += (phGoal - ph) * Math.min(1, dt * 7); }
+            const sq = Math.cos(ph), back2 = sq < 0;
+            reset('#0a0000'); cur = VEL;
+            // everything hangs from the pivot: ribbon, clasp, ring and medal turn together
+            keep(); shift(PX * u1, PY * u1); spin(-th);
+            sitter = 1;
+            for (let q = 0; q < 12; q++) { cur = RIB[STRIPE[q]]; box((q - 6) * u1, 2 * u1, u1 * 1.02, 11 * u1); }
+            sitter = 2; cur = CLASP; box(-7 * u1, 12.5 * u1, 14 * u1, 2 * u1);
+            cur = RINGC; hoop(0, 15.6 * u1, 1.5 * u1, 1.3 * u1, 0.45 * u1);
+            keep(); shift(0, L * u1); stretch(Math.max(0.07, Math.abs(sq)), 1);
+            sitter = 0; cur = SHADOW; disc(1.3 * u1, 1.5 * u1, R * u1);
+            sitter = 3; cur = RIMC; disc(0, 0, R * u1);
+            sitter = 4; cur = BEADC;
+            for (let q = 0; q < 44; q += 2) { const a = q / 44 * Math.PI * 2; disc(Math.cos(a) * (R - 1.15) * u1, Math.sin(a) * (R - 1.15) * u1, 0.62 * u1); }
+            sitter = 1; cur = FLD; disc(0, 0, (R - 2.3) * u1);
+            if (Math.abs(sq) > 0.25) {
+              sitter = 2; cur = LEAF;
+              for (const s of [-1, 1]) for (let q = 0; q < 7; q++) { const a = Math.PI / 2 + s * (0.5 + q * 0.3), r = (R - 4.5) * u1; oval(Math.cos(a) * r, Math.sin(a) * r, 1.2 * u1, 0.6 * u1, a + Math.PI / 2); }
+              clipTo((a, b) => a * a + b * b <= ((R - 2.6) * u1) ** 2);
+              if (!back2) {
+                // the sitter struck in relief, a little over half size
+                keep(); shift(0, -2 * u1); stretch(0.6, 0.6);
+                sitter = 2; pen(bodyC); oval(0, gBot * sy + 0.21, 0.42, 0.22, 0, 1);
+                keep(); stretch(sx, sy); hairBehind(); back();
+                sitter = 3; keep(); stretch(sx, sy); pen(headC); headFill(); hairFront(); back();
+                sitter = 4; pen(headC); box((fx - 0.018) * sx, noseY * sy - 0.03, 0.036 * sx, 0.05);
+                sitter = 1; cur = INC;
+                for (const s of [-1, 1]) disc((s * eyeDX + fx) * sx, eyeY * sy, 0.045);
+                box((fx - 0.075) * sx, mouthY * sy, 0.15 * sx, 0.032);
+                sitter = 4; keep(); stretch(sx, sy); hatDraw(); back();
+                back();
+              } else {
+                // the back: Primer's three primitives in relief, overlapping
+                sitter = 1; cur = INC; disc(-3.2 * u1, -1.5 * u1, 5.8 * u1); box(-2 * u1, -5.8 * u1, 8.6 * u1, 8.6 * u1); tri([-6.2 * u1, 7.2 * u1], [6.2 * u1, 7.2 * u1], [0, -2.2 * u1]);
+                sitter = 3; pen(RED); disc(-3.2 * u1, -1.5 * u1, 5 * u1);
+                sitter = 4; pen(BLU); box(-1.2 * u1, -5 * u1, 7 * u1, 7 * u1);
+                sitter = 2; pen(YEL); tri([-5 * u1, 6.5 * u1], [5 * u1, 6.5 * u1], [0, -1 * u1]);
+              }
+            }
+            back(); back();
+            // strike it: gold by material, a bevel lit from the upper left, then the glint (under the pointer when it's near)
+            const gp = c.input.inside && !g.down ? (c.input.x + c.input.y) * G : (t * 20) % 150 - 30;
+            for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
+              const n = j * G + i, g0 = grid[n];
+              if (g0 === VEL || g0 === SHADOW) {
+                // quilted velvet: diamond seams with a button where they cross; a soft spotlight round the medal
+                const a = (i + j) % 8, b = (i - j + 64) % 8, lit = Math.hypot(i - mx0, j - my0 + 4) < 22 && (i * 3 + j * 5) % 4 !== 0;
+                out[n] = g0 === SHADOW ? VW[3] : a === 0 && b === 0 ? VW[2] : a === 0 || b === 0 ? VW[1] : lit ? VW[5] : VW[(i * 7 + j * 3) % 13 === 0 ? 4 : 0];
+                continue;
+              }
+              const ri = RIB.indexOf(g0);
+              if (ri >= 0) { out[n] = RW[ri][(i + j) % 7 === 0 ? 0 : j < 3 ? 2 : 1]; continue; }
+              const h = mine[n], hn = m => (m >= 0 && m < G * G ? mine[m] : 0);
+              let f = base.has(g0) ? base.get(g0) : 3;
+              const ul = Math.max(hn(n - G - 1), hn(n - G), i > 0 ? hn(n - 1) : 0), lo = Math.min(hn(n - G - 1), hn(n - G), i > 0 ? hn(n - 1) : 0);
+              if (h > lo && h >= ul) f = Math.min(4, f + 1);
+              else if (h < ul || h > hn(n + G + 1) || h > hn(n + G) || (i < G - 1 && h > hn(n + 1))) f = Math.max(0, f - 1);
+              const d = i + j - gp;
+              out[n] = d > -1 && d < 1 ? GLINT : d > -3 && d < 3 ? GOLD[Math.min(4, f + 1)] : GOLD[f];
+            }
+            // sparks that come and go on the rim
+            const [mx, my] = medalAt();
+            for (let k = 0; k < tw.length; k++) {
+              const pz = t * 0.8 + tw[k] * 7, life = pz % 1; if (life > 0.45) continue;
+              const a = tw[k] * 6.28 + Math.floor(pz) * 2.4, si = Math.round(mx + Math.cos(a) * R * Math.abs(sq) - 0.5), sj = Math.round(my + Math.sin(a) * R - 0.5), arm = life < 0.15 || life > 0.3 ? 1 : 2;
+              for (let q = -arm; q <= arm; q++) for (const [a2, b2] of [[si + q, sj], [si, sj + q]]) if (a2 >= 0 && b2 >= 0 && a2 < G && b2 < G) out[b2 * G + a2] = Math.abs(q) < arm ? GLINT : GOLD[4];
+            }
+            return out;
+          },
+        };
+      }
+      if (legend === 'Unprinted') {
+        // pass 3: deeper relief, inks that flood their whole colour, a pulled-proof moment, and a brayer always to hand
+        const P = [word('#dcd0b6'), word('#ffffff'), word('#7a6b50'), word('#b3a283')], RAISED = word('#f6f1e5'), TABLE = word('#2a2622'), TABLE2 = word('#36312b'), GRAPH = word('#a39d91'), GRAPH2 = word('#bdb7ac');
+        const BACK = word('#f4efe3'), BACKD = word('#d8cfbc'), FOLD = word('#9c8f75'), SHINE = word('#fffdf2'), HANDLE = word('#5a4632'), HANDLEL = word('#7d6447'), RED2 = word('#c8372b');
+        const INKS4 = [RED, YEL, BLU, INK], inkOf = new Map();
+        const variants = s => { let v = inkOf.get(s); if (!v) { const h = inkList[s]; v = [word(h), mixW(h, '#ffffff', 0.3), mixW(h, '#000000', 0.3), mixW(h, '#000000', 0.14)]; inkOf.set(s, v); } return v; };
+        const passOf = s => { const p = PASS[inkList[s]]; return p === undefined ? 3 : p; };
+        const H = new Int32Array(G * G);
+        const LIGHTS = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [1, -1], [0, -1], [-1, -1]];
+        const inPlate = (i, j) => i >= 4 && i <= 43 && j >= 4 && j <= 40;
+        const PEN = new Map();
+        const glyphs = [['.a.', 'aa.', '.a.', '.a.', 'aaa'], ['...a', '..a.', '..a.', '.a..', 'a...'], ['.a.', 'aa.', '.a.', '.a.', 'aaa']];
+        let gx = 5; for (const gph of glyphs) { gph.forEach((row, r) => row.split('').forEach((ch, q) => { if (ch === 'a') PEN.set((42 + r) * G + gx + q, GRAPH); })); gx += gph[0].length + 1; }
+        let px0 = 31, py0 = 45;
+        for (let q = 0; q <= 14; q++) { const x = Math.round(31 + q * 0.45), y = Math.round(44.6 + Math.sin(q * 0.9) * 1.5 - (q < 6 ? (6 - q) * 0.25 : 0)); for (const [a, b] of [[px0, py0], [x, y]]) PEN.set(b * G + a, q % 5 === 0 ? GRAPH2 : GRAPH); px0 = x; py0 = y; }
+        // each ink: when it went down (null: not yet), how far each cell lies from the strokes that put it there
+        const SPEED = 45, floodT = [null, null, null, null], dist = [0, 1, 2, 3].map(() => new Float32Array(G * G).fill(1e9)), reach = [0, 0, 0, 0];
+        let ink = 0, washAt = -9, holdT = 0, pullAt = -9, pulled = false, stroke = [];
+        const flood = (t) => {
+          // the ink runs out from the brayer's path over every part of the poster printed in that colour
+          const d = dist[ink]; let far = 0;
+          const pts = stroke.length > 40 ? stroke.filter((_, k) => k % Math.ceil(stroke.length / 40) === 0) : stroke;
+          for (let n = 0; n < G * G; n++) { const i = n % G, j = (n - i) / G; let m = d[n]; for (const [x, y] of pts) { const e = (i + 0.5 - x) ** 2 + (j + 0.5 - y) ** 2; if (e < m * m) m = Math.sqrt(e); } d[n] = m; if (m < 1e8) far = Math.max(far, m); }
+          if (floodT[ink] === null) floodT[ink] = t;
+          reach[ink] = Math.max(reach[ink], (t - floodT[ink]) * SPEED + far);
+        };
+        const inkedAt = (p, n, t) => floodT[p] !== null && t >= floodT[p] + dist[p][n] / SPEED;
+        const brayer = (bx, by, col, rolling) => {
+          // a roller loaded with ink and its wooden handle, angled down and right
+          const dark = mixW(INKS4[ink], '#000000', 0.4);
+          for (let a = -3; a <= 3; a++) for (let b = -1; b <= 0; b++) { const i = bx + a, j = by + b; if (i >= 0 && j >= 0 && i < G && j < G) out[j * G + i] = b ? col : rolling && (a + Math.floor(g.last * 20)) % 3 === 0 ? col : dark; }
+          for (const s of [-1, 1]) { const i = bx + s * 4, j = by - 1; if (i >= 0 && i < G && j >= 0) out[j * G + i] = HANDLE; }
+          for (let k = 1; k <= 6; k++) { const i = bx + 4 + Math.floor(k * 0.7), j = by - 1 - k; if (i >= 0 && j >= 0 && i < G && j < G) out[j * G + i] = k > 3 ? HANDLEL : HANDLE; }
+        };
+        return {
+          tap: tapped,
+          frame(t) {
+            track(t);
+            const click = takeClick();
+            if (g.down && g.moved > 0.03) {
+              if (!stroke.length) c.sound.hit('noise', 0.05, { cutoff: 500, dur: 0.2 });
+              const n = Math.max(1, Math.ceil(Math.hypot(g.x - g.px, g.y - g.py) * G));
+              for (let s = 0; s <= n; s++) stroke.push([(g.px + (g.x - g.px) * s / n) * G, (g.py + (g.y - g.py) * s / n) * G]);
+              if (stroke.length > 6 && Math.floor(t * 6) !== Math.floor((t - g.dt) * 6)) { flood(t); stroke = stroke.slice(-12); }
+            }
+            if (g.release && stroke.length) { flood(t); stroke = []; ink = (ink + 1) % 4; c.sound.note(tonic + [0, third, 7, 12][ink], { dur: 0.3, vel: 0.12, wave: 'triangle' }); }
+            if (click) { ink = (ink + 1) % 4; c.sound.note(tonic + [0, third, 7, 12][ink], { dur: 0.25, vel: 0.12, wave: 'triangle' }); }
+            holdT = g.down && g.moved < 0.03 ? t - g.t0 : 0;
+            if (holdT > 1.2 && washAt < g.t0) { washAt = t; c.sound.hit('noise', 0.12, { cutoff: 900, dur: 0.6 }); }
+            if (washAt > 0 && t - washAt > 0.5 && t - washAt < 0.7 && floodT.some(v => v !== null)) { for (let p = 0; p < 4; p++) { floodT[p] = null; dist[p].fill(1e9); reach[p] = 0; } pulled = false; }
+            const washing = t - washAt < 0.5 ? (t - washAt) / 0.5 : 0;
+            skipBack = true; draw(t); skipBack = false;
+            // which inks this poster uses, and whether all of them have finished running: then the proof is pulled
+            const used = [false, false, false, false];
+            for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) { const n = j * G + i; H[n] = inPlate(i, j) ? (layer[n] ? 2 + layer[n] : 0) : 1; if (inPlate(i, j) && layer[n]) used[passOf(grid[n])] = true; }
+            if (!pulled && used.every((u, p) => !u || (floodT[p] !== null && t > floodT[p] + reach[p] / SPEED + 0.2))) {
+              pulled = true; pullAt = t;
+              [0, third, 7, 12, 19, 24].forEach((n, i) => c.sound.note(tonic + 12 + n, { dur: 0.9, vel: 0.1, wave: 'sine', at: 0.1 + i * 0.07 }));
+            }
+            let Ld;
+            if (c.input.inside && !g.down) { const dx = c.input.x - 0.5, dy = c.input.y - 0.42; Ld = [Math.abs(dx) > 0.1 ? Math.sign(dx) : 0, Math.abs(dy) > 0.1 ? Math.sign(dy) : 0]; if (!Ld[0] && !Ld[1]) Ld = [-1, -1]; }
+            else Ld = LIGHTS[Math.floor(t / 0.55) % LIGHTS.length];
+            for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
+              const n = j * G + i;
+              if (i < 2 || j < 2 || i > G - 3 || j > G - 3) { out[n] = (i === 1 || j === 1 || i === G - 2 || j === G - 2) && hsh(i >> 1, j >> 1, 3) < 0.5 ? TABLE2 : TABLE; continue; }
+              const hAt = (a, b) => a >= 0 && b >= 0 && a < G && b < G ? H[b * G + a] : 1;
+              const h0 = H[n], h1 = hAt(i + Ld[0], j + Ld[1]), h2 = hAt(i + 2 * Ld[0], j + 2 * Ld[1]), h3 = hAt(i + 3 * Ld[0], j + 3 * Ld[1]);
+              const shade = h0 > h1 ? 1 : h0 < h1 || (h0 < h2 && h2 > 1) ? 2 : h0 < h3 && h3 > 1 ? 3 : 0;
+              const s = grid[n], p = inPlate(i, j) && layer[n] ? passOf(s) : -1;
+              if (p >= 0 && inkedAt(p, n, t) && !(washing && hsh(i, j, 9) < washing)) {
+                // the wet edge of the running ink shows a touch darker
+                const wet = floodT[p] !== null && t < floodT[p] + dist[p][n] / SPEED + 0.12;
+                out[n] = variants(s)[wet ? 2 : shade]; continue;
+              }
+              out[n] = PEN.get(n) || (shade === 0 && h0 > 1 ? RAISED : P[shade]);
+            }
+            // the pulled proof: a shine runs over it, its corner lifts off the block and settles, and the pencil gets a red tick
+            const pu = t - pullAt;
+            if (pu >= 0 && pu < 1.6) {
+              const sweep = pu * 110 - 10;
+              for (let j = 4; j <= 40; j++) for (let i = 4; i <= 43; i++) { const d = i + j - sweep; if (d >= 0 && d < 2) out[j * G + i] = SHINE; }
+              const k = Math.round(Math.sin(Math.min(1, pu / 1.4) * Math.PI) * 17);
+              for (let j = 4; j < 4 + k; j++) for (let i = 43 - (k - (j - 4)) + 1; i <= 43; i++) out[j * G + i] = i - (43 - (k - (j - 4))) <= 1 ? FOLD : (i + j) % 5 ? BACK : BACKD;
+              for (let q = 0; q < k; q++) { const i = 43 - k + q + 1, j = 4 + q; if (i >= 4 && j <= 40 && i - 1 >= 4) out[j * G + i - 1] = TABLE2; }
+            }
+            if (pulled) for (const [a, b] of [[16, 45], [17, 46], [18, 45], [19, 44], [20, 43]]) out[b * G + a] = RED2;
+            // the four inks in the margin, the loaded one boxed in pencil
+            for (let q = 0; q < 4; q++) { const x0 = 21 + q * 2, col = word(INKS4[q]); out[44 * G + x0] = col; out[45 * G + x0] = col; if (q === ink) { out[43 * G + x0] = GRAPH; out[46 * G + x0] = GRAPH; } }
+            // the brayer: under the pointer (rolling when pressed), else resting on the corner of the sheet
+            const inkW = word(INKS4[ink]);
+            if (c.input.inside || g.down) brayer(Math.round(g.x * G), Math.round(g.y * G), inkW, g.down && g.moved > 0.03);
+            else brayer(39, 46, inkW, false);
+            return out;
+          },
+        };
+      }
+      // the Sun
+      const SEA2 = mixW(BLU, '#ffffff', 0.22), SEA0 = mixW(BLU, '#000000', 0.25), SUNW = word(YEL), RAY2 = word(CRM), CLOUD = word(CRM), BIRD = word(INK), CHEEK = mixW(RED, YEL, 0.2);
+      // the sky by the sun's height: night, dusk, morning, noon (two ring colours each), and the sea under it
+      const SKIES = [['#0d1433', '#16204a'], ['#5b1f5e', '#8a2d5c'], [RED, mixHex(RED, YEL, 0.38)], ['#f6a33a', '#f8bd4f']];
+      const SEAS = [['#070b1e', '#121a3a', '#1c2850'], [mixHex(BLU, '#3a1040', 0.4), mixHex(BLU, '#000000', 0.3), mixHex(BLU, '#ffffff', 0.12)], [BLU, mixHex(BLU, '#000000', 0.25), mixHex(BLU, '#ffffff', 0.22)], ['#2a7fd0', '#1f63a8', '#7cc3f5']];
+      function mixHex(a, b, u) { const w = mixW(a, b, u); return '#' + [w & 255, (w >> 8) & 255, (w >> 16) & 255].map(v => v.toString(16).padStart(2, '0')).join(''); }
+      const sunR = 9.6, HZ = 34;
+      const cloud0 = nr() * 60, birds = [[nr() * 70, 8 + nr() * 6, 2.2 + nr()], [nr() * 70, 4 + nr() * 5, 1.6 + nr()]];
+      const starsN = []; for (let k = 0; k < 40; k++) starsN.push([Math.floor(nr() * G), Math.floor(nr() * (HZ - 2)), nr() * 6.28]);
+      let sunX = 24, sunY = 20.5, flare = -9, sunLook = 0, held = false;
+      const lerpW = (a, b, u) => mixW(a, b, Math.max(0, Math.min(1, u)));
+      return {
+        tap: tapped,
+        frame(t) {
+          track(t);
+          // drag the sun anywhere in the sky; let go and it stays there
+          if (g.press && Math.hypot(g.x * G - sunX, g.y * G - sunY) < sunR + 6) held = true;
+          if (!g.down) held = false;
+          if (held) { sunX += (Math.max(4, Math.min(44, g.x * G)) - sunX) * Math.min(1, g.dt * 12); sunY += (Math.max(6, Math.min(46, g.y * G)) - sunY) * Math.min(1, g.dt * 12); }
+          const click = takeClick();
+          if (click && Math.hypot(click[0] * G - sunX, click[1] * G - sunY) < sunR + 2) {
+            flare = t; react = REACTS[reactN % 4]; reactN++; reactAt = t; sing(react, click[0]);
+            [0, third + 12, 19, 24].forEach((n, i) => c.sound.note(tonic + n, { dur: 1.4, vel: 0.1, wave: 'sine', attack: 0.04, at: i * 0.03 }));
+          }
+          // how high it is: 0 under the sea, 1 at the horizon, 2 halfway up, 3 near the top
+          const hgt = Math.max(0, Math.min(3, sunY > HZ ? 1 - (sunY - HZ) / 8 : 1 + (HZ - sunY) / 13));
+          const k = Math.min(2, Math.floor(hgt)), f = hgt - k;
+          const sky = [0, 1].map(q => lerpW(SKIES[k][q], SKIES[k + 1][q], f)), sea = [0, 1, 2].map(q => lerpW(SEAS[k][q], SEAS[k + 1][q], f));
+          const night = hgt < 1 ? 1 - hgt : 0, sy0 = sunY + (Math.sin(t * 0.7) > 0.6 && !held ? -1 : 0);
+          const fl = t - flare < 0.9 ? Math.ceil(3 * (1 - (t - flare) / 0.9)) : 0;
+          const r0 = sunR + 1.2 + fl * 1.5, step = Math.PI / 8, rot = t * 0.12, rayK = 0.55 + Math.min(1, hgt / 2) * 0.45;
+          const toward = c.input.inside && !held ? Math.atan2(c.input.y * G - sy0, c.input.x * G - sunX) : null;
+          const rays = [];
+          for (let q = 0; q < 16; q++) {
+            const an = q / 16 * Math.PI * 2 + rot;
+            let near = 0;
+            if (toward !== null) { let da = Math.abs(an - toward) % (Math.PI * 2); if (da > Math.PI) da = Math.PI * 2 - da; near = da < 0.3 ? 2 : da < 0.6 ? 1 : 0; }
+            rays.push([an, q % 2 === 0, near]);
+          }
+          const inRay = (d, a) => {
+            if (d <= r0 || d >= r0 + 11) return 0;
+            const q = ((Math.round((a - rot) / step) % 16) + 16) % 16, [an, long, near] = rays[q];
+            let da = Math.abs(a - an) % (Math.PI * 2); if (da > Math.PI) da = Math.PI * 2 - da;
+            const len = ((long ? 8.5 : 5.5) + near) * rayK, hw = (long ? 0.2 : 0.09) * (1 - (d - r0) / len);
+            return d < r0 + len && da < hw ? (long ? 1 : 2) : 0;
+          };
+          const cxo = ((cloud0 + t * 1.6) % 84) - 18, cloudC = lerpW('#3a3f6a', CRM, hgt / 1.6), cloudS = lerpW('#252a4c', mixHex(CRM, BLU, 0.28), hgt / 1.6);
+          for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
+            const n = j * G + i, x = i + 0.5, y = j + 0.5;
+            if (j >= HZ) {
+              // the sea: stepped waves sliding along, the sun's reflection broken across them under wherever it is
+              const row = j - HZ, ph = Math.floor(t * 2 + row * 0.7), wv = (i + ph * (row % 2 ? 1 : -1) + 64) % 6;
+              let col = (row % 3 === 0 && wv < 2) || (row % 3 === 1 && wv === 1) ? sea[2] : row > 9 ? sea[1] : sea[0];
+              const rw = (7 - row * 0.25) * (0.6 + 0.4 * Math.sin(t * 2.3 + row * 1.3)) * Math.min(1, hgt * 0.8 + 0.2);
+              if (row % 2 === 0 && Math.abs(x - sunX) < rw) col = night > 0.6 ? word('#f3e7bd') : row < 2 || Math.abs(x - sunX) < rw * 0.5 ? SUNW : RAY2;
+              out[n] = col; continue;
+            }
+            const d = Math.hypot(x - sunX, y - sy0);
+            let col = sky[Math.floor((d + t * 0.6) / 3.2) % 2];
+            if (night > 0.3) { for (const [si, sj, sp] of starsN) if (si === i && sj === j && Math.sin(t * 1.5 + sp) > -0.3) col = word('#fff6d8'); }
+            if (d < sunR) col = SUNW;
+            else { const r = inRay(d, Math.atan2(y - sy0, x - sunX)); if (r) col = r === 1 ? SUNW : RAY2; }
+            if (y > 3 && y < 13 && x > cxo - 4 && x < cxo + 13) {
+              // a bigger cloud: four puffs on a flat foot
+              const cd = Math.min(Math.hypot(x - cxo, y - 9.5), Math.hypot(x - cxo - 3.5, y - 7) * 1.05, Math.hypot(x - cxo - 7.5, y - 7.6), Math.hypot(x - cxo - 10, y - 10));
+              if ((cd < 3.2 && y < 12) || (y >= 10 && y < 12 && x > cxo && x < cxo + 10)) col = y > 10.8 ? cloudS : cloudC;
+            }
+            out[n] = col;
+          }
+          // the moon comes up when the sun goes down
+          if (night > 0.2) for (let b = -3; b <= 3; b++) for (let a = -3; a <= 3; a++) { const x = 40 + a, y = 7 + b, d1 = a * a + b * b, d2 = (a + 1.6) ** 2 + (b - 0.8) ** 2; if (d1 <= 10 && d2 > 6.5) out[y * G + x] = word('#f3e7bd'); }
+          // birds by day: a flap is a V, a glide a flat line
+          if (night < 0.5) for (const [b0, by, sp] of birds) {
+            const bx = Math.round(((b0 + t * sp) % 60) - 6), up = Math.floor(t * 4 + b0) % 2, j = Math.round(by);
+            for (const [a, b] of up ? [[-3, -2], [-2, -1], [-1, 0], [0, 0], [1, -1], [2, -2]] : [[-3, 0], [-2, -1], [-1, 0], [0, 0], [1, -1], [2, 0]]) { const ii = bx + a, jj = j + b; if (ii >= 0 && ii < G && jj >= 0 && jj < HZ) out[jj * G + ii] = BIRD; }
+          }
+          // the face: Primer's own glyphs, wide awake at noon, sleepy at dusk, asleep under the sea
+          if (sy0 - sunR < HZ) {
+            reset('#0a0000');
+            const ph = (blinkOff + t) % blinkGap, open = ph < 0.16 ? 0 : 1;
+            const ra = t - reactAt, rk = react && ra < 2.6 ? Math.min(1, ra / 0.08) * Math.min(1, (2.6 - ra) / 0.3) : 0;
+            const want = c.input.inside ? Math.max(-1, Math.min(1, (c.input.x - sunX / G) * 3)) : 0;
+            sunLook += (want - sunLook) * 0.12;
+            const zoom = sunR / G / 0.25, keepEyes = eyes, keepMouth = mouth;
+            if (hgt > 2.2) { eyes = 'Wide'; mouth = 'Grin'; } else if (hgt < 1.25) { eyes = 'Crescents'; mouth = 'Shy'; }
+            keep(); shift(sunX / G, sy0 / G); stretch(zoom / sx, zoom / sy); sitter = 1; face(t, open, sunLook, react, rk); back();
+            eyes = keepEyes; mouth = keepMouth;
+            for (let n = 0; n < HZ * G; n++) if (mine[n]) out[n] = words[grid[n]];
+            for (const s of [-1, 1]) { const ci = Math.round(sunX + s * 5.6 - 1), cj = Math.round(sy0 + 2.2); for (const [a, b] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const ii = ci + a, jj = cj + b; if (ii >= 0 && ii < G && jj >= 0 && jj < HZ && !mine[jj * G + ii]) out[jj * G + ii] = CHEEK; } }
+          }
+          return out;
+        },
+      };
+    })();
 
     // ---------- the viewer ----------
     // A tap on the poster passes the three primaries round (head, body, hat) and plays a triad:
@@ -939,8 +1191,7 @@ Proto.add({
     const REACTS = ['Delight', 'Surprise', 'Wink', 'Shy'];
     let reactN = reactOrder;
     const turn = (u, t) => {
-      if (legend === 'Sun') [bodyC, hatC] = [hatC, bodyC];
-      else [headC, bodyC, hatC] = [hatC, headC, bodyC];
+      [headC, bodyC, hatC] = [hatC, headC, bodyC];
       if (hat === 'None' && bg !== GLD) backC = hatC === bg ? notAny(bg, headC, bodyC) : hatC;
       if (splitC === headC || splitC === bodyC) splitC = [RED, YEL, BLU, INK, CRM].find(q => q !== headC && q !== bg && q !== bodyC);
       hopAt = t;
@@ -965,18 +1216,7 @@ Proto.add({
         c.sound.note(tonic + 24, { dur: 0.6, vel: 0.11, wave: 'sine', at: 0.12, pan: (u - 0.5) * 0.8, attack: 0.03 });
         return;
       }
-      if (legend === 'Unprinted') {
-        printed = (printed + 1) % 5;
-        c.sound.hit('kick', 0.18);
-        if (printed > 0) c.sound.note(tonic + [0, third, 7, 12][printed - 1], { dur: 0.6, vel: 0.2, wave: 'triangle', pan: (u - 0.5) * 0.6 });
-        if (printed === 4) [0, third, 7, 12].forEach((n, i) => c.sound.note(tonic + 12 + n, { dur: 0.9, vel: 0.12, wave: 'sine', at: 0.15 + i * 0.06 }));
-        return;
-      }
-      if (legend === 'Gold Foil') {
-        sparks.push([Math.floor(u * G), Math.floor(v * G), t]);
-        c.sound.note(tonic + 24, { dur: 1.6, vel: 0.13, wave: 'sine', pan: (u - 0.5) * 0.8 });
-        c.sound.note(tonic + 31, { dur: 1.3, vel: 0.08, wave: 'sine', at: 0.04, pan: (u - 0.5) * 0.8 });
-      }
+      if (LG) { LG.tap(u, v, t); return; }
       if (comp === 'Bird' && Math.hypot(u - birdX, v - (birdY - 0.05)) < 0.08) {
         birdAt = t;
         const n = tonic + 24 + [0, third, 7][Math.floor(t * 7) % 3];
@@ -987,7 +1227,6 @@ Proto.add({
       }
       if (onFace(u, v)) {
         react = REACTS[reactN % 4]; reactN++; reactAt = t; sing(react, u);
-        if (legend === 'Sun') { flareAt = t; [0, third + 12, 19, 24].forEach((n, i) => c.sound.note(tonic + n, { dur: 1.4, vel: 0.1, wave: 'sine', attack: 0.04, at: i * 0.03 })); }
         return;
       }
       turn(u, t);
@@ -1018,14 +1257,16 @@ Proto.add({
     const small = Object.assign(document.createElement('canvas'), { width: G, height: G });
     const sg = small.getContext('2d'), sheet = sg.createImageData(G, G), sheet32 = new Uint32Array(sheet.data.buffer);
     const show = t => {
-      sheet32.set(finish(t)); sg.putImageData(sheet, 0, 0);
+      sheet32.set(LG ? LG.frame(t) : finish()); sg.putImageData(sheet, 0, 0);
       x.setTransform(1, 0, 0, 1, 0, 0); x.imageSmoothingEnabled = false;
       x.drawImage(small, 0, 0, S, S);
     };
-    draw(0); show(0);
+    if (!LG) draw(0);
+    show(0);
     return (t) => {
       for (const tp of c.input.taps()) tapAt(tp.x, tp.y, t);
-      draw(t); show(t);
+      if (!LG) draw(t);
+      show(t);
     };
   },
 });
