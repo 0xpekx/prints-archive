@@ -828,8 +828,7 @@ Proto.add({
       const NIGHT = ['#050a1c', '#0a1530', '#10244a', '#1a3c68', '#2a6090', '#4596bc', '#86d8ec'].map(v => blendI(hx(v), rooms[0], 0.05));
       const rampD = (cols, f, x, y, amt) => cols[Math.max(0, Math.min(cols.length - 1, Math.floor(f * (cols.length - 1) + 0.5 + (dth(x, y) - 0.5) * amt)))];
       const WL = ['#0e4a7e', '#1a6fa8', '#2a96cc', '#4cc0e6', '#8ae0f6'].map(hx), WR = ['#0a3664', '#13558a', '#1f78b0', '#38a2d6', '#6ccaee'].map(hx);
-      const SURFC = ['#2a9ccc', '#5cc8ea', '#c8f6ff'].map(hx), GRAV = ['#f0c070', '#d88850', '#a87a5a', '#f4e8c8', '#e08aa0', '#7a90b0'].map(hx);
-      const FISHS = [['#ff7a1a', '#ffc070', '#ffb040', '#ffe2b8', '#d8520c'], ['#f4f0ec', '#ffffff', '#ff5a3a', '#fff4ee', '#e83a24'], ['#ff8a2a', '#ffd090', '#2a2026', '#fff0d8', '#d85a14']][grain[3] < 0.55 ? 0 : grain[3] < 0.82 ? 1 : 2].map(hx);
+      const SURFC = ['#2a9ccc', '#5cc8ea', '#c8f6ff'].map(hx), GRAV = ['#e2cca0', '#b08262', '#a87a5a', '#f4e8c8', '#e08aa0', '#7a90b0'].map(hx);
       const caus = (x, y, t) => {
         const a = Math.sin(x * 0.7 + t * 1.1 + Math.sin(y * 0.55 - t * 0.7) * 1.7), b = Math.sin(y * (y < 30 ? 0.75 : 1.6) - t * 0.9 + Math.sin(x * 0.42 + t * 0.6) * 2.1);
         const v = Math.abs(a + b);
@@ -853,10 +852,28 @@ Proto.add({
         if (lit > 0.08) { const cs = caus(x, y, t); if (cs > 0.4) lv = Math.max(lv, lit > 0.5 ? 5 : 4); else if (cs > 0.05 && lit > 0.3) lv = Math.max(lv, 3); }
         return NIGHT[lv];
       }
+      // the goldfish's sprite (head right, 14 by 6): a forked fantail in four swish poses (spread, up, spread, down)
+      // and its body; its colours: o body, h its lit back, s its shaded belly, d and t the dorsal fin and tail,
+      // p the pectoral fin, w and k the eye, m the mouth
+      const FBODY = ['...ddd....', '..ohhhoo..', 'oooooowko.', 'ooooookkom', '.soooppos.', '..ssssss..'];
+      const FTAIL = [['t...', 'tt..', '.ttt', '.ttt', 'tt..', 't...'], ['tt..', '.tt.', '..tt', '.ttt', 'tt..', '....'], ['t...', 'tt..', '.ttt', '.ttt', 'tt..', 't...'], ['....', 'tt..', '.ttt', '..tt', '.tt.', 'tt..']];
+      const fv = grain[3] < 0.55 ? 0 : grain[3] < 0.82 ? 1 : 2;
+      const fpal = a => { const m = { o: a[0], h: a[1], s: a[2], d: a[3], t: a[3], p: a[4], m: a[5], w: '#ffffff', k: '#16101c' }; for (const q in m) m[q] = hx(m[q]); return m; };
+      const FPAL = fpal([['#ff7a1a', '#ffb060', '#e05a10', '#ffd040', '#ffe8a0', '#8a2a06'], ['#f8f4f0', '#ffffff', '#d8d0e0', '#ff5a3a', '#ffe4dc', '#c82a1a'], ['#ff7a1a', '#ffb060', '#e05a10', '#ffd040', '#fff4e8', '#8a2a06']][fv]);
+      const FGOLD = fpal(['#ffd23a', '#fff6b0', '#c88a10', '#ffb020', '#fff0c0', '#a86a08']);
+      // the red-and-white one wears a red cap and a red saddle; the orange-and-white one a white saddle
+      const FOVER = new Int32Array(84);
+      if (fv === 1) for (const [i, j] of [[9, 1], [10, 1], [11, 1], [9, 2], [12, 2], [12, 3], [6, 2], [7, 2], [7, 3]]) FOVER[j * 14 + i] = hx('#ff5a3a');
+      if (fv === 2) for (const [i, j] of [[6, 1], [7, 1], [8, 1], [6, 2], [7, 2]]) FOVER[j * 14 + i] = hx('#fff4e8');
+      const fishM = new Uint8Array(N * N);
+      let tailPh = 0;
       let fishU = -2, fishDir = 1, fishV = 0, lookX = 0, lookY = 0, dartAt = -9, flipAt = -9, eaten = 0, fleeUntil = -9, fleeTo = 0, finger = null;
       const food = [], hearts = [];
       const tankBub = [];
+      // (the tank's colours are looked up once, not parsed again every frame)
+      const hxMemo = new Map(), hxA = v => { let q = hxMemo.get(v); if (q === undefined) { q = hx(v); hxMemo.set(v, q); } return q; };
       function aquarium(t) {
+        const hx = hxA;
         hop = 0; ty = tall ? 3 : 7; cyS = ty + 7 + H;
         const h = H;
         kind.fill(0);
@@ -879,7 +896,7 @@ Proto.add({
             let col = rampD(left ? WL : WR, 0.88 - 0.98 * v / h + shaft, x, y, 0.7);
             if (v === 0) col = left ? hx('#d8f8ff') : hx('#a8e8fa');
             else if (v === 1) col = (k + Math.floor(t * 3)) % 6 === 0 ? WHITE : left ? WL[4] : WR[4];
-            if (v >= h - 3 && v < h - 1) col = GRAV[(k * 7 + v * 3 + (left ? 0 : 2) + (grain[k % 40] > 0.6 ? 1 : 0)) % 6];
+            if (v === h - 2) col = GRAV[(k * 7 + v * 3 + (left ? 0 : 2) + (grain[k % 40] > 0.6 ? 1 : 0)) % 6];
             if (v === h - 1) col = left ? hx('#16263a') : hx('#0c1826');
             P(x, y, col, 1);
           }
@@ -887,31 +904,44 @@ Proto.add({
         // swaying grass at both ends, and a little sunken castle on the right
         const blades = [[-12, 8, 0], [-10, 6, 1], [-8, 4, 0], [9, 5, 1], [11, 8, 0], [12, 6, 1]];
         for (const [u, len, tone] of blades) for (let j = 0; j < len; j++) {
-          const bv = h - 4 - j, sw = Math.round(Math.sin(t * 1.3 + u * 0.7 + j * 0.35) * j / len * 1.6);
+          const bv = h - 3 - j, sw = Math.round(Math.sin(t * 1.3 + u * 0.7 + j * 0.35) * j / len * 1.6);
           T(u + sw, bv, j === len - 1 ? hx('#9af08a') : tone ? hx('#2e9a50') : hx('#45c066'));
         }
-        const CAS = { c: hx('#d8c8a8'), C: hx('#a89a80'), d: hx('#2a1c2a'), f: hx('#ff5a6a') };
-        ['..f..', '..c..', 'c.c.c', 'ccccc', 'cCdCc', 'cCdCc'].forEach((r, j) => { for (let i = 0; i < 5; i++) if (r[i] !== '.') T(3 + i, h - 9 + j, CAS[r[i]]); });
+        const CAS = { c: hx('#8aa0b8'), C: hx('#5a7090'), d: hx('#14243a'), f: hx('#ff5a6a') };
+        ['..f..', '..c..', 'c.c.c', 'ccccc', 'cCdCc', 'cCdCc'].forEach((r, j) => { for (let i = 0; i < 5; i++) if (r[i] !== '.') T(3 + i, h - 8 + j, CAS[r[i]]); });
         // the air stone and its stream of bubbles
-        T(-5, h - 4, hx('#5a6070')); T(-4, h - 4, hx('#7a8090'));
-        for (let i = 0; i < 5; i++) { const ph = (t * 0.55 + i / 5) % 1, bv = Math.round(h - 5 - ph * (h - 5)); if (bv > 1) T(-5 + (Math.sin(t * 3 + i * 2) > 0 ? 1 : 0), bv, i % 2 ? WHITE : hx('#bff2ff')); }
+        T(-5, h - 3, hx('#5a6070')); T(-4, h - 3, hx('#7a8090'));
+        for (let i = 0; i < 5; i++) { const ph = (t * 0.55 + i / 5) % 1, bv = Math.round(h - 4 - ph * (h - 4)); if (bv > 1) T(-5 + (Math.sin(t * 3 + i * 2) > 0 ? 1 : 0), bv, i % 2 ? WHITE : hx('#bff2ff')); }
         for (let i = tankBub.length - 1; i >= 0; i--) { const b = tankBub[i], bv = Math.round(b.v - (t - b.t0) * 7); if (t < b.t0) continue; if (bv < 2) { tankBub.splice(i, 1); continue; } T(b.u + (bv % 3 === 0 ? 1 : 0), bv, WHITE); }
-        // the goldfish: a fancy fantail, its double tail flowing, swimming laps round the tank
-        const fl = Math.floor(t * (t - dartAt < 0.8 ? 12 : 5)) % 2, fu = Math.round(fishU), fb = h - 10 + Math.round(fishV) - (t - flipAt < 0.9 ? Math.round(Math.sin(Math.PI * (t - flipAt) / 0.9) * 3) : 0);
-        const BODY = ['..ddd.....', 'oooooo....', 'ohhoooowo.', 'oooooooko.', 'ooooooooom', 'bbbbbbbb..', '.f....f...'];
-        const TAIL = fl ? ['...', '...', '.tt', 'ttt', '.tt', '...', '...'] : ['...', 't..', 'tt.', 'ttt', 'tt.', 't..', '...'];
-        const FROWS = BODY.map((r, j) => TAIL[j] + r);
+        // the goldfish: a fantail swimming laps along the glass, drawn from a side-view sprite (head right, 14 by 6):
+        // its round body lit along the back and shaded under the belly, a big dark eye with a glint, a dorsal fin,
+        // a pectoral fin that paddles, and a double tail that swishes up and down as it swims
+        const fu = Math.round(fishU), fb = h - 9 + Math.round(fishV) - (t - flipAt < 0.9 ? Math.round(Math.sin(Math.PI * (t - flipAt) / 0.9) * 3) : 0);
+        const tp = Math.floor(tailPh) & 3, TAIL = FTAIL[tp];
         // (after every fifth flake it eats it turns a happy golden somersault)
-        const flip = t - flipAt < 0.9, FS = flip ? [hx('#ffd23a'), hx('#fff6b0'), hx('#ffb020'), hx('#fff0c0'), hx('#c88a10')] : FISHS;
+        const flip = t - flipAt < 0.9, FM = flip ? FGOLD : FPAL;
         const fd = flip ? (Math.floor((t - flipAt) * 7) % 2 ? -fishDir : fishDir) : fishDir;
-        const FMAP = { o: FS[0], h: FS[1], d: FS[2], t: FS[2], b: FS[3], f: FS[2], m: FS[4], w: WHITE, k: INK };
-        FROWS.forEach((r, j) => { for (let i = 0; i < 13; i++) if (r[i] !== '.' && r[i] !== ' ') T(fu + (fd > 0 ? i - 6 : 6 - i), fb + j, FMAP[r[i]]); });
+        fishM.fill(0);
+        for (let j = 0; j < 6; j++) {
+          const r = TAIL[j] + FBODY[j];
+          for (let i = 0; i < 14; i++) {
+            let ch = r[i];
+            // (the pectoral fin paddles in time with the tail)
+            if ((tp & 1) && i === 10 && (j === 4 || j === 5)) ch = j === 4 ? 'o' : 'p';
+            if (ch === '.') continue;
+            const ov = FOVER[j * 14 + i];
+            const col = ov && !flip ? ov : FM[ch];
+            const u = fu + (fd > 0 ? i - 7 : 7 - i), bv = fb + j, k = u < 0 ? -u - 1 : u;
+            // (its steps along the glass's slope are counted from the fish, not the tank, so its outline keeps its shape
+            // as it swims instead of shimmering a cell at a time)
+            if (k < 14 && bv >= 0 && bv < h) { const y = ty + 14 - ((k + (fu & 1)) >> 1) + bv, x = 20 + u; if (y >= 0 && y < N) { P(x, y, col, 1); fishM[y * N + x] = 1; } }
+          }
+        }
         // the food you dropped, sinking (it rests on the gravel until the fish finds it)
-        for (const f of food) { if (t < f.t0) continue; const bv = Math.round(Math.min(h - 4, 1 + (t - f.t0) * 1.7)), u = f.u + (bv < h - 4 && Math.sin(t * 3 + f.t0 * 7) > 0.5 ? 1 : 0); if (t - f.t0 < 0.25) T(f.u, 0, WHITE); T(u, bv, f.c ? hx('#f0a050') : hx('#c8603a')); }
+        for (const f of food) { if (t < f.t0) continue; const bv = Math.round(Math.min(h - 3, 1 + (t - f.t0) * 1.7)), u = f.u + (bv < h - 3 && Math.sin(t * 3 + f.t0 * 7) > 0.5 ? 1 : 0); if (t - f.t0 < 0.25) T(f.u, 0, WHITE); T(u, bv, f.c ? hx('#f0a050') : hx('#c8603a')); }
         for (let i = hearts.length - 1; i >= 0; i--) { const k = t - hearts[i].t0; if (k > 1.6) { hearts.splice(i, 1); continue; } const bv = Math.round(hearts[i].bv - k * 6); if (bv >= 1) { T(hearts[i].u, bv, hx('#ff5a8a')); T(hearts[i].u + 1, bv, hx('#ff5a8a')); T(hearts[i].u, bv + 1, hx('#ff8ab0')); } }
-        if (grain[3] >= 0.82) for (const [i, j] of [[5, 2], [8, 4], [6, 4]]) T(fu + (fishDir > 0 ? i - 6 : 6 - i), fb + j, hx('#2a2026'));
-        // the glass: a bright edge down the front corner
-        for (let bv = 3; bv < h - 2; bv++) if (bv % 5 !== 4) T(-1, bv, hx('#e8fbff'));
+        // the glass: a bright edge down the front corner (broken where the fish passes, so it doesn't cut it in two)
+        for (let bv = 3; bv < h - 2; bv++) if (bv % 5 !== 4) { const y = ty + 14 + bv; if (y < N && !fishM[y * N + 19]) T(-1, bv, hx('#e8fbff')); }
         // its eyes: two bubbles stuck on the glass, looking at you
         const lx = lookX > 0.3 ? 1 : lookX < -0.3 ? -1 : 0, ly = lookY > 0.3 ? 1 : 0, bl = blink(t);
         for (const sg of [-1, 1]) {
@@ -1237,29 +1267,34 @@ Proto.add({
         if (down && gx >= 6 && gx < 34) { const ct = colTop(gx); if (gy >= ct && gy < ct + h) finger = { u: Math.floor(gx) - 20, bv: gy - ct }; }
         // where it wants to be: away from a knock, at your finger, at the nearest food, or idling
         const live = food.filter(f => t >= f.t0);
-        let goalU = Math.sin(t * 0.33) * 9, goalV = Math.sin(t * 1.1) * 1.2, fast = false;
+        // (it holds its depth while it idles, so it glides; in a tall tank it wanders up and down too)
+        let goalU = Math.sin(t * 0.33) * 6.5, goalV = Math.sin(t * 0.6) * (0.3 + (h - 14) * 0.3) - (h - 14) * 0.4, fast = false, face = 0;
+        // (to eat, its mouth goes to the thing from the side it is on, or the other side if that's past the glass;
+        // close in, it turns to face it)
+        const reach = u => { let sd = fishU <= u ? -1 : 1; if (Math.abs(u + 6 * sd) > 7) sd = -sd; goalU = u + 6 * sd; if (Math.abs(goalU - fishU) < 2.5) face = -sd; };
         if (t < fleeUntil) { goalU = fleeTo; fast = true; }
-        else if (finger) { goalU = finger.u - 6 * Math.sign(finger.u - fishU || 1); goalV = finger.bv - (h - 10) - 4; fast = true; }
+        else if (finger) { reach(finger.u); goalV = finger.bv - (h - 9) - 3; fast = true; }
         else if (live.length) {
           let best = live[0], bd = 1e9;
           for (const f of live) { const d = Math.abs(f.u - fishU); if (d < bd) { bd = d; best = f; } }
-          const fbv = Math.min(h - 4, 1 + (t - best.t0) * 1.7);
-          goalU = best.u - 6 * Math.sign(best.u - fishU || 1); goalV = fbv - (h - 10) - 4; fast = true;
+          const fbv = Math.min(h - 3, 1 + (t - best.t0) * 1.7);
+          reach(best.u); goalV = fbv - (h - 9) - 3; fast = true;
         }
         const stp = Math.max(-0.45, Math.min(0.45, (goalU - fishU) * (fast ? 0.16 : 0.07)));
-        if (Math.abs(stp) > 0.02) fishDir = stp > 0 ? 1 : -1;
-        fishU = Math.max(-12, Math.min(12, fishU + stp));
-        fishV = Math.max(-2.5, Math.min(2, fishV + Math.max(-0.25, Math.min(0.25, (goalV - fishV) * 0.12))));
+        if (face) fishDir = face; else if (Math.abs(stp) > 0.02) fishDir = stp > 0 ? 1 : -1;
+        fishU = Math.max(-7, Math.min(7, fishU + stp));
+        tailPh += dt * (3.5 + 22 * Math.abs(stp)) * (t - dartAt < 0.8 ? 2 : 1);
+        fishV = Math.max(11.5 - h, Math.min(2, fishV + Math.max(-0.25, Math.min(0.25, (goalV - fishV) * 0.12))));
         // a gulp when its mouth reaches a flake
-        const mu = fishU + 6 * fishDir, mv = h - 10 + fishV + 4;
+        const mu = fishU + 6 * fishDir, mv = h - 9 + fishV + 3;
         for (let i = food.length - 1; i >= 0; i--) {
           const f = food[i]; if (t < f.t0) continue;
-          const fbv = Math.min(h - 4, 1 + (t - f.t0) * 1.7);
+          const fbv = Math.min(h - 3, 1 + (t - f.t0) * 1.7);
           if (Math.abs(mu - f.u) <= 1.6 && Math.abs(mv - fbv) <= 1.6) {
             food.splice(i, 1); eaten++;
             if (tankBub.length < 12) tankBub.push({ u: Math.round(mu), v: Math.round(mv), t0: t });
             c.sound.hit('blip', 0.12, { freq: 620 });
-            if (eaten % 5 === 0) { flipAt = t; hearts.push({ u: Math.round(fishU), bv: h - 10 + Math.round(fishV), t0: t + 0.4 }); [0, 2, 4, 7, 9, 12].forEach((k, j) => c.sound.note(scale(k) + 12, { dur: 0.12, vel: 0.08, wave: 'sine', at: j * 0.07 })); }
+            if (eaten % 5 === 0) { flipAt = t; hearts.push({ u: Math.round(fishU), bv: h - 9 + Math.round(fishV), t0: t + 0.4 }); [0, 2, 4, 7, 9, 12].forEach((k, j) => c.sound.note(scale(k) + 12, { dur: 0.12, vel: 0.08, wave: 'sine', at: j * 0.07 })); }
           }
         }
         lookX = finger ? (finger.u) / 6 : live.length ? (live[0].u) / 6 : inp.inside ? (gx - 20) / 6 : Math.sin(t * 0.5) * 0.5 + Math.sin(t * 0.21) * 0.6;
