@@ -1,9 +1,9 @@
 prints archive
 ==============
 
-This folder is a complete public copy of prints: the art code that draws every print (art/*.js, art/pfp1/, art/drop03/,
-gems.js) and the public record (record/). With the art code and a print's seed anyone can redraw
-that print exactly, even if the prints site is gone.
+This folder is a complete public copy of prints: the art code that draws every print (art/*.js, art/pfp1/,
+art/drop03/ and each later drop's art/dropNN/, gems.js) and the public record (record/). With the art code and a
+print's seed anyone can redraw that print exactly, even if the prints site is gone.
 
 manifest.json lists every file with its size, SHA-256 and IPFS CID, so you can check a copy is exact.
 
