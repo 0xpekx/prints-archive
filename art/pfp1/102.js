@@ -397,7 +397,7 @@ Proto.add({
     function testCard(t) {
       if (press) { const nt = Math.max(0, Math.min(1, press[0] / N)); if (Math.abs(nt - station) < 0.03 && Math.abs(tune - station) >= 0.03) c.sound.note(83, { dur: 0.5, vel: 0.06, wave: 'sine' }); tune = nt; }
       const off = Math.abs(tune - station), locked = off < 0.03, bad = locked ? 0 : Math.min(1, (off - 0.03) * 3.2);
-      tuneRoll = locked ? Math.round(tuneRoll * 0.8) : tuneRoll + bad * 0.9;
+      tuneRoll = locked ? Math.trunc(tuneRoll * 0.8) : tuneRoll + bad * 0.9;   // (trunc: rounding stuck at 2 rows for good once tuned)
       const since = t - legAt, roll = (since < 0.9 ? Math.round((1 - since / 0.9) ** 2 * 32) : 0) + Math.floor(tuneRoll);
       const tmp = new Array(N * N), blink = (t + blinkOff) % blinkEvery < 0.14;
       for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
