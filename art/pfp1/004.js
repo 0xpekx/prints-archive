@@ -149,7 +149,7 @@ Proto.add({
       if (beard[0] === 'Ember Beard') beard = ['Long'];
     }
     if (swapped) {
-      skin = ramp({ Toad: ['#24401a', '#4a8a34', '#8ad05a'], Mouse: ['#4a4048', '#8a7e86', '#c8bec4'], Raven: ['#08080e', '#22223a', '#4a4a6a'] }[creature]);
+      skin = ramp({ Toad: ['#24401a', '#4a8a34', '#8ad05a'], Mouse: ['#4a4048', '#8a7e86', '#c8bec4'], Raven: ['#0c0c1a', '#282846', '#545482'] }[creature]);
       if (beard[0] === 'Clean Shaven') beard = ['Long'];
       c.trait('Face', creature); c.trait('Eyes', creature + ' Eyes'); c.trait('Nose', 'None'); c.trait('Brows', 'None'); c.trait('Familiar', 'Tiny Wizard');
     }
@@ -788,22 +788,26 @@ Proto.add({
       }
 
       // ----- Swapped: the familiar has taken over: hat, robe, beard and all, out in a mushroom ring by moonlight,
-      // the wizard riding tiny on its shoulder. Drag the hat off its head and drop it on the tiny wizard -----
+      // the wizard riding tiny on its shoulder, fireflies rising and a ring of spell sparks round them. It breathes, sways
+      // and blinks (the founder, 2026-10-23: "kinda breathe and sway/move a bit"); the hat's tip swings. A tap: the tiny
+      // wizard flicks his wand and sparks burst off it; the pointer draws the fireflies (the hat stays put: the founder,
+      // 2026-10-23) -----
       function swapScene() {
         const FOREST = rampOf(['#03080e', '#08182a', '#10283a', '#1e4458']);
         const GLOW = rampOf(['#0a2a3a', '#1a7a9a', '#4ad8e8', '#d0ffff']);
         const ROBE = ramp(robes[1]), HAIR = ramp(hairCol[1]), HIDE = skin, TINY = realSkin;
-        const sparks = [];
-        for (let i = 0; i < 7; i++) sparks.push([hv(i, 1, 8) * 6.28, 9 + hv(i, 2, 8) * 6, 0.5 + hv(i, 3, 8)]);
-        let swapUntil = -1, wave = -1, held = null, backFrom = null, backAt = -9, tinyAt = -9;
-        let hatOff = [0, 0];
-        const TINY_HAT = [10, -1.5], ON_TINY = 3;
+        let wave = -1, castAt = -9;
+        const bursts = [];
+        // (the tiny wizard: sat on the right shoulder; his sprite's top-left corner, and his wand's tip)
+        const TX = 26, TY = 12, WX = TX + 8, WY = TY + 6;
+        let OX = 0, OY = 0;
+        const PO = (x, y, cl) => P(x + OX, y + OY, cl);
         const hb0 = creature === 'Mouse' ? 9 : creature === 'Toad' ? 6.8 : 7.6;
         // is a cell on the hat (cone or brim), with the hat moved by (ox, oy)?
-        const onHat = (x, y, ox, oy, hb) => {
+        const onHat = (x, y, ox, oy, hb, sw = 0) => {
           const px = x + 0.5 - ox, py = y + 0.5 - oy;
           if (py < hb - 12 || py > hb + 1.4) return 0;
-          const u = (py - (hb - 12)) / 12, mx = 20 + bendW * (1 - u) * (1 - u);
+          const u = (py - (hb - 12)) / 12, mx = 20 + (bendW + sw) * (1 - u) * (1 - u);
           if (py <= hb && Math.abs(px - mx) <= 0.5 + u * 6.4) return Math.abs(py - hb + 1) < 0.6 ? 3 : 1;
           return ((px - 20) / 11) ** 2 + ((py - hb - 0.4) / 1.3) ** 2 <= 1 ? 2 : 0;
         };
@@ -812,6 +816,16 @@ Proto.add({
           else if (creature === 'Mouse') [14, 16, 14].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.05, vel: 0.1, wave: 'sine', at: at + i * 0.06 }));
           else [0, 0.22].forEach(d => c.sound.note(lyd2(-3), { dur: 0.16, vel: 0.12, wave: 'sawtooth', cutoff: 1400, at: at + d }));
         };
+        // a dither that's solid in the middle of each step and grainy only at the seams (the robe and the sky read clean
+        // at 64 px instead of as checkerboard)
+        const sdith = (rmp, v, x, y, soft = 0.3) => { const p = Math.max(0, Math.min(rmp.length - 1.001, v * (rmp.length - 1))), i = Math.floor(p), f = Math.max(0, Math.min(1, (p - i - 0.5) / soft + 0.5)); return rmp[f > th(x, y) ? i + 1 : i]; };
+        // the robe: round, broad shoulders (the tiny wizard sits on one)
+        const robeHalf = y => (y < 19 ? -1 : Math.min(17.5, 8 + 9.5 * Math.sqrt(Math.min(1, (y - 19) / 7))));
+        const onRobe = (x, y) => Math.abs(x + 0.5 - 20) <= robeHalf(y);
+        const MOON = rampOf(['#8a8a78', '#d8d2b4', '#f6f0d8', '#fffdf2']), MX = 8.5, MY = 3.5, MR = 5.4;
+        const VIOLET = rampOf(['#2a0a3a', '#7a2aaa', '#d07aff', '#ffe0ff']), GOLD = rampOf(['#4a2a08', '#a8701a', '#ffd25a']);
+        const STARS = [];
+        for (let i = 0; i < 14; i++) STARS.push([-3 + Math.floor(hv(i, 1, 41) * 47), -4 + Math.floor(hv(i, 2, 41) * 22), hv(i, 3, 41) * 6.28, 1 + hv(i, 4, 41) * 2]);
         // the creature's head: 1 hide, 2 the paler bits (belly, inner ear, beak), 3 eye white, 4 dark
         const head = (x, y) => {
           const px = x + 0.5, py = y + 0.5;
@@ -832,119 +846,197 @@ Proto.add({
           return 0;
         };
         return {
-          extra: t => (t < swapUntil ? 1 : 0) + (t < wave ? 2 : 0) + ':' + (held || t - backAt < 0.7 || t - tinyAt < ON_TINY + 0.5 || c.input.inside ? Math.floor(t * 16) : ''),
+          // (the motes and sparks move all the time: drawn 16 times a second)
+          extra: t => Math.floor(t * 16) + (t < wave ? 'w' : ''),
           feel: t => {
-            const p = ptr();
             for (const [x, y] of tapsNow()) {
               if (x < -2 || y < -4 || x >= N + 2 || y >= N) continue;
-              if (!held && t - tinyAt > ON_TINY && t - backAt > 0.7 && onHat(Math.floor(x), Math.floor(y), hatOff[0], hatOff[1], hb0)) {
-                // you take hold of the hat
-                held = [x - hatOff[0], y - hatOff[1]];
-                c.sound.hit('noise', 0.08, { cutoff: 2600, dur: 0.15 }); callOf(0.05);
-              } else if (Math.hypot(x - 30, y - 13) < 4 && t - tinyAt > ON_TINY) {
-                wave = t + 1.2;
-                [4, 2, 0].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.1, vel: 0.14, wave: 'triangle', cutoff: 1600, at: i * 0.12 }));
+              // a tap: the tiny wizard flicks his wand, a burst of sparks flies from its tip, the familiar calls
+              wave = t + 1.2; castAt = t;
+              const n0 = bursts.length;
+              for (let k = 0; k < 34; k++) {
+                const a = -Math.PI / 2 + 0.45 + (hv(k, Math.floor(t * 30), 21) - 0.5) * 2.4, v = 9 + hv(k, Math.floor(t * 30), 22) * 17;
+                bursts.push([WX, WY, Math.cos(a) * v, Math.sin(a) * v, t, 1 + hv(k, Math.floor(t * 30), 23) * 0.9, k % 3]);
               }
+              if (bursts.length > 120) bursts.splice(0, bursts.length - 120);
+              c.sound.hit('noise', 0.08, { cutoff: 4200, dur: 0.12 });
+              [7, 9, 11, 14].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.18, vel: 0.08, wave: 'triangle', cutoff: 2400, at: 0.03 + i * 0.05 }));
+              callOf(0.3);
+              void n0;
             }
-            if (held) {
-              hatOff = [p.x - held[0], p.y - held[1]];
-              if (!p.down) {
-                held = null;
-                if (Math.hypot(p.x - 30, p.y - 12) < 6) {
-                  // dropped on the tiny wizard: it lands over him, sparkling, the wizard's again for a moment
-                  tinyAt = t; hatOff = TINY_HAT.slice();
-                  c.sound.hit('noise', 0.14, { cutoff: 2600, dur: 0.3 });
-                  [0, 4, 7, 11, 14].forEach((k, i) => c.sound.note(lyd2(k), { dur: 0.3, vel: 0.1, wave: 'triangle', cutoff: 1800, at: 0.1 + i * 0.1 }));
-                } else { backFrom = hatOff.slice(); backAt = t; }
-              }
-            }
-            if (tinyAt > 0 && t - tinyAt > ON_TINY && t - tinyAt < ON_TINY + 0.1) { backFrom = hatOff.slice(); backAt = t; tinyAt = -9; swapUntil = t + 1.1; c.sound.hit('noise', 0.14, { cutoff: 2600, dur: 0.3 }); callOf(0.2); }
-            if (!held && t - backAt < 0.7) { const u = Math.min(1, (t - backAt) / 0.6); hatOff = [backFrom[0] * (1 - u), backFrom[1] * (1 - u)]; }
-            else if (!held && tinyAt < 0 && t - backAt >= 0.7) hatOff = [0, 0];
+            for (let k = bursts.length - 1; k >= 0; k--) if (t - bursts[k][4] > bursts[k][5]) bursts.splice(k, 1);
           },
           draw: (t, q) => {
-            const down = t < swapUntil ? 1 : 0, bare = Math.hypot(hatOff[0], hatOff[1]) > 2, onTiny = t - tinyAt < ON_TINY;
+            // it breathes (its chest and head rise a cell on the breath in) and sways (its head leans a cell, the hat's tip
+            // swings further, lagging), slow, out of step with each other
+            const br = Math.sin(t * 1.75), swv = Math.sin(t * 1.15 + 0.6), lag = Math.sin(t * 1.15 + 0.1);
+            const down = br > 0.3 ? -1 : 0, lean = swv > 0.5 ? 1 : swv < -0.5 ? -1 : 0, tipS = lag * 2.4 + br * 0.3;
+            // (never in the first seconds: a still or a thumbnail is drawn from the start, eyes open)
+            const blink = (t % 4.3) > 4.17 || ((t + 0.4) % 11.7) > 11.58;
+            const onRobeB = (x, y) => onRobe(x, y - down);
+            const hb = hb0, pp = ptr();
+            // the particles: fireflies rising off the mushrooms (drawn toward the pointer), a ring of spell sparks round
+            // the familiar (behind it, then in front), stars, the wand's trickle, and a tap's burst
+            const motes = [], ring = [];
+            for (let i = 0; i < 26; i++) {
+              const sp = 0.05 + hv(i, 4, 31) * 0.06, u = (t * sp + hv(i, 5, 31)) % 1;
+              let mx = -3 + hv(i, 6, 31) * 46 + Math.sin(t * (0.6 + hv(i, 7, 31)) + i) * 2.4, my = 40 - u * 50;
+              if (pp.in) { const dx = pp.x - mx, dy = pp.y - my, d = Math.hypot(dx, dy); if (d < 14 && d > 0.5) { const f = (1 - d / 14) * 0.55; mx += dx * f; my += dy * f; } }
+              const tw = 0.5 + 0.5 * Math.sin(t * (2 + hv(i, 8, 31) * 3) + i * 1.7), fade = Math.min(1, u * 5, (1 - u) * 4);
+              motes.push([mx, my, tw * fade, i % 3 === 0 ? 1 : 0, i % 2]);
+            }
+            for (let i = 0; i < 8; i++) {
+              const a = t * 0.9 + i * Math.PI * 2 / 8 + Math.sin(t * 0.5 + i) * 0.15;
+              ring.push([a, Math.sin(a)]);
+            }
+            const moteAt = (m, front) => {
+              if (m[4] !== front || m[2] < 0.12 || (front && head(Math.round(m[0]), Math.round(m[1])))) return;
+              const cl = m[3] ? VIOLET : GLOW;
+              if (m[2] > 0.45) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P(m[0] + dx, m[1] + dy, m[2] > 0.8 ? cl[2] : cl[1]);
+              P(m[0], m[1], m[2] > 0.55 ? cl[3] : cl[2]);
+            };
+            const ringAt = front => {
+              for (const [a, z] of ring) {
+                if ((z > 0) !== front) continue;
+                const at = b => [20 + Math.cos(b) * 17, 25 + Math.sin(b) * 3.4 - Math.cos(b) * 1.4];
+                for (let k = 5; k >= 1; k--) { const [x, y] = at(a - k * 0.08); P(x, y, k < 2 ? GOLD[2] : k < 4 ? GOLD[1] : GOLD[0]); }
+                const [x, y] = at(a);
+                if (front) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) P(x + dx, y + dy, GOLD[2]);
+                P(x, y, front ? hex('#fffbe0') : GOLD[2]);
+              }
+            };
+            // the figure's shape, once a frame (for its dark edge and the glow round it)
+            const FM = new Uint8Array(W * W), fm = (x, y) => { const X = x + B, Y = y + B; return X >= 0 && Y >= 0 && X < W && Y < W && FM[Y * W + X] === 1; };
+            each((x, y) => { if (onRobeB(x, y) || head(x - lean, y - down) || onHat(x - lean, y - down, 0, 0, hb0, tipS)) FM[(y + B) * W + x + B] = 1; });
+            const aura = 0.3 + 0.2 * Math.sin(t * 1.6);
             // the clearing: dark trees all round, moonlight, a ring of glowing mushrooms on the moss
             each((x, y) => {
-              let col = dith(FOREST, 0.8 - (y + B) / W * 0.45 + Math.max(0, 0.5 - Math.hypot(x - 20, y + 6) / 30), x, y);
+              const dm = Math.hypot(x + 0.5 - MX, y + 0.5 - MY);
+              let col = sdith(FOREST, 0.72 - (y + B) / W * 0.5 + Math.max(0, 0.42 - dm / 26) + Math.max(0, 0.3 - Math.hypot(x - 20, y + 6) / 34), x, y, 0.45);
+              // the moon, a few craters, and its rim
+              if (dm < MR) col = dm > MR - 0.9 && x + 0.5 > MX ? MOON[1] : sdith(MOON, 0.95 - dm / MR * 0.35 - (hv(x >> 1, y >> 1, 11) < 0.18 ? 0.3 : 0), x, y, 0.2);
+              else if (Math.abs(dm - MR - 2.6) < 0.5 && th(x, y) < 0.35 + 0.15 * Math.sin(t * 0.8)) col = FOREST[3];
               const trunk = (x + 64) % 13 < 3 && (Math.abs(x - 20) > 13);
-              if (trunk && y < 32) col = FOREST[0];
+              if (trunk && y < 32) col = (x + 64) % 13 === 2 && dm < 16 ? FOREST[1] : FOREST[0];
               if (y >= 32) col = dith(rampOf(['#04100a', '#0c2a16', '#1a4a22']), 0.35 + hv(x, y, 3) * 0.4, x, y);
+              // a dark edge round the figure, so it stands off the night at any size
+              if (!fm(x, y)) {
+                if (fm(x - 1, y) || fm(x + 1, y) || fm(x, y + 1) || fm(x, y - 1)) col = INK2;
+                else if (y < 32 && (fm(x - 2, y) || fm(x + 2, y) || fm(x, y - 2) || fm(x - 1, y - 1) || fm(x + 1, y - 1) || fm(x - 1, y + 1) || fm(x + 1, y + 1)) && th(x, y) < aura) col = GLOW[th(x + 1, y) < aura * 0.5 ? 1 : 0];
+              }
               P(x, y, col);
             });
-            for (const [mx, my, k] of [[1, 33, 0], [5, 35, 1], [10, 37, 0], [30, 37, 1], [35, 35, 0], [39, 33, 1], [-2, 31, 1], [42, 31, 0]]) {
-              const glow = 0.5 + 0.5 * Math.sin(t * 1.4 + mx), cap = k ? GLOW : rampOf(['#2a0a3a', '#7a2aaa', '#d07aff', '#ffe0ff']);
-              for (let y = my - 5; y < my + 3; y++) for (let x = mx - 5; x < mx + 6; x++) { const d = Math.hypot(x - mx, (y - my) * 1.3); if (d < 4.5 && th(x, y) < (4.5 - d) / 6 * glow) P(x, y, cap[0]); }
-              P(mx, my, hex('#d8d0c0')); P(mx, my + 1, hex('#b8b0a0'));
-              P(mx - 1, my - 1, cap[1]); P(mx, my - 1, cap[2]); P(mx + 1, my - 1, cap[1]); P(mx, my - 2, cap[3]);
+            // stars between the trees, twinkling
+            for (const [sx, sy, ph, sp] of STARS) {
+              if (Math.hypot(sx - MX, sy - MY) < MR + 3.5 || fm(sx, sy) || fm(sx, sy + 1)) continue;
+              const b = Math.sin(t * sp + ph);
+              if (b > -0.3) P(sx, sy, b > 0.6 ? hex('#ffffff') : FOREST[3]);
+              if (b > 0.85) { P(sx - 1, sy, FOREST[3]); P(sx + 1, sy, FOREST[3]); P(sx, sy - 1, FOREST[3]); P(sx, sy + 1, FOREST[3]); }
             }
+            // glowing mushrooms in the moss behind
+            for (const [mx, my, k] of [[-2, 31, 1], [42, 31, 0], [1, 33, 0], [39, 33, 1]]) mushroom(mx, my, k, 0.8);
+            // what's behind the figure: half the fireflies, the far half of the spell ring
+            for (const m of motes) moteAt(m, 0);
+            ringAt(false);
             // the robe, wide on its shoulders, a star clasp
             each((x, y) => {
-              if (y < 19) return;
-              const px = x + 0.5 - 20, half = Math.min(17, 7 + (y - 19) * 1.3);
-              if (Math.abs(px) > half) return;
-              P(x, y, dith(ROBE, 0.5 + (-px * 0.03) - (y - 19) * 0.01, x, y));
+              if (!onRobeB(x, y)) return;
+              const px = x + 0.5 - 20, fold = y > 23 && Math.abs(Math.abs(px) - (4 + (y - 23) * 0.55)) < 0.6 ? 0.2 : 0;
+              let col = sdith(ROBE, 0.62 - px * 0.032 - (y - down - 19) * 0.012 - fold, x, y);
+              if (!onRobeB(x - 1, y)) col = ROBE[ROBE.length - 1];
+              else if (!onRobeB(x + 1, y) || (y - down > 19 && !onRobeB(x, y - 1) && px > 0)) col = ROBE[0];
+              P(x, y, col);
             });
-            P(20, 21, hex('#ffe27a')); P(19, 22, hex('#d09a24')); P(21, 22, hex('#d09a24'));
+            // where the tiny wizard sits, his shadow on the shoulder
+            for (let x = TX + 1; x < TX + 6; x++) if (onRobe(x, TY + 11)) P(x, TY + 11 + down, ROBE[0]);
+            P(20, 21 + down, hex('#ffe27a')); P(19, 22 + down, hex('#d09a24')); P(21, 22 + down, hex('#d09a24'));
             // the creature's head under the wizard's hat
             each((x, y) => {
-              const k = head(x, y - down);
+              const k = head(x - lean, y - down);
               if (!k) return;
-              const lit = 0.55 + (20 - x) * 0.02 - (y - 12) * 0.02 + (!head(x - 1, y - down) || !head(x, y - 1 - down) ? 0.35 : 0);
+              const lit = 0.55 + (20 - x) * 0.02 - (y - 12) * 0.02 + (!head(x - 1 - lean, y - down) || !head(x - lean, y - 1 - down) ? 0.35 : 0);
               P(x, y, k === 2 ? HIDE[2] : dith(HIDE, Math.max(0, Math.min(1, lit)), x, y));
             });
-            const Y = down;
-            if (bare && !onTiny) {
-              // the hat's gone: it gapes up after it
-              for (const ex of creature === 'Toad' ? [15, 25] : creature === 'Mouse' ? [17, 23] : [15, 23]) { P(ex, 11 + Y, hex('#ffffff')); P(ex + 1, 11 + Y, hex('#ffffff')); P(ex, 12 + Y, hex('#ffffff')); P(ex + 1, 12 + Y, INK2); }
-              for (let x = 18; x <= 21; x++) P(x, 17 + Y, INK2); P(19, 18 + Y, INK2); P(20, 18 + Y, INK2);
-            } else if (creature === 'Toad') {
+            OX = lean; OY = down;
+            const Y = 0;
+            if (creature === 'Toad') {
               // golden eyes with a bar of a pupil, a wide toad's grin, warts
-              for (const ex of [14, 25]) { rows4(['.yyy.', 'yyyyy', 'kkkkk', 'yyyyy', '.yyy.'], ex - 2, 8 + Y, { y: hex('#ffd040'), k: hex('#100808') }); P(ex - 1, 8 + Y, hex('#fff4b0')); }
-              for (let x = 11; x <= 29; x++) P(x, 18 + Y + (x < 13 || x > 27 ? -1 : 0), INK2);
-              P(18, 14 + Y, HIDE[0]); P(22, 14 + Y, HIDE[0]);
-              for (const [a, b] of [[12, 14], [27, 15], [16, 12], [24, 12], [13, 16], [26, 13]]) P(a, b + Y, HIDE[2]);
+              for (const ex of [14, 25]) { if (blink) rows4(['.ggg.', 'ggggg', 'kkkkk', 'ggggg', '.ggg.'], ex - 2, 8 + Y, { g: HIDE[1], k: hex('#100808') }); else { rows4(['.yyy.', 'yyyyy', 'kkkkk', 'yyyyy', '.yyy.'], ex - 2, 8 + Y, { y: hex('#ffd040'), k: hex('#100808') }); PO(ex - 1, 8 + Y, hex('#fff4b0')); } }
+              for (let x = 11; x <= 29; x++) PO(x, 18 + Y + (x < 13 || x > 27 ? -1 : 0), INK2);
+              PO(18, 14 + Y, HIDE[0]); PO(22, 14 + Y, HIDE[0]);
+              for (const [a, b] of [[12, 14], [27, 15], [16, 12], [24, 12], [13, 16], [26, 13]]) PO(a, b + Y, HIDE[2]);
             } else if (creature === 'Mouse') {
               // big black shining eyes, a pink nose, buck teeth, long whiskers
-              for (const ex of [16, 23]) { P(ex, 12 + Y, INK2); P(ex + 1, 12 + Y, INK2); P(ex, 13 + Y, INK2); P(ex + 1, 13 + Y, INK2); P(ex, 12 + Y, hex('#ffffff')); }
-              P(19, 16 + Y, hex('#ff7aa0')); P(20, 16 + Y, hex('#ff7aa0')); P(19, 17 + Y, hex('#d05a7a')); P(20, 17 + Y, hex('#d05a7a'));
-              P(19, 18 + Y, hex('#ffffff')); P(20, 18 + Y, hex('#ffffff'));
-              for (const sd of [-1, 1]) for (const dy of [-1, 0, 1]) for (let k = 0; k < 5; k++) P(20 + sd * (3 + k) - (sd < 0 ? 1 : 0), 17 + Y + dy + (k > 2 ? dy : 0), hex('#f4eef4'));
+              for (const ex of [16, 23]) { if (blink) { PO(ex - 1, 13 + Y, INK2); PO(ex, 13 + Y, INK2); PO(ex + 1, 13 + Y, INK2); PO(ex + 2, 13 + Y, INK2); } else { PO(ex, 12 + Y, INK2); PO(ex + 1, 12 + Y, INK2); PO(ex, 13 + Y, INK2); PO(ex + 1, 13 + Y, INK2); PO(ex, 12 + Y, hex('#ffffff')); } }
+              PO(19, 16 + Y, hex('#ff7aa0')); PO(20, 16 + Y, hex('#ff7aa0')); PO(19, 17 + Y, hex('#d05a7a')); PO(20, 17 + Y, hex('#d05a7a'));
+              PO(19, 18 + Y, hex('#ffffff')); PO(20, 18 + Y, hex('#ffffff'));
+              for (const sd of [-1, 1]) for (const dy of [-1, 0, 1]) for (let k = 0; k < 5; k++) PO(20 + sd * (3 + k) - (sd < 0 ? 1 : 0), 17 + Y + dy + (k > 2 ? dy : 0), hex('#f4eef4'));
             } else {
               // white-ringed eyes and a great grey beak
-              for (const ex of [14, 24]) { rows4(['.ww.', 'wyyw', 'wykw', '.ww.'], ex - 1, 10 + Y, { w: hex('#e8e8f0'), y: hex('#ffe070'), k: INK2 }); }
-              rows4(['kkkkkkk', 'kGGGGgk', '.kGggk.', '.kGggk.', '..kGk..', '..kgk..', '...k...'], 17, 13 + Y, { k: INK2, g: hex('#4a4a5a'), G: hex('#a8a8b8') });
-              for (const [a, b] of [[16, 6], [17, 5], [18, 6], [21, 6], [22, 5], [14, 9], [26, 9], [13, 13], [27, 13]]) P(a, b + Y, hex('#4a5a9a'));
+              for (const ex of [14, 24]) { if (blink) rows4(['.ww.', 'wkkw', 'wwww', '.ww.'], ex - 1, 10 + Y, { w: hex('#3a3a5a'), k: INK2 }); else rows4(['.ww.', 'wyyw', 'wykw', '.ww.'], ex - 1, 10 + Y, { w: hex('#e8e8f0'), y: hex('#ffe070'), k: INK2 }); }
+              rows4(['.kkkkkkk.', 'kWGGGGggk', 'kGGGGGggk', '.kGGGggk.', '.kGGGgk..', '..kGGgk..', '..kGgk...', '...kgk...', '...kk....'], 16, 13 + Y, { k: INK2, g: hex('#5a5a70'), G: hex('#a4a4ba'), W: hex('#e4e4f4') });
+              for (const [a, b] of [[16, 6], [17, 5], [18, 6], [21, 6], [22, 5], [14, 9], [26, 9], [13, 13], [27, 13], [15, 8], [25, 8], [19, 7], [20, 7]]) PO(a, b + Y, hex('#6a7ac0'));
+              for (const ex of [14, 24]) { PO(ex - 1, 9 + Y, hex('#8a9ae0')); PO(ex + 2, 9 + Y, hex('#8a9ae0')); }
             }
             // the beard it has put on, the hat it wears
+            // (its tip swings a little behind the head)
+            OX = 0; OY = 0;
             each((x, y) => {
-              const py = y + 0.5 - Y, px = x + 0.5 - 20, top = creature === 'Toad' ? 19.5 : 20;
-              if (py >= top && py < top + 9 && Math.abs(px) <= 4.4 - (py - top) * 0.45) P(x, y, dith(HAIR, 0.6 + Math.sin(x * 1.9) * 0.3 - (py - top) * 0.03, x, y));
+              const py = y + 0.5 - down, top = creature === 'Toad' ? 19.5 : 20, px = x + 0.5 - 20 - lean - (py - top > 4 ? Math.round(-lag * 0.8) : 0);
+              if (py >= top && py < top + 9 && Math.abs(px) <= 4.4 - (py - top) * 0.45) P(x, y, dith(HAIR, 0.6 + Math.sin((x - lean) * 1.9) * 0.3 - (py - top) * 0.03, x, y));
             });
             // the string that holds the false beard on
-            for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) P(20 + sd * (4 + k), (creature === 'Toad' ? 19 : 19) + Y - Math.round(k * 0.8), hex('#d8ccb0'));
+            OX = lean; OY = down;
+            for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) PO(20 + sd * (4 + k), 19 + Y - Math.round(k * 0.8), hex('#d8ccb0'));
+            // the tiny wizard rides the shoulder up and down with its breath
+            OX = 0;
             // the wizard, tiny, on its shoulder: hat, face, white beard, an arm up when it waves
             const tw = t < wave && Math.floor(t * 6) % 2;
-            rows4(['...y...', '..ggy..', '..ggg..', '.ggggg.', 'yyyyyyy', '.fsfsf.', '.fbbbf.', '..bbb..', '.rrbrr.', '.rrrrr.', 'rrrrrrr'], 27, 8, { y: hex('#ffe27a'), g: hex('#3a8aff'), r: hex('#e8e0f0'), f: TINY[2], s: INK2, b: hex('#ffffff') });
-            P(27 - (tw ? 1 : 0), 17 - (tw ? 3 : 0), TINY[2]); P(26 - (tw ? 1 : 0), 18 - (tw ? 3 : 1), TINY[1]);
-            // spell sparks circling
-            for (const [a, r, sp] of sparks) { const an = a + t * sp; P(20 + Math.cos(an) * (r + 6), 22 + Math.sin(an) * r * 0.6, Math.sin(t * 3 + a) > 0 ? GLOW[3] : GLOW[2]); }
-            if (down) for (let k = 0; k < 8; k++) P(20 + Math.cos(k + t * 4) * (5 + (t * 6 % 3)), 4 + Math.sin(k * 1.7) * 2, hex('#c8c8d0'));
-            // the hat: on its head, in your hand, or swamping the tiny wizard
-            const pp = ptr(), hover = !held && !bare && pp.in && onHat(Math.floor(pp.x), Math.floor(pp.y), hatOff[0], hatOff[1], hb0);
-            const hx = hatOff[0] + (hover ? (Math.floor(t * 8) % 2 ? 1 : -1) : 0), hy = hatOff[1] + (bare || onTiny ? 0 : down), hb = hb0;
+            rows4(['...y...', '..ggy..', '..ggg..', '.ggggg.', 'yyyyyyy', '.fsfsf.', '.fbbbf.', '..bbb..', '.rrbrr.', '.rrrrr.', 'rrrrrrr'], TX, TY, { y: hex('#ffe27a'), g: hex('#3a8aff'), r: hex('#e8e0f0'), f: TINY[2], s: INK2, b: hex('#ffffff') });
+            // his hand and a little wand, raised while he casts; its tip glows and lets a spark fall now and then
+            const up = tw ? 2 : 0, wx = WX + (tw ? 1 : 0), wy = WY - up;
+            PO(TX + 6, TY + 9 - up, TINY[2]); PO(TX + 7, TY + 8 - up, hex('#6a4a2a')); PO(wx, wy + 1, hex('#6a4a2a'));
+            const tip = 0.5 + 0.5 * Math.sin(t * 5);
+            PO(wx, wy, tip > 0.5 || t < wave ? hex('#fff6c0') : GOLD[2]);
+            if (tip > 0.8 || t < wave) { PO(wx - 1, wy, GOLD[1]); PO(wx + 1, wy, GOLD[1]); PO(wx, wy - 1, GOLD[1]); }
+            for (let k = 0; k < 4; k++) { const u = (t * 0.7 + k / 4) % 1; if (u < 0.85) PO(wx + Math.sin(u * 9 + k) * 1.2, wy + 1 + u * 7, u < 0.4 ? GOLD[2] : GOLD[1]); }
+            OX = 0; OY = 0;
+            for (const [mx, my, k] of [[0, 37, 1], [3, 39, 0], [37, 39, 1], [40, 37, 0]]) mushroom(mx, my, k, 1);
+            // what's in front: the near half of the ring, the other fireflies
+            ringAt(true);
+            for (const m of motes) moteAt(m, 1);
+            // the hat, on its head
             each((x, y) => {
-              const k = onHat(x, y, hx, hy, hb);
+              const k = onHat(x, y, lean, down, hb, tipS);
               if (!k) return;
-              const u = (y + 0.5 - hy - (hb - 12)) / 12, mx = 20 + hx + bendW * (1 - u) * (1 - u);
-              P(x, y, k === 3 ? hex('#d09a24') : dith(ROBE, k === 2 ? 0.3 : 0.55 - (x + 0.5 - mx) * 0.05, x, y));
+              const u = (y + 0.5 - down - (hb - 12)) / 12, mx = 20 + lean + (bendW + tipS) * (1 - u) * (1 - u);
+              let col = k === 3 ? hex('#d09a24') : sdith(ROBE, k === 2 ? 0.3 : 0.62 - (x + 0.5 - mx) * 0.06, x, y);
+              if (k === 1 && !onHat(x - 1, y, lean, down, hb, tipS)) col = ROBE[ROBE.length - 1];
+              if (k === 2 && !onHat(x, y + 1, lean, down, hb, tipS)) col = ROBE[0];
+              P(x, y, col);
             });
-            // a star glinting on the hat band now and then (all the time while you hover on it)
-            if (hover || (t % 2.2) < 0.25) { const gx = Math.round(20 + hx + 2), gy = Math.round(hb + hy - 1); P(gx, gy, hex('#ffffff')); P(gx - 1, gy, hex('#fff0a0')); P(gx + 1, gy, hex('#fff0a0')); P(gx, gy - 1, hex('#fff0a0')); P(gx, gy + 1, hex('#fff0a0')); }
-            if (onTiny) for (let k = 0; k < 6; k++) { const a = t * 5 + k * 1.05; P(30 + Math.cos(a) * 6, 6 + Math.sin(a) * 3, k % 2 ? GLOW[3] : hex('#ffe27a')); }
+            // a star glinting on the hat band now and then (and as a spell is cast)
+            if ((t % 2.2) < 0.25 || t - castAt < 0.5) { const gx = Math.round(20 + 2 + lean), gy = Math.round(hb - 1 + down); P(gx, gy, hex('#ffffff')); P(gx - 1, gy, hex('#fff0a0')); P(gx + 1, gy, hex('#fff0a0')); P(gx, gy - 1, hex('#fff0a0')); P(gx, gy + 1, hex('#fff0a0')); }
+            // a tap's burst: sparks thrown up from the wand, slowing, falling, going out
+            for (const [x0, y0, vx, vy, b0, life, k] of bursts) {
+              const a = t - b0;
+              if (a < 0 || a > life) continue;
+              const x = x0 + vx * a * (1 - a * 0.35), y = y0 + vy * a + 9 * a * a, u = a / life;
+              const cl = k === 0 ? GOLD : k === 1 ? GLOW : VIOLET;
+              P(x, y, u < 0.35 ? (k === 0 ? hex('#fff6c0') : cl[3]) : u < 0.7 ? cl[2] : cl[1]);
+              if (u < 0.3) P(x - vx * 0.03, y - vy * 0.03, cl[1]);
+            }
+            // a glowing mushroom: a dome cap, a pale stem, a soft glow that breathes
+            function mushroom(mx, my, k, sc) {
+              const glow = 0.55 + 0.45 * Math.sin(t * 1.4 + mx), cap = k ? GLOW : VIOLET;
+              for (let y = my - 6; y < my + 3; y++) for (let x = mx - 6; x < mx + 7; x++) { const d = Math.hypot(x - mx, (y - my + 1) * 1.2); if (d > 2.5 && d < 5.5 * sc && th(x, y) < (5.5 * sc - d) / 9 * glow) P(x, y, cap[0]); }
+              P(mx, my, hex('#e8e0d0')); P(mx, my + 1, hex('#c8c0b0')); P(mx, my + 2, hex('#a89e8e'));
+              P(mx - 2, my - 1, cap[1]); P(mx - 1, my - 1, cap[3]); P(mx, my - 1, cap[2]); P(mx + 1, my - 1, cap[2]); P(mx + 2, my - 1, cap[1]);
+              P(mx - 1, my - 2, cap[2]); P(mx, my - 2, cap[3]); P(mx + 1, my - 2, cap[2]);
+            }
           },
         };
-        function rows4(map, x0, y0, pal) { map.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') P(x0 + i, y0 + j, pal[r[i]]); }); }
+        function rows4(map, x0, y0, pal) { map.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] !== '.') PO(x0 + i, y0 + j, pal[r[i]]); }); }
       }
     }
     // (the legendaries end here)
