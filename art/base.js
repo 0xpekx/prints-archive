@@ -1,6 +1,7 @@
-// What the page needs of the art before the art itself, which loads after the first screen (art/lib.js, px.js, the
-// pieces and the newer drops' runtimes: one bundle of about 5 MB). Here: the seeded randomness, the palettes, and what
-// each piece is (art/facts.js: names, families, kinds), so traits, odds and a collector's orb work at once.
+// What the page needs of the art before the art itself, which loads only when a piece of its drop is drawn (art/lib.js,
+// px.js, the pieces and the newer drops' runtimes: a bundle a drop, about 5 MB in all; app.js needArt). Here: the seeded
+// randomness, the palettes, and what each piece is (art/facts.js: names, families, kinds), so traits, odds and a
+// collector's orb work at once, and lists and grids (the PC's thumbnails) need none of it.
 // window.Proto and window.ProtoPFP start as stand-ins holding just that. When the art has run (art/adopt.js, its last
 // script), each piece's code goes onto its stand-in and the stand-ins get the art's functions, so whatever held them
 // before (core.js's series, app.js) draws from then on. ProtoBase.loaded resolves then.
@@ -195,7 +196,8 @@
     srcs.forEach((src, k) => {
       const s = document.createElement('script');
       s.src = src; s.async = false;
-      s.onerror = () => { if (failed) return; failed = true; if (++x.tries < 6) setTimeout(() => run(g), 2000 * x.tries); else { busy = false; next(); } };
+      // (given up after six tries: the next piece drawn asks again, and whatever waits for it then draws)
+      s.onerror = () => { if (failed) return; failed = true; if (++x.tries < 6) setTimeout(() => run(g), 2000 * x.tries); else { x.asked = false; x.tries = 0; busy = false; next(); } };
       if (k === srcs.length - 1) s.onload = () => { if (!failed) { adoptGroup(g); busy = false; next(); } };
       document.head.appendChild(s);
     });
