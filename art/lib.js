@@ -217,7 +217,16 @@ vec3 palStep(float t){ t = fract(t); if (u_native > 0.5) return hsb(floor(t * 12
   //  px:  g.d is a packed n*n pixel grid, blown up with hard edges
   //  vec: g.ctx draws in a 1000 x 1000 space; g.lw(w) keeps hairlines visible
   //  gl:  frame() returns the uniforms for def.frag, drawn at n x n
-  function add(def) { def.index = list.length; list.push(def); }
+  // A piece's number (def.index, which g.home and the gallery's hashes go by) is its place in the whole drop: its family's
+  // first piece's, from art/facts.js (ProtoBase.famAt), and its place in its family. The page loads Drop 01 a family at a
+  // time (art/base.js need; the speed doc's F, 2026-10-26), and a family loaded alone numbers its pieces as the whole
+  // drop does. Without the facts (server/tools/art-facts.mjs, making them) it's the order they're added in, the same.
+  const famN = {};
+  function add(def) {
+    const at = window.ProtoBase && window.ProtoBase.famAt ? window.ProtoBase.famAt(def.fam) : null;
+    def.index = at == null ? list.length : at + (famN[def.fam] = (famN[def.fam] || 0) + 1) - 1;
+    list.push(def);
+  }
 
   // ---------- input (large view only) ----------
   // g.input is what the pointer is doing over the piece, in 0..1 canvas units

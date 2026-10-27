@@ -1,5 +1,6 @@
 // What the page needs of the art before the art itself, which loads only when a piece of its drop is drawn (art/lib.js,
-// px.js, the pieces and the newer drops' runtimes: a bundle a drop, about 5 MB in all; app.js needArt). Here: the seeded
+// px.js, the pieces and the newer drops' runtimes: a bundle a drop, Drop 01's a family, about 5 MB in all; app.js
+// needArt). Here: the seeded
 // randomness, the palettes, and what each piece is (art/facts.js: names, families, kinds), so traits, odds and a
 // collector's orb work at once, and lists and grids (the PC's thumbnails) need none of it.
 // window.Proto and window.ProtoPFP start as stand-ins holding just that. When the art has run (art/adopt.js, its last
@@ -118,7 +119,14 @@
   let known = '';
   // the later drops' stand-in runtimes, by window global (ProtoD03...), made from facts.js
   const extra = {};
-  function facts(F) {
+  // Drop 01's families, one a file: [file, family, its first piece's number, its pieces, the files it needs with it]
+  // (art-facts.mjs). lib.js add() numbers a family's pieces from its first (famAt), and the page loads them a family at
+  // a time (need, below)
+  let files = [];
+  const famFirst = new Map();
+  function facts(F, D1) {
+    files = (D1 && D1.files) || [];
+    for (const f of files) famFirst.set(f[1], f[2]);
     known = JSON.stringify(F);
     main.list.push(...F.main.map(o => Object.assign({}, o)));
     pfp.list.push(...F.pfp.map(o => Object.assign({}, o, { rt: pfp })));
@@ -165,52 +173,98 @@
     done();
   }
   // the page: the art's scripts are in <template id="art"> (index.html), so they don't run with the page. They come in
-  // groups, one per drop's art (the founder, 2026-10-15: load each drop's art only when it's needed): main (Drop 01's
-  // library and pieces), pfp1 (Drop 02), drop03 (Drop 03)... A group is put in when something of that drop has to be
-  // drawn (need(g)), one group at a time, and taken onto its stand-ins when its last script has run. The cloud build
-  // makes each group one file (data-g on its script tag); on the PC they're the separate scripts, grouped by name.
-  // art/adopt.js (all at once) is for the engine, which runs every script; the page leaves it out.
-  const groupOf = s => s.getAttribute('data-g') || ((/art\/((?:pfp|drop)\d+)[-/]/.exec(s.getAttribute('src')) || [])[1]) || 'main';
+  // groups, put in when something of theirs has to be drawn (need(g); the founder, 2026-10-15: load each drop's art only
+  // when it's needed). Drop 01's a family at a time (the speed doc's F, 2026-10-26: the front door and a shared print
+  // draw a few of its pieces, and loaded all 500 of them, 763 KB): lib (art/lib.js and px.js) first, then each family
+  // its own group, named by its file (p07-tilings); main is all of Drop 01. Then a group a newer drop: pfp1 (Drop 02),
+  // drop03 (Drop 03)... What's asked for together goes in together, in the page's order, and onto its stand-ins when it
+  // has all run: a family's pieces each onto its own number's (lib.js add() numbers them as the whole drop does), checked
+  // against art/facts.js. The cloud build makes each group one file (data-g on its script tag); on the PC they're the
+  // separate scripts, grouped by name. art/adopt.js (all at once) is for the engine, which runs every script; the page
+  // leaves it out.
+  const D1 = /^p\d\d-[\w-]+$/;
+  function groupOf(s) {
+    const g = s.getAttribute('data-g'), m = !g && (/art\/((?:pfp|drop)\d+)[-/]/.exec(s.getAttribute('src')) || /art\/(p\d\d-[\w-]+)\.js/.exec(s.getAttribute('src')));
+    return g || (m ? m[1] : 'lib');   // (art/lib.js and art/px.js)
+  }
+  const scripts = () => { const t = document.getElementById('art'); return t ? [...t.content.querySelectorAll('script')].filter(s => !/art\/adopt\.js/.test(s.getAttribute('src'))) : []; };
+  let d1 = null;
+  const d1Groups = () => d1 || (d1 = [...new Set(scripts().map(groupOf).filter(g => g === 'lib' || D1.test(g)))]);
   const G = {};
   const grp = g => G[g] || (G[g] = (() => { let res; const p = new Promise(r => { res = r; }); return { ready: false, asked: false, tries: 0, p, res }; })());
-  let busy = false;
+  let busy = false, soon = false;
   const waiting = [];
+  // a family and those it needs with it (p12-terrain draws with p11-sprites' helpers), theirs first
+  const withNeeds = g => { const f = files.find(x => x[0] === g); return [...new Set([...((f && f[4]) || []).flatMap(withNeeds), g])]; };
   function need(g = 'main') {
     const x = grp(g);
-    if (x.ready || x.asked || typeof document === 'undefined' || !document.getElementById('art')) return x.p;
-    x.asked = true;
-    waiting.push(g);
-    next();
+    if (x.ready || typeof document === 'undefined' || !document.getElementById('art')) return x.p;
+    // (a family needs Drop 01's library, and the families whose helpers it uses (art/facts.js); main is all of them)
+    for (const y of g === 'main' ? d1Groups() : D1.test(g) ? ['lib', ...withNeeds(g)] : [g]) { const z = grp(y); if (!z.ready && !z.asked) { z.asked = true; waiting.push(y); } }
+    // (what's asked for in the same moment, a page's few pieces, goes in as one)
+    if (!soon) { soon = true; Promise.resolve().then(() => { soon = false; next(); }); }
     return x.p;
   }
   function next() {
     if (busy || !waiting.length) return;
     busy = true;
-    run(waiting.shift());
+    run(waiting.splice(0));
   }
-  function run(g) {
-    const x = grp(g), t = document.getElementById('art');
-    const srcs = [...t.content.querySelectorAll('script')].filter(s => groupOf(s) === g && !/art\/adopt\.js/.test(s.getAttribute('src'))).map(s => s.getAttribute('src'));
-    if (!srcs.length) { x.ready = true; x.res(); busy = false; next(); return; }
-    let failed = false;
-    srcs.forEach((src, k) => {
-      const s = document.createElement('script');
-      s.src = src; s.async = false;
-      // (given up after six tries: the next piece drawn asks again, and whatever waits for it then draws)
-      s.onerror = () => { if (failed) return; failed = true; if (++x.tries < 6) setTimeout(() => run(g), 2000 * x.tries); else { x.asked = false; x.tries = 0; busy = false; next(); } };
-      if (k === srcs.length - 1) s.onload = () => { if (!failed) { adoptGroup(g); busy = false; next(); } };
+  function run(gs) {
+    gs.sort((a, b) => (b === 'lib') - (a === 'lib'));   // (the library's functions before the families that use them)
+    const mine = scripts().filter(s => gs.includes(groupOf(s))), bad = new Set();
+    let left = mine.length;
+    if (!left) { finish(gs, bad); return; }
+    for (const s0 of mine) {
+      const s = document.createElement('script'), g = groupOf(s0);
+      s.src = s0.getAttribute('src'); s.async = false;
+      s.onload = () => { if (!--left) finish(gs, bad); };
+      s.onerror = () => { bad.add(g); if (!--left) finish(gs, bad); };
       document.head.appendChild(s);
-    });
+    }
   }
-  // one group's code onto its stand-ins
+  function finish(gs, bad) {
+    const again = [];
+    for (const g of gs) {
+      const x = grp(g);
+      if (!bad.has(g) && adoptGroup(g)) { x.ready = true; x.res(); continue; }
+      // (one that didn't come, or didn't run, is asked for again, a few times and slower each time; then given up: the
+      // next piece drawn asks again, and whatever waits for it then draws)
+      if (++x.tries < 6) again.push(g); else { x.asked = false; x.tries = 0; }
+    }
+    if (!ready && d1Groups().every(g => G[g] && G[g].ready)) { ready = true; grp('main').ready = true; grp('main').res(); done(); }
+    if (again.length) setTimeout(() => { waiting.push(...again.filter(g => !waiting.includes(g))); next(); }, 2000 * Math.max(...again.map(g => grp(g).tries)));
+    busy = false;
+    next();
+  }
+  // a group's code onto its stand-ins; false if it isn't all there
+  let realLib = null;
+  const taken = new WeakSet();
   function adoptGroup(g) {
-    const x = grp(g);
-    if (g === 'main') { const real = window.Proto; if (real && real !== main) take(main, real, 'index'); window.Proto = main; ready = true; done(); }
-    else if (g === 'pfp1') { const real = window.ProtoPFP; if (real && real !== pfp) take(pfp, real, 'num'); window.ProtoPFP = pfp; }
+    if (g === 'lib') {
+      // Drop 01's library: its functions onto the stand-in (the families after it add their pieces through them)
+      const real = window.Proto;
+      if (real && real !== main && real.add) { realLib = real; for (const k in real) if (k !== 'list') main[k] = real[k]; window.Proto = main; }
+      return !!realLib;
+    }
+    if (D1.test(g)) {
+      // a family's pieces, each onto the stand-in with its number, if they're the pieces art/facts.js says it has
+      const f = files.find(x => x[0] === g), defs = f && realLib ? realLib.list.filter(d => d.fam === f[1] && !taken.has(d)) : [];
+      if (!f || defs.length !== f[3] || defs.some(d => { const s = main.list[d.index]; return !s || s.index !== d.index || (s.name && s.name !== d.name); })) {
+        console.error(`art/${g}.js is not what art/facts.js says: run node server/tools/art-facts.mjs`);
+        return false;
+      }
+      for (const d of defs) { Object.assign(main.list[d.index], d); taken.add(d); }
+      return true;
+    }
+    if (g === 'pfp1') { const real = window.ProtoPFP; if (real && real !== pfp) take(pfp, real, 'num'); window.ProtoPFP = pfp; }
     else { const gl = ((window.PrintsCatalogue || {}).runtimes || {})[g], real = gl && window[gl]; if (gl && real && real !== extra[gl]) { take(extra[gl], real, 'num'); window[gl] = extra[gl]; } }
-    x.ready = true; x.res();
+    return true;
   }
+  // a Drop 01 piece's group: its family's file (a stand-in def, by its number); null for any other
+  const groupOfDef = def => { if (!def || def.rt || def.index == null) return null; const f = files.find(x => def.index >= x[2] && def.index < x[2] + x[3]); return f ? f[0] : 'main'; };
+  const famAt = fam => (famFirst.has(fam) ? famFirst.get(fam) : null);
   const load = () => need('main');
   const has = g => !!(G[g] && G[g].ready) || (g === 'main' && ready);
-  const B = window.ProtoBase = { rngFromHash, randomHash, hashFor, hex, css, PALETTES, INKS, facts, factsOf, adopt, load, need, has, loaded, stale: false, get ready() { return ready; } };
+  const B = window.ProtoBase = { rngFromHash, randomHash, hashFor, hex, css, PALETTES, INKS, facts, factsOf, adopt, load, need, has, groupOfDef, famAt, loaded, stale: false, get ready() { return ready; } };
 })();
