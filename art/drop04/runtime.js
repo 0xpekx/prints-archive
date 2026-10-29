@@ -188,7 +188,8 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
       beats() { const b = beats; beats = 0; return b; },
       beat() { beats++; },
       taps() { return taps.splice(0); },
-      push(x, y) { if (taps.length < 32) taps.push({ x, y }); },
+      pushes: 0,   // every tap ever pushed (the runtime's quiet-when-untouched sound reads it)
+      push(x, y) { this.pushes++; if (taps.length < 32) taps.push({ x, y }); },
       cell(n) { return this.inside ? { x: Math.min(n - 1, Math.max(0, Math.floor(this.x * n))), y: Math.min(n - 1, Math.max(0, Math.floor(this.y * n))) } : null; },
     };
   }
@@ -200,9 +201,24 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
   // muted, in tiles, or in GIF export, so pieces can call them freely.
   // wave: 'sine' | 'triangle' | 'square' | 'sawtooth'; kind: 'kick' | 'snare' | 'hat' | 'click' | 'blip' | 'noise'.
   // g.sound.pcm(samples, rate) queues raw samples end to end (for pieces that make their own waveform).
+  // A soft mix (the founder, 2026-10-29: nothing obnoxious, no static, the sounds nice): every hit but 'noise' is a pitched
+  // tone (a click is a soft tick, a hat a small tink, a snare a wooden tock); 'noise' is only a low, eased-in whoosh; a square
+  // or sawtooth always goes through a low-pass; at most 14 voices, at most 6 new sounds in any 0.12 s, the same sound at
+  // most once in 60 ms, and a sound that comes back soon comes back a little different (level and a few cents).
   const Audio = (() => {
     let ac = null, master = null, voices = 0, noiseBuf = null;
-    const MAX_VOICES = 24;
+    const MAX_VOICES = 14, BURST = 6, BURST_S = 0.12, SAME_S = 0.06, last = new Map();
+    let recent = [], jit = 0x2545f491;
+    const wob = () => { jit = (Math.imul(jit ^ jit >>> 15, 0x2c1b3c6d) + 0x6d2b79f5) >>> 0; return jit / 4294967296; };   // (sound only: never a piece's own stream)
+    // may a sound with this key start at t, and how changed (null: dropped)
+    function admit(key, t) {
+      recent = recent.filter(x => x > ac.currentTime - 1);
+      if (voices >= MAX_VOICES || recent.filter(x => Math.abs(x - t) < BURST_S).length >= BURST) return null;
+      const prev = last.get(key);
+      if (prev !== undefined && Math.abs(t - prev) < SAME_S) return null;
+      recent.push(t); if (last.size > 200) last.clear(); last.set(key, t);
+      return prev !== undefined && t - prev < 1.5 ? { vel: 0.88 + 0.2 * wob(), cents: (wob() - 0.5) * 14 } : { vel: 1, cents: 0 };
+    }
     function init() {
       if (ac) return ac;
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -226,40 +242,44 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
       gain.gain.exponentialRampToValueAtTime(0.0001, t + a + dur);
     }
     function note(midi, o = {}) {
-      if (!ac || voices >= MAX_VOICES) return;
-      const t = ac.currentTime + (o.at || 0), dur = Math.min(4, o.dur || 0.25), vel = Math.min(1, o.vel ?? 0.5);
+      if (!ac) return;
+      const t = ac.currentTime + (o.at || 0), dur = Math.min(4, o.dur || 0.25), wave = o.wave || 'triangle', hz = o.freq || 440 * Math.pow(2, (midi - 69) / 12);
+      const w = admit(wave + Math.round(hz), t); if (!w) return;
+      const vel = Math.min(1, o.vel ?? 0.5) * w.vel * (hz > 1100 ? 0.6 : 1);   // above about MIDI 85 only a softer sparkle
       const osc = ac.createOscillator(), gain = ac.createGain();
-      osc.type = o.wave || 'triangle';
-      osc.frequency.value = o.freq || 440 * Math.pow(2, (midi - 69) / 12);
+      osc.type = wave; osc.frequency.value = hz; osc.detune.value = w.cents;
+      const buzzy = wave === 'square' || wave === 'sawtooth', cut = buzzy ? Math.min(o.cutoff || 2200, 3000) : o.cutoff;
       let node = osc;
-      if (o.cutoff) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.cutoff; osc.connect(f); node = f; }
+      if (cut) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; osc.connect(f); node = f; }
       node.connect(gain); gain.connect(out(o.pan));
-      env(gain, t, o.attack || 0.008, vel * 0.25, dur);
+      env(gain, t, Math.max(0.005, o.attack || 0.008), vel * 0.25, dur);
       osc.start(t); osc.stop(t + dur + 0.05);
       voices++; osc.onended = () => voices--;
     }
+    // the hits as tones: [from Hz, to Hz, glide s, wave, level, fade s]
+    const TONE = { kick: [150, 40, 0.15, 'sine', 1.6, 0.3], blip: [880, 440, 0.06, 'sine', 0.7, 0.08], click: [1400, 980, 0.025, 'sine', 0.5, 0.035],
+      hat: [2600, 2200, 0.04, 'sine', 0.25, 0.05], snare: [300, 180, 0.08, 'triangle', 0.7, 0.13] };
     function hit(kind = 'click', vel = 0.6, o = {}) {
-      if (!ac || voices >= MAX_VOICES) return;
-      const t = ac.currentTime + (o.at || 0), gain = ac.createGain(), v = Math.min(1, vel) * 0.35;
+      if (!ac) return;
+      const t = ac.currentTime + (o.at || 0), w = admit(kind + (o.freq || ''), t); if (!w) return;
+      const gain = ac.createGain(), v = Math.min(1, vel) * 0.35 * w.vel;
       gain.connect(out(o.pan));
-      if (kind === 'kick' || kind === 'blip') {
-        const osc = ac.createOscillator();
-        osc.type = 'sine';
-        const f0 = kind === 'kick' ? 150 : (o.freq || 880);
-        osc.frequency.setValueAtTime(f0, t);
-        osc.frequency.exponentialRampToValueAtTime(kind === 'kick' ? 40 : f0 * 0.5, t + (kind === 'kick' ? 0.15 : 0.06));
-        osc.connect(gain); env(gain, t, 0.002, v * (kind === 'kick' ? 1.6 : 0.7), kind === 'kick' ? 0.3 : 0.08);
-        osc.start(t); osc.stop(t + 0.4); voices++; osc.onended = () => voices--;
-      } else {
-        const src = ac.createBufferSource(), f = ac.createBiquadFilter();
-        src.buffer = noiseBuf;
-        f.type = kind === 'hat' ? 'highpass' : kind === 'snare' ? 'bandpass' : kind === 'noise' ? 'lowpass' : 'bandpass';
-        f.frequency.value = kind === 'hat' ? 7000 : kind === 'snare' ? 1800 : kind === 'noise' ? (o.cutoff || 1200) : 3000;
+      if (kind === 'noise') {
+        // the one noise left: low-passed under 900 Hz and eased in, for a whoosh or a splash
+        const src = ac.createBufferSource(), f = ac.createBiquadFilter(), len = Math.min(0.6, o.dur || 0.4);
+        src.buffer = noiseBuf; f.type = 'lowpass'; f.frequency.value = Math.min(900, o.cutoff || 900);
         src.connect(f); f.connect(gain);
-        const len = kind === 'hat' ? 0.05 : kind === 'snare' ? 0.18 : kind === 'noise' ? (o.dur || 0.4) : 0.015;
-        env(gain, t, 0.001, v, len);
+        env(gain, t, 0.02, v * 0.6, len);
         src.start(t); src.stop(t + len + 0.05); voices++; src.onended = () => voices--;
+        return;
       }
+      const T = TONE[kind] || TONE.click, f0 = o.freq && kind !== 'kick' ? o.freq : T[0], f1 = f0 * T[1] / T[0];
+      const osc = ac.createOscillator();
+      osc.type = T[3]; osc.detune.value = w.cents;
+      osc.frequency.setValueAtTime(f0, t);
+      osc.frequency.exponentialRampToValueAtTime(f1, t + T[2]);
+      osc.connect(gain); env(gain, t, 0.005, v * T[4], T[5]);
+      osc.start(t); osc.stop(t + T[5] + 0.1); voices++; osc.onended = () => voices--;
     }
     // raw samples (-1..1) queued end to end, for pieces that compute their own
     // waveform (bytebeat): call it each frame with the next chunk
@@ -277,6 +297,19 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
     return { init, note, hit, pcm, get ready() { return !!ac; }, resume() { if (ac && ac.state === 'suspended') ac.resume(); }, suspend() { if (ac && ac.state === 'running') ac.suspend(); } };
   })();
   const SILENT = { on: false, note() {}, hit() {}, pcm() {} };
+  // each Loot piece's level, measured so they all sit within a couple of LU of each other (scratch/sound, the Loot I sound pass)
+  const VOLUME = {"1":1.349,"19":0.556,"31":0.292,"33":0.684,"52":1.333,"56":0.741,"61":0.55,"62":0.758,"66":0.882,"67":3.366,"68":1.819,"71":0.786,"75":1.497,"80":0.777,"87":0.296,"91":0.147,"92":0.437,"94":0.463,"95":1,"96":1.778,"98":0.676,"99":0.183,"100":0.385,"101":0.912,"102":0.201,"103":0.192,"105":1.259,"117":1.603,"118":2.089,"133":0.478,"141":1.059,"143":2.318,"151":1.23,"154":0.923,"156":2.041,"158":0.179,"162":1.567,"165":0.169,"166":2.722,"167":1.148,"168":2.541,"172":4,"173":0.933,"175":1.012,"177":3.734,"179":4,"180":3.566,"186":1.55,"189":0.21,"191":0.306,"192":4,"197":0.343,"222":1.799,"240":0.513,"243":3.525,"263":0.514,"264":4,"265":0.316,"291":1.059,"292":0.661,"295":1.496,"299":2.571,"301":1.23,"304":1.759,"308":3.02,"309":0.708,"314":1.679,"319":1.097,"336":0.768,"341":0.484,"343":0.226,"348":0.944,"386":1.059,"387":1.047,"482":0.224,"484":0.269,"489":3.444};
+  // the Loot pieces whose notes wandered off key (many picked by arithmetic, a semitone at a time), each kept to one major
+  // pentatonic so taps that overlap still sound good together: piece -> key (0 C ... 11 B); each note goes to the nearest step
+  const KEY = {"31":0,"56":5,"62":0,"92":9,"101":2,"102":4,"141":0,"154":0,"158":0,"165":0,"166":8,"167":9,"173":0,"175":9,"191":0,"263":0,"301":4,"309":4,"343":3,"489":0};
+  const inKey = (m, k) => { const pc = (((m - k) % 12) + 12) % 12, to = [0, 2, 4, 7, 9, 12].reduce((b, d) => Math.abs(d - pc) < Math.abs(b - pc) ? d : b, 0); return m + to - pc; };
+  // a piece's own loudness (def.volume, else VOLUME, else 1): every sound it plays at that share of its level, so the pieces sit together
+  function withVolume(s, k, key) {
+    if (!(k > 0)) k = 1;
+    if ((k === 1 && key == null) || s === SILENT) return s;
+    const sc = o => Object.assign({}, o, { vel: Math.min(1, o && o.vel != null ? o.vel : 0.5) * k });
+    return { get on() { return s.on; }, note(m, o) { s.note(key == null || (o && o.freq) ? m : inKey(Math.round(m), key), sc(o)); }, hit(kind, v, o) { s.hit(kind, Math.min(1, v == null ? 0.6 : v) * k, o); }, pcm(d, r, o) { s.pcm(d, r, sc(o)); } };
+  }
   // A live sound for the large view: plays only while `isOn()` says so.
   function makeSound(isOn) {
     return {
@@ -410,6 +443,14 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
         return value;
       },
     };
+    // sound answers a touch and then goes quiet (the founder, 2026-10-29): a piece plays only within 8 s of the viewer's last
+    // tap, press or move over it, so nothing loops or plays on its own (sounds already scheduled still finish)
+    let time = 0, f = 0, heard = -1e9;
+    const ip = c.input, seen = { n: ip.pushes, x: ip.x, y: ip.y };
+    if (c.sound !== SILENT) {
+      const s0 = withVolume(c.sound, def.volume ?? VOLUME[def.num], def.key ?? KEY[def.num]), awake = () => time - heard < 8;
+      c.sound = { get on() { return s0.on && awake(); }, note(m, o) { if (awake()) s0.note(m, o); }, hit(k, v, o) { if (awake()) s0.hit(k, v, o); }, pcm(d, r, o) { if (awake()) s0.pcm(d, r, o); } };
+    }
     let copy = () => {};
     if (def.gl) {
       const g = sharedGl(S);
@@ -419,7 +460,6 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
       // the piece drew into the bottom-left S x S of the shared canvas
       copy = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'copy'; ctx.drawImage(glc, 0, glc.height - S, S, S, 0, 0, S, S); ctx.globalCompositeOperation = 'source-over'; };
     } else c.ctx = ctx;
-    let time = 0, f = 0;
     const frame = def.make(c);
     copy();
     return {
@@ -427,6 +467,7 @@ var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals
       // a frame function may say it repeats exactly after `period` seconds
       period: frame && frame.period || 0, periodSteps: frame && frame.periodSteps || 0,
       step(dt) {
+        if (ip.down || ip.pushes !== seen.n || ip.x !== seen.x || ip.y !== seen.y) { heard = time; seen.n = ip.pushes; seen.x = ip.x; seen.y = ip.y; }
         time += dt; f++;
         if (!frame) return;
         if (def.gl) sharedGl(S);
