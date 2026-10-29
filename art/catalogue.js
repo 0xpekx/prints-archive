@@ -42,6 +42,7 @@ window.PrintsCatalogue = {
    "title": "Loot I",
    "price": 200,
    "noSetPick": true,
+   "ownTraits": true,
    "kind": "limited",
    "isNew": true,
    "noBonus": [
