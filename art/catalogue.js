@@ -28,13 +28,35 @@ window.PrintsCatalogue = {
    "price": 150,
    "noSetPick": true,
    "kind": "limited",
-   "isNew": true,
+   "isNew": false,
    "noBonus": [
     "Iso Dioramas",
     "Sky Isles",
     "Shopfronts",
     "Big Top"
    ]
+  },
+  {
+   "id": 4,
+   "num": "04",
+   "title": "Loot I",
+   "price": 200,
+   "noSetPick": true,
+   "kind": "limited",
+   "isNew": true,
+   "noBonus": [
+    "Plinth",
+    "Foil Card"
+   ],
+   "launch": {
+    "at": "2026-10-29T16:00:00Z",
+    "windowHours": 8,
+    "cap": 100,
+    "discount": 0.2,
+    "premiumAfter": 3,
+    "premium": 0,
+    "randomSerials": true
+   }
   }
  ],
  "daily": "1009",
@@ -4917,10 +4939,1473 @@ window.PrintsCatalogue = {
    "rt": "drop03",
    "touch": 1,
    "music": 1
+  },
+  {
+   "key": "drop04-103",
+   "name": "Three Bells",
+   "fam": "Penny Arcade",
+   "set": "Penny Arcade",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A penny machine at the end of the pier. Some nights it plays itself. Ring all three bells.",
+   "species": [
+    [
+     103,
+     "Three Bells",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-101",
+   "name": "Snip",
+   "fam": "Penny Arcade",
+   "set": "Penny Arcade",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A cut-the-string prize machine. Wait for the glint. Something on the ring is not for sale.",
+   "species": [
+    [
+     101,
+     "Snip",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-102",
+   "name": "Top Row",
+   "fam": "Penny Arcade",
+   "set": "Penny Arcade",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A stacking-lights prize tower. Take the radio, or play on for the telly. Tap to stop each row.",
+   "species": [
+    [
+     102,
+     "Top Row",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-105",
+   "name": "Roll a Penny",
+   "fam": "Penny Arcade",
+   "set": "Penny Arcade",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A roll-a-penny stall at the fair. Roll it clear of the lines. Mind the gulls.",
+   "species": [
+    [
+     105,
+     "Roll a Penny",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-062",
+   "name": "Hoopla",
+   "fam": "Hook a Prize",
+   "set": "Hook a Prize",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A hoopla stall. Your hand wobbles; throw when it settles. Sometimes the hen gets out.",
+   "species": [
+    [
+     62,
+     "Hoopla",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-061",
+   "name": "Lucky Spin",
+   "fam": "Hook a Prize",
+   "set": "Hook a Prize",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A fair prize wheel. Call your wedge, then spin. Some keepers cheat.",
+   "species": [
+    [
+     61,
+     "Lucky Spin",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-067",
+   "name": "Lucky Pond",
+   "fam": "Hook a Prize",
+   "set": "Hook a Prize",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A hook-a-duck pond at the seaside. Hold the rod steady and drop. One of them is not a toy.",
+   "species": [
+    [
+     67,
+     "Lucky Pond",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-068",
+   "name": "Scratch Haul",
+   "fam": "Hook a Prize",
+   "set": "Hook a Prize",
+   "drop": 4,
+   "supply": 2048,
+   "brief": "A scratch card on the counter. Most of them lose. Collect the whole key and see what turns up.",
+   "species": [
+    [
+     68,
+     "Scratch Haul",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-301",
+   "name": "Duck Derby",
+   "fam": "Race Day",
+   "set": "Race Day",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A rubber-duck race down a village river, prizes on the trestle. Splash yours home first. Some years a much bigger duck enters.",
+   "species": [
+    [
+     301,
+     "Duck Derby",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-308",
+   "name": "Snail Ring",
+   "fam": "Race Day",
+   "set": "Race Day",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A snail race on a damp cloth, garden prizes round the ring. Draw a line of water and one will follow it. Now and then a tortoise turns up.",
+   "species": [
+    [
+     308,
+     "Snail Ring",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-304",
+   "name": "Beetle Box",
+   "fam": "Race Day",
+   "set": "Race Day",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "Beetles rolling beads down their lanes to the burrow. Drop sugar ahead of yours. Some nights the lights are out and one of them glows.",
+   "species": [
+    [
+     304,
+     "Beetle Box",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-309",
+   "name": "Soapbox Hill",
+   "fam": "Race Day",
+   "set": "Race Day",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "Soapbox carts down a village hill, prizes pegged on a washing line at the bottom. Three pushes a run, so choose them. Someone once entered a piano.",
+   "species": [
+    [
+     309,
+     "Soapbox Hill",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-154",
+   "name": "Showdown",
+   "fam": "Card Table",
+   "set": "Card Table",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A card table under a lamp, the regulars and a pot of odd stakes. Five-card draw. Watch their sleeves.",
+   "species": [
+    [
+     154,
+     "Showdown",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-117",
+   "name": "Same Again",
+   "fam": "Card Table",
+   "set": "Card Table",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "Snap with a made-up deck under the lamp. First to seven takes the game, and the house gets quicker. Mind the joker.",
+   "species": [
+    [
+     117,
+     "Same Again",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-158",
+   "name": "Milk Caps",
+   "fam": "Card Table",
+   "set": "Card Table",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A stack of milk caps in a chalk ring. Wind up and slam it; the face-up ones are yours. Keep an eye on the magpie.",
+   "species": [
+    [
+     158,
+     "Milk Caps",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-118",
+   "name": "Chatterbox",
+   "fam": "Card Table",
+   "set": "Card Table",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A paper fortune-teller on a desk. Pick a colour, pick a number, lift the flap. Some of them bite.",
+   "species": [
+    [
+     118,
+     "Chatterbox",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-240",
+   "name": "Spin Cycle",
+   "fam": "Around the House",
+   "set": "Around the House",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A washing machine mid-wash, with whatever was left in the pockets; now and then something lives in the filter. Open the door and fish them out.",
+   "species": [
+    [
+     240,
+     "Spin Cycle",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1
+  },
+  {
+   "key": "drop04-482",
+   "name": "Doormat",
+   "fam": "Around the House",
+   "set": "Around the House",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "The morning's post on the doormat, and sometimes the dog gets there first. Pick a piece up and open it; rattle the letterbox for more.",
+   "species": [
+    [
+     482,
+     "Doormat",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-087",
+   "name": "Fridge Door",
+   "fam": "Around the House",
+   "set": "Around the House",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A fridge door, and everything the family stuck to it. Pull a magnet; sometimes the letters move on their own.",
+   "species": [
+    [
+     87,
+     "Fridge Door",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-319",
+   "name": "Clear Canister",
+   "fam": "Around the House",
+   "set": "Around the House",
+   "drop": 4,
+   "supply": 1024,
+   "brief": "A vacuum over a deep old rug; the clear canister shows what it picked up. Mind the sock.",
+   "species": [
+    [
+     319,
+     "Clear Canister",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-175",
+   "name": "White Water",
+   "fam": "Expedition",
+   "set": "Expedition",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A raft down a river; grab what floats by. Run it again and the water's faster.",
+   "species": [
+    [
+     175,
+     "White Water",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-179",
+   "name": "Noon Beam",
+   "fam": "Expedition",
+   "set": "Expedition",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A buried sun temple. Turn the mirrors to put the beam on the disc, then lift what the altar gives up.",
+   "species": [
+    [
+     179,
+     "Noon Beam",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-172",
+   "name": "Weightstones",
+   "fam": "Expedition",
+   "set": "Expedition",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A stone floor in a ruined star college. Push the stones onto the plates, in as few pushes as you can, and the finds fly out onto your cloth.",
+   "species": [
+    [
+     172,
+     "Weightstones",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-177",
+   "name": "On the Rope",
+   "fam": "Expedition",
+   "set": "Expedition",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A climber on a rope down the ice. Swing over and bring up what was lost down there.",
+   "species": [
+    [
+     177,
+     "On the Rope",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-180",
+   "name": "Thin Ice",
+   "fam": "Expedition",
+   "set": "Expedition",
+   "drop": 4,
+   "supply": 512,
+   "brief": "Frozen water with things lost on it. Skate out and back; mind the thin ice, and fish out what goes through.",
+   "species": [
+    [
+     180,
+     "Thin Ice",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-173",
+   "name": "Lungful",
+   "fam": "Expedition",
+   "set": "Expedition",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A free dive in a lagoon. Tap a find and bring it up before your breath runs out; the bubbles help.",
+   "species": [
+    [
+     173,
+     "Lungful",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-141",
+   "name": "Canal Magnet",
+   "fam": "Dredged Up",
+   "set": "Dredged Up",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A canal cut open, and a magnet on a rope. Iron sticks; nothing else does. Now and then something down there is still at home. Drop it in.",
+   "species": [
+    [
+     141,
+     "Canal Magnet",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-386",
+   "name": "Claw",
+   "fam": "Dredged Up",
+   "set": "Dredged Up",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A small submersible on the sea floor, three thousand metres down. Fly it, send the arm, ping the dark and see what pings back.",
+   "species": [
+    [
+     386,
+     "Claw",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-387",
+   "name": "Low Water",
+   "fam": "Dredged Up",
+   "set": "Dredged Up",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A reservoir in a drought, the drowned village showing again. Bring the rain back, or skim a stone. Some villages remember being lived in.",
+   "species": [
+    [
+     387,
+     "Low Water",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-264",
+   "name": "Mill Race",
+   "fam": "Dredged Up",
+   "set": "Dredged Up",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A mill wheel, a net of things the pond kept, and a landing stage. Drop the net and let the water do the work. Mind the ducks.",
+   "species": [
+    [
+     264,
+     "Mill Race",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-143",
+   "name": "Colour",
+   "fam": "Dredged Up",
+   "set": "Dredged Up",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A pan of creek gravel and two cold hands. Tip it, wash the light stuff out and pick the gold. Then another scoop.",
+   "species": [
+    [
+     143,
+     "Colour",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-156",
+   "name": "Wish You Were Here",
+   "fam": "First Post",
+   "set": "First Post",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A box of postcards from towns that aren't on any map. Turn one over, post the ones never sent. One of them hasn't been written yet.",
+   "species": [
+    [
+     156,
+     "Wish You Were Here",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-222",
+   "name": "Bottle Post",
+   "fam": "First Post",
+   "set": "First Post",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A bottle washed up with a letter in it. Pull the cork, shake out what the sender put in, read the wish. Sometimes somebody writes back.",
+   "species": [
+    [
+     222,
+     "Bottle Post",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-489",
+   "name": "Bush Mail",
+   "fam": "First Post",
+   "set": "First Post",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A floatplane at a jetty with the week's bush mail. Load the handcart and she flies off, and back. Some nights the sky does something.",
+   "species": [
+    [
+     489,
+     "Bush Mail",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-484",
+   "name": "Wish Letters",
+   "fam": "First Post",
+   "set": "First Post",
+   "drop": 4,
+   "supply": 512,
+   "brief": "Letters to Father Christmas, the wishes drawn in crayon. Read one and stamp it granted; the present turns up. Not all of them are from children.",
+   "species": [
+    [
+     484,
+     "Wish Letters",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-133",
+   "name": "Enclosed",
+   "fam": "First Post",
+   "set": "First Post",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A sealed letter on a desk. Crack the wax, turn over what was folded in, and earn the P.S. Some letters have more to say.",
+   "species": [
+    [
+     133,
+     "Enclosed",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-075",
+   "name": "Ledger Page",
+   "fam": "First Post",
+   "set": "First Post",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A merchant's ledger page. Settle the lines. Not every line is honest.",
+   "species": [
+    [
+     75,
+     "Ledger Page",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-001",
+   "name": "Satchel",
+   "fam": "Adventurer's Pack",
+   "set": "Adventurer's Pack",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A traveller's things laid out by the satchel. Something small sometimes lives in it. Throw them back in.",
+   "species": [
+    [
+     1,
+     "Satchel",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-031",
+   "name": "Arms Rack",
+   "fam": "Adventurer's Pack",
+   "set": "Adventurer's Pack",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A second-hand weapon stall. Haggle every price down, but watch the keeper's face. Some days there's something under the counter.",
+   "species": [
+    [
+     31,
+     "Arms Rack",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-066",
+   "name": "Roll Table",
+   "fam": "Adventurer's Pack",
+   "set": "Adventurer's Pack",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A loot table, and dice to read it. Most rows are nothing much. Tick off the whole sheet in as few rolls as you can.",
+   "species": [
+    [
+     66,
+     "Roll Table",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-080",
+   "name": "Item Spread",
+   "fam": "Adventurer's Pack",
+   "set": "Adventurer's Pack",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A fortune told with item cards by lamplight. The reader leaves the last card for you.",
+   "species": [
+    [
+     80,
+     "Item Spread",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-056",
+   "name": "Font",
+   "fam": "Adventurer's Pack",
+   "set": "Adventurer's Pack",
+   "drop": 4,
+   "supply": 512,
+   "brief": "Something at the bottom of a font. Drops might bless it; a coin landed on it surely will.",
+   "species": [
+    [
+     56,
+     "Font",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-033",
+   "name": "Pedlar's Tray",
+   "fam": "Adventurer's Pack",
+   "set": "Adventurer's Pack",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A pedlar's tray. Sell the lot and see what's under the bottom. Mind the magpies.",
+   "species": [
+    [
+     33,
+     "Pedlar's Tray",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-165",
+   "name": "Attic Tower",
+   "fam": "Piled High",
+   "set": "Piled High",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A tower of trunks and boxes in an attic. Pull one out, then stack them back up to the chalk line. Some trunks rattle.",
+   "species": [
+    [
+     165,
+     "Attic Tower",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-162",
+   "name": "Leaf Heap",
+   "fam": "Piled High",
+   "set": "Piled High",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A heap of autumn leaves with the summer's lost things in it. Kick through it; something in there is still ticking.",
+   "species": [
+    [
+     162,
+     "Leaf Heap",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-167",
+   "name": "Tumbler",
+   "fam": "Piled High",
+   "set": "Piled High",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A rock tumbler on a bench. Turn it by hand to polish the stones bright; once in a while one of them is older than anything.",
+   "species": [
+    [
+     167,
+     "Tumbler",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-168",
+   "name": "Fair Weight",
+   "fam": "Piled High",
+   "set": "Piled High",
+   "drop": 4,
+   "supply": 512,
+   "brief": "Valuables on a balance. Add weights until the bell rings; it can tell when someone's cheating.",
+   "species": [
+    [
+     168,
+     "Fair Weight",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-166",
+   "name": "Tangle",
+   "fam": "Piled High",
+   "set": "Piled High",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A dish of tangled necklaces. Pull slowly to drag the others, quickly to slip free; open the lockets and see what they keep.",
+   "species": [
+    [
+     166,
+     "Tangle",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-341",
+   "name": "Live Magnet",
+   "fam": "Scrap and Springs",
+   "set": "Scrap and Springs",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A scrapyard magnet with today's iron stuck to it. Something in there is still ticking. Tap to cut the power.",
+   "species": [
+    [
+     341,
+     "Live Magnet",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-343",
+   "name": "Crusher",
+   "fam": "Scrap and Springs",
+   "set": "Scrap and Springs",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A car in the crusher with somebody's odds and ends still in it. Save what you can, and check nobody's aboard. Tap the press.",
+   "species": [
+    [
+     343,
+     "Crusher",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-348",
+   "name": "Scavenger",
+   "fam": "Scrap and Springs",
+   "set": "Scrap and Springs",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A small robot picking through a scrap heap. Sometimes it brings the little one. Tap a glint to send it.",
+   "species": [
+    [
+     348,
+     "Scavenger",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-263",
+   "name": "Snap Traps",
+   "fam": "Scrap and Springs",
+   "set": "Scrap and Springs",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A tray of set spring traps, each holding a ball. Three balls a round. Sometimes there's an audience.",
+   "species": [
+    [
+     263,
+     "Snap Traps",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-265",
+   "name": "Long Throw",
+   "fam": "Scrap and Springs",
+   "set": "Scrap and Springs",
+   "drop": 4,
+   "supply": 512,
+   "brief": "A toy trebuchet throwing a castle's odds and ends into a hay cart. Mind the wind. Some of it would rather fly.",
+   "species": [
+    [
+     265,
+     "Long Throw",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-299",
+   "name": "Drone Show",
+   "fam": "Night Sky",
+   "set": "Night Sky",
+   "drop": 4,
+   "supply": 128,
+   "brief": "A drone show over a town by the water, one figure after another. Something else is watching too. Tap the sky for the next one.",
+   "species": [
+    [
+     299,
+     "Drone Show",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-291",
+   "name": "Planisphere",
+   "fam": "Night Sky",
+   "set": "Night Sky",
+   "drop": 4,
+   "supply": 128,
+   "brief": "A star wheel. Every figure on it is a thing: a kettle, a ladder, a boot. Turn it to find them all. There may be one more.",
+   "species": [
+    [
+     291,
+     "Planisphere",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-292",
+   "name": "Cloud Spotting",
+   "fam": "Night Sky",
+   "set": "Night Sky",
+   "drop": 4,
+   "supply": 128,
+   "brief": "Lying out at night, watching clouds that are plainly things. A teapot. A boot. Sometimes us. Tap one to call it out.",
+   "species": [
+    [
+     292,
+     "Cloud Spotting",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-295",
+   "name": "Lights Out",
+   "fam": "Night Sky",
+   "set": "Night Sky",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A small town at night and the sky its lights hide. Switch them off and the stars come through. Sometimes something else does too.",
+   "species": [
+    [
+     295,
+     "Lights Out",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-336",
+   "name": "Tractor Beam",
+   "fam": "Night Sky",
+   "set": "Night Sky",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A saucer over a farm at night, taking things up one at a time. Somebody up there is enjoying it. Hold to beam.",
+   "species": [
+    [
+     336,
+     "Tractor Beam",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-314",
+   "name": "Glow Stones",
+   "fam": "Night Sky",
+   "set": "Night Sky",
+   "drop": 4,
+   "supply": 256,
+   "brief": "An old stone wall at night and a UV lamp. Some stones are hiding a glow. Something in the grass has its own. Move the lamp to look.",
+   "species": [
+    [
+     314,
+     "Glow Stones",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-091",
+   "name": "Relic",
+   "fam": "On a Plinth",
+   "set": "On a Plinth",
+   "drop": 4,
+   "supply": 128,
+   "brief": "One old thing, alone in the dark with a lantern. Something small lives with some of them. Carry the lantern.",
+   "species": [
+    [
+     91,
+     "Relic",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-099",
+   "name": "Last Coin",
+   "fam": "On a Plinth",
+   "set": "On a Plinth",
+   "drop": 4,
+   "supply": 128,
+   "brief": "The last coin, spun on the table. Call it, then slap it down. Some nights a magpie is watching.",
+   "species": [
+    [
+     99,
+     "Last Coin",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-100",
+   "name": "Ninety-Nine",
+   "fam": "On a Plinth",
+   "set": "On a Plinth",
+   "drop": 4,
+   "supply": 128,
+   "brief": "One kind of thing, stacked, and how many. One lamp. Build it up to the line.",
+   "species": [
+    [
+     100,
+     "Ninety-Nine",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-095",
+   "name": "Hidden Tune",
+   "fam": "On a Plinth",
+   "set": "On a Plinth",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A shadow on a lit blind. Guess what it is, then play it. Sometimes something small sings along.",
+   "species": [
+    [
+     95,
+     "Hidden Tune",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-098",
+   "name": "Speck",
+   "fam": "On a Plinth",
+   "set": "On a Plinth",
+   "drop": 4,
+   "supply": 256,
+   "brief": "Something small, lost on a very big field. Have a look round. Now and then a robin is looking too.",
+   "species": [
+    [
+     98,
+     "Speck",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-151",
+   "name": "Booster",
+   "fam": "Legendary Pull",
+   "set": "Legendary Pull",
+   "drop": 4,
+   "supply": 128,
+   "brief": "A Pyxlings booster, ripped open on the table. Some of them don't stay on their cards. Rip another.",
+   "species": [
+    [
+     151,
+     "Booster",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-092",
+   "name": "Plus One",
+   "fam": "Legendary Pull",
+   "set": "Legendary Pull",
+   "drop": 4,
+   "supply": 128,
+   "brief": "A +1 to something, with nothing attached. Some are shy. Tap it.",
+   "species": [
+    [
+     92,
+     "Plus One",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-096",
+   "name": "Name Card",
+   "fam": "Legendary Pull",
+   "set": "Legendary Pull",
+   "drop": 4,
+   "supply": 128,
+   "brief": "A calling card for something you never see. Some are written in lemon. Bring the lamp closer.",
+   "species": [
+    [
+     96,
+     "Name Card",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-019",
+   "name": "Fortune",
+   "fam": "Legendary Pull",
+   "set": "Legendary Pull",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A fortune teller's booth, the pouch tipped out across the velvet. Sometimes something climbs out. Turn the cards.",
+   "species": [
+    [
+     19,
+     "Fortune",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-243",
+   "name": "Bopped",
+   "fam": "Legendary Pull",
+   "set": "Legendary Pull",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A glade bully, bopped, with everything it swallowed lying round it. Bag the lot.",
+   "species": [
+    [
+     243,
+     "Bopped",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-094",
+   "name": "Plinth",
+   "fam": "Plinth",
+   "set": "Plinth",
+   "drop": 4,
+   "supply": 64,
+   "brief": "A treasure on a plinth, turning slowly under one lamp. Something lives behind the skirting. Give it a spin.",
+   "species": [
+    [
+     94,
+     "Plinth",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-071",
+   "name": "Foil Card",
+   "fam": "Foil Card",
+   "set": "Foil Card",
+   "drop": 4,
+   "supply": 64,
+   "brief": "One trading card, on show in its own room. Now and then the picture moves. Look closer.",
+   "species": [
+    [
+     71,
+     "Foil Card",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-191",
+   "name": "Loupe",
+   "fam": "Curiosities",
+   "set": "Curiosities",
+   "drop": 4,
+   "supply": 128,
+   "brief": "A small old piece of jewellery under the jeweller's loupe. Now and then a magpie wants it back. Hold the glass still.",
+   "species": [
+    [
+     191,
+     "Loupe",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-189",
+   "name": "Beetle Case",
+   "fam": "Curiosities",
+   "set": "Curiosities",
+   "drop": 4,
+   "supply": 128,
+   "brief": "Pinned beetles in a collector's case, a slip under each. One is only sleeping, and some cases still glow. Tap the glass.",
+   "species": [
+    [
+     189,
+     "Beetle Case",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-186",
+   "name": "Last Camp",
+   "fam": "Curiosities",
+   "set": "Curiosities",
+   "drop": 4,
+   "supply": 128,
+   "brief": "What came back from an expedition, under museum glass. Sometimes there is still a light on in the tent. Knock on the glass.",
+   "species": [
+    [
+     186,
+     "Last Camp",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-197",
+   "name": "Ring Box",
+   "fam": "Curiosities",
+   "set": "Curiosities",
+   "drop": 4,
+   "supply": 256,
+   "brief": "One ring in an open box on a table. A few of them only ever want to go home. Spin it.",
+   "species": [
+    [
+     197,
+     "Ring Box",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-192",
+   "name": "Pendant",
+   "fam": "Curiosities",
+   "set": "Curiosities",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A small token on a thread, turning. Some stones have a hole you can see somewhere else through. Swing it over the top.",
+   "species": [
+    [
+     192,
+     "Pendant",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
+  },
+  {
+   "key": "drop04-052",
+   "name": "Settings",
+   "fam": "Curiosities",
+   "set": "Curiosities",
+   "drop": 4,
+   "supply": 256,
+   "brief": "A socketed piece on the jeweller's bench and the stones to set in it. One socket is sometimes hungry. Set them true.",
+   "species": [
+    [
+     52,
+     "Settings",
+     ""
+    ]
+   ],
+   "rt": "drop04",
+   "touch": 1,
+   "music": 1
   }
  ],
  "runtimes": {
-  "drop03": "ProtoD03"
+  "drop03": "ProtoD03",
+  "drop04": "ProtoD04"
  },
  "grids": {
   "pfp1": {
@@ -5113,6 +6598,85 @@ window.PrintsCatalogue = {
    "285": 112,
    "288": 160,
    "289": 160
+  },
+  "drop04": {
+   "1": 200,
+   "19": 125,
+   "31": 125,
+   "33": 125,
+   "52": 160,
+   "56": 125,
+   "61": 200,
+   "62": 200,
+   "66": 200,
+   "67": 200,
+   "68": 200,
+   "71": 200,
+   "75": 200,
+   "80": 160,
+   "87": 125,
+   "91": 100,
+   "92": 100,
+   "94": 125,
+   "95": 125,
+   "96": 125,
+   "98": 125,
+   "99": 125,
+   "100": 125,
+   "101": 125,
+   "102": 125,
+   "103": 160,
+   "105": 160,
+   "117": 160,
+   "118": 160,
+   "133": 200,
+   "141": 125,
+   "143": 120,
+   "151": 240,
+   "154": 200,
+   "156": 160,
+   "158": 200,
+   "162": 128,
+   "165": 96,
+   "166": 160,
+   "167": 100,
+   "168": 125,
+   "172": 112,
+   "173": 125,
+   "175": 125,
+   "177": 125,
+   "179": 125,
+   "180": 125,
+   "186": 200,
+   "189": 160,
+   "191": 120,
+   "192": 125,
+   "197": 128,
+   "222": 160,
+   "240": 125,
+   "243": 100,
+   "263": 120,
+   "264": 125,
+   "265": 136,
+   "291": 160,
+   "292": 160,
+   "295": 120,
+   "299": 112,
+   "301": 200,
+   "304": 160,
+   "308": 200,
+   "309": 200,
+   "314": 100,
+   "319": 100,
+   "336": 100,
+   "341": 160,
+   "343": 128,
+   "348": 80,
+   "386": 125,
+   "387": 125,
+   "482": 125,
+   "484": 125,
+   "489": 125
   }
  }
 };
