@@ -11,7 +11,9 @@ How to mirror it
 ----------------
 1. Serve this whole folder, unchanged, as static files at any public HTTPS address, for example
    https://example.org/prints-archive/ (so that .../prints-archive/manifest.json opens).
-   Any static host works: a web server, object storage, GitHub Pages and the like.
+   Any static host of your own works: a web server or object storage. One mirror counts per host and
+   network, so an address on a host another keeper's mirror already uses (a shared one like GitHub Pages)
+   can't be registered.
    Or seed prints-archive.torrent (it also downloads from the main copy over HTTP).
 2. Register the address on prints (the Public record page). prints checks a few random files now and then.
    While your mirror keeps serving the exact files you keep the Keeper badge and earn a little ink.
