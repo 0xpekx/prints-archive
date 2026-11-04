@@ -100,6 +100,8 @@ Proto.add({
     const gold = legend === 'Cursed Gold', mer = legend === 'Merfolk', king = legend === 'Pirate King';
     if (legend !== 'None') ghostly = false;
     if (legend === 'None' && broll < 0.005) carry = 'Ship in a Bottle';
+    // what a Merfolk rolled before the sea overrode it: it only colours her (merScene), nothing is drawn from a stream again
+    const was = mer ? { hat, hair, skin, companion } : null;
     if (mer) {
       // one of the sea's own: teal skin, fins for ears, kelp for hair, a coral crown and a trident
       skin = '#4cc0a4'; hair = '#2e7a3e'; hat = 'Coral Crown'; carry = 'Trident'; hairDo = 'Long';
@@ -546,14 +548,55 @@ Proto.add({
       }
 
       // ----- Merfolk: one of the sea's own, under the waves, hair streaming, a trident and a coral crown.
-      // Drag through the water and the current takes the hair, the kelp and the fish; touch the trident to call the fish -----
+      // Drag through the water and the current takes the hair, the kelp and the fish; touch the trident to call the fish.
+      // Always the same drawing; what she rolled only picks her colours and a small mark or two -----
       function merScene() {
-        const HAIRS = [['#0a2a16', '#1a5a2c', '#3a8a40', '#6ab858'], ['#3a0810', '#8a1a2a', '#d0403e', '#ff8a6a'], ['#1e0a3a', '#4a2a8a', '#7a5ac8', '#b89aff']];
-        const HAIR = HAIRS[Math.floor(lv[1] * 3)];
-        const SKIN = ['#145a4c', '#2a8a74', '#4cc0a4', '#9aeccc'];
-        const FIN = lv[2] < 0.5 ? ['#6a2a7a', '#b05ac0', '#e8a0f0'] : ['#8a3a1a', '#e07a3a', '#ffc080'];
-        const IRIS = lv[3] < 0.5 ? '#ffd040' : '#b0f0ff';
-        const WATER = ['#06142e', '#0a2850', '#104476', '#18689a', '#2a92b8'];
+        // the hair stays in its family (green, red, violet); the hair she rolled picks the shade
+        const HAIRS = [
+          [['#0a2a16', '#1a5a2c', '#3a8a40', '#6ab858'], ['#123208', '#2c6e14', '#54981c', '#88c03a'], ['#04302f', '#0a6e6c', '#12a39a', '#5ce0cc']],
+          [['#3a0810', '#8a1a2a', '#d0403e', '#ff8a6a'], ['#4a1804', '#a84a08', '#e8841a', '#ffc060'], ['#3e0424', '#96104e', '#e02c84', '#ff90c0']],
+          [['#1e0a3a', '#4a2a8a', '#7a5ac8', '#b89aff'], ['#0a0e44', '#1e309c', '#3c60e4', '#8eacff'], ['#360840', '#7e1c9c', '#c044d8', '#ee9cf4']],
+        ];
+        const HAIR = HAIRS[Math.floor(lv[1] * 3)][hairs.indexOf(was.hair) % 3];
+        // the skin she rolled: a small step within the teal family (a rolled ghost is the palest)
+        const SKIN = [
+          ['#145a4c', '#2a8a74', '#4cc0a4', '#9aeccc'], ['#12603a', '#2a9460', '#58cc8c', '#b0f4c0'], ['#0f5258', '#22848c', '#46bcc0', '#a2ecec'],
+          ['#145a4c', '#2a8a74', '#4cc0a4', '#9aeccc'], ['#0c463a', '#1c745c', '#38a88a', '#84dcb8'], ['#1f6a58', '#44a08a', '#78d8bc', '#c4f8e0'],
+        ][skins.indexOf(was.skin)] || ['#2c7464', '#5cb09c', '#98e4cc', '#dcfcf0'];
+        // the coat: her fins and the checks of her top, one palette as they always were
+        const FIN = { Plum: ['#6a2a7a', '#b05ac0', '#e8a0f0'], Navy: ['#14247e', '#3a58e0', '#9ab4ff'], Crimson: ['#86102e', '#e83a5c', '#ffa8b4'], 'Bottle Green': ['#0a5c34', '#18b060', '#a0ffb8'],
+          Coal: ['#2c2470', '#6c54cc', '#c0b0ff'], Mustard: ['#925c08', '#f0a818', '#ffe070'], 'Gold Brocade': ['#a87008', '#ffc81c', '#fff4a0'], 'Sailor Stripes': ['#1e2c8a', '#5a78e8', '#f4f0e6'],
+          Leather: ['#8a3a1a', '#e07a3a', '#ffc080'], 'Sky Blue': ['#0e62a8', '#2ea4f4', '#a8e8ff'] }[coat.v] || ['#6a2a7a', '#b05ac0', '#e8a0f0'];
+        const TOP = coat.v === 'Sailor Stripes' ? ['#1e2c8a', '#d0d8f4'] : FIN;
+        // the hat she rolled: the coral of her crown
+        const CROWN = { Bandana: ['#960c5c', '#f03aa0', '#ffa4d8'], Bicorne: ['#983208', '#fc7a10', '#ffc878'], Cavalier: ['#94600a', '#f4b810', '#fff4a0'], Headscarf: ['#b85a68', '#ffc4bc', '#fff4ec'], 'Knit Cap': ['#18208e', '#2e62f4', '#90c0ff'], 'Peaked Cap': ['#54189a', '#a84cf4', '#e0b0ff'] }[was.hat] || ['#8a1a2a', '#e0404a', '#ff8a8a'];
+        // the iris she rolled (lv[3] still picks which of the first two comes first)
+        const IRIS = [lv[3] < 0.5 ? '#ffd040' : '#b0f0ff', lv[3] < 0.5 ? '#b0f0ff' : '#ffd040', '#70f090', '#ff98f0', '#ff9a30'][['#4a2e1a', '#2a5a9a', '#3a7a3a', '#5a5a66', '#8a5a14'].indexOf(iris)];
+        // the sky: a clear tint of the water and the surface's own light; Noon is the water she always had
+        const [WATER, SURF] = { Noon: [['#06142e', '#0a2850', '#104476', '#18689a', '#2a92b8'], '#9ae0f0'], Dusk: [['#100e34', '#20205e', '#343a90', '#4a58ac', '#6e74c4'], '#ffc890'],
+          Dawn: [['#0a1636', '#1a3466', '#305a96', '#5484b8', '#8ea0cc'], '#ffe0e4'], Storm: [['#09141a', '#132830', '#20424e', '#306470', '#4e8690'], '#bcc8cc'],
+          Night: [['#030a1c', '#06163a', '#0a2658', '#103a7c', '#1a5298'], '#fff0b0'], 'Green Flash': [['#051c28', '#08384a', '#0b6068', '#128a80', '#2cb090'], '#d8ffa0'] }[sea.v];
+        // the outfit: the shell at her neck
+        const SHELL = { Oilskin: ['#ffe050', '#d0900a'], 'Jerkin and Bandolier': ['#f8c088', '#b86a30'], 'Blouse and Sash': ['#ffffff', '#c0d8e8'], 'Ragged Vest': ['#ff8a78', '#d82c50'], 'Open Shirt': ['#ffac40', '#e86a1a'] }[outfit] || ['#ffd8e8', '#e8a0c0'];
+        // the companion the sea took: the three fish that cross in front (they only show in motion)
+        const SCHOOL = { Parrot: { '#e8323e': ['#ff6a6a', '#c82a3a'], '#2a9a5a': ['#6ae08a', '#2a9a5a'], '#2a6ad8': ['#6aa0ff', '#2a6ad8'] }[parrotCol], Crab: ['#ff5a4a', '#b02a1a'], 'Ship Rat': ['#b0b4bc', '#70747c'], Kraken: ['#b060d0', '#6a2a8a'] }[was.companion] || ['#ff8a3a', '#c84a1a'];
+        // the card's Mouth, Eyes and Marks, and her earring: a few cells, worked out once
+        const MOUTH = grin === 'Lips' ? '#d02c5c' : '#0a3a30';
+        const near = patchLeft ? 12 : 19;
+        const cells = [];
+        const mark = (col, ...xy) => { for (let i = 0; i < xy.length; i += 2) cells.push([xy[i], xy[i + 1], col]); };
+        if (grin === 'Gold Tooth') mark('#ffd040', 16, 17);
+        if (eyes === 'Scarred') mark('#f0406a', near, 10, near, 14);
+        if (marks === 'Freckles') mark(SKIN[0], 11, 14, 13, 14, 12, 16, 18, 14, 20, 14, 19, 16);
+        if (marks === 'Cheek Scar') mark('#f0406a', 20, 14, 19, 15, 18, 16);
+        if (marks === 'Anchor Tattoo') mark(SKIN[0], 6, 26, 5, 27, 6, 27, 7, 27, 6, 28, 5, 29, 7, 29, 6, 30);
+        if (marks === 'Weathered') mark('#f4eed8', 20, 15, 11, 15, 24, 25, 23, 26, 25, 27, 22, 28);
+        if (marks === 'Soot Stripe') mark('#0a2c2c', 11, 14, 12, 14, 19, 14, 20, 14);
+        if (marks === 'Beauty Mark') mark('#ffffff', 18, 16);
+        if (earring) { mark('#ffd040', 9, 15, 22, 15); mark('#fff4e0', 9, 16, 22, 16); }
+        // the brows on her card pick one small thing in her hair: a pale lock, pearls, a shell, or nothing
+        const LOCK = brows === 'Furrowed' ? -7 : null;
+        const IN_HAIR = brows === 'Raised' ? [[-7, 17, '#fff4e0'], [-8, 19, '#fff4e0'], [-9, 21, '#fff4e0']] : brows === 'Arched' ? [[-8, 18, CROWN[2]], [-8, 19, CROWN[1]], [-7, 19, CROWN[2]]] : [];
         const fish = [0, 1, 2, 3, 4, 5, 6, 7].map(k => [hv(k, 1, 5) * 10, hv(k, 2, 5) * 4]);
         const FRONT = k => k >= 5; // these three cross in front, low down
         const motes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => [hv(k, 7, 5) * 36 - 2, hv(k, 8, 5) * 30 + 1]);
@@ -570,7 +613,7 @@ Proto.add({
         };
         const fishAt = (f, k, t, gold) => {
           const x = Math.round(f.x), y = Math.round(f.y), dir = gold ? (Math.sin(t * 2.2 + k * 0.785) > 0 ? -1 : 1) : -1;
-          const B1 = gold ? '#ffd040' : FRONT(k) ? '#ff8a3a' : '#5ab0d0', B2 = gold ? '#c88a10' : FRONT(k) ? '#c84a1a' : '#3a90b8';
+          const B1 = gold ? '#ffd040' : FRONT(k) ? SCHOOL[0] : '#5ab0d0', B2 = gold ? '#c88a10' : FRONT(k) ? SCHOOL[1] : '#3a90b8';
           put(x, y, B1); put(x - dir, y, B1); put(x, y + 1, B2); put(x - dir, y + 1, B2); put(x + dir, y, '#0a1a2a');
           put(x - 2 * dir, y - (Math.floor(t * 6 + k) % 2), B2); put(x - 2 * dir, y + 1, B2);
         };
@@ -610,7 +653,7 @@ Proto.add({
               let k = Math.max(0, Math.min(4, Math.floor(4.4 - (y + 2) / 8 + th(x, y) * 0.9)));
               if (Math.sin((x - y * 0.35) * 0.5 + t * 0.6) + Math.sin((x + y * 0.2) * 0.23 - t * 0.4) > 1.35 && y < 26) k = Math.min(4, k + 1);
               let col = WATER[k];
-              if (y <= 0 && (x + Math.floor(t * 5)) % 5 < 2) col = '#9ae0f0';
+              if (y <= 0 && (x + Math.floor(t * 5)) % 5 < 2) col = SURF;
               put(x, y, col);
             });
             for (const [kx, ph] of [[1, 0], [3, 1.4], [30, 2.2]]) for (let y = 6; y < N + sp; y++) {
@@ -629,23 +672,24 @@ Proto.add({
             // the hair, streaming and waving behind
             for (let y = 5; y < N; y++) {
               const hw = y < 12 ? 6.5 + (y - 5) * 0.45 : y < 22 ? 9.6 + (y - 12) * 0.12 : 10.8 - (y - 22) * 0.5;
-              const wave = Math.sin(t * 1.6 - y * 0.4) * Math.max(0, y - 9) * 0.09 + swirl * Math.max(0, y - 9) * 0.14;
+              const wave = Math.sin(t * 1.6 - y * 0.4) * Math.max(0, y - 9) * 0.09 + swirl * Math.max(0, y - 9) * 0.14, wob = Math.sin(y * 0.5 - t) * 0.6;
               for (let x = 0; x < N; x++) {
                 const px = x + 0.5 - 16 - wave;
                 if (Math.abs(px) > hw) continue;
-                const strand = Math.floor(px * 0.9 + Math.sin(y * 0.5 - t) * 0.6) % 3;
-                fput(x, y + Y, HAIR[Math.abs(px) > hw - 1 ? 0 : strand === 0 ? 1 : strand === 1 ? 2 : 1]);
+                const strand = Math.floor(px * 0.9 + wob) % 3;
+                fput(x, y + Y, HAIR[LOCK !== null && y > 14 && Math.floor(px + wob) === LOCK ? 3 : Math.abs(px) > hw - 1 ? 0 : strand === 0 ? 1 : strand === 1 ? 2 : 1]);
               }
             }
+            for (const [ox, oy, oc] of IN_HAIR) fput(Math.floor(16 + ox + Math.sin(t * 1.6 - oy * 0.4) * Math.max(0, oy - 9) * 0.09 + swirl * Math.max(0, oy - 9) * 0.14), oy + Y, oc);
             // shoulders and a scaled top, a shell necklace
             for (let y = 21; y < N; y++) for (let x = 3; x < 29; x++) {
               const half = 4 + (y - 21) * 1.6;
               if (Math.abs(x + 0.5 - 16) > Math.min(12, half)) continue;
               const chest = y >= 25 && Math.abs(x + 0.5 - 16) < 7;
-              fput(x, y + Y, chest ? (((x + (y % 2)) % 2) ? FIN[1] : FIN[0]) : SKIN[x < 16 ? 2 : 1]);
+              fput(x, y + Y, chest ? (((x + (y % 2)) % 2) ? TOP[1] : TOP[0]) : SKIN[x < 16 ? 2 : 1]);
             }
             for (let x = 11; x <= 20; x++) fput(x, 24 + Y + (Math.abs(x + 0.5 - 16) < 2 ? 1 : 0), '#f4ecd8');
-            fput(15, 26 + Y, '#ffd8e8'); fput(16, 26 + Y, '#ffd8e8'); fput(15, 27 + Y, '#e8a0c0'); fput(16, 27 + Y, '#e8a0c0');
+            fput(15, 26 + Y, SHELL[0]); fput(16, 26 + Y, SHELL[0]); fput(15, 27 + Y, SHELL[1]); fput(16, 27 + Y, SHELL[1]);
             // neck, head: lit from the surface above
             for (let y = 6; y < 23; y++) for (let x = 9; x < 23; x++) {
               const head = inE(x, y, 16, 13.2, 5.4, 6.4), neck = y >= 18 && Math.abs(x + 0.5 - 16) < 2.4;
@@ -656,7 +700,7 @@ Proto.add({
             // fin ears, frilled
             for (const sd of [-1, 1]) rows(sd < 0 ? ['2...', '12..', '112.', '0112', '.011', '..01'] : ['...2', '..21', '.211', '2110', '110.', '10..'], sd < 0 ? 7 : 21, 9 + Y, { 0: FIN[0], 1: FIN[1], 2: FIN[2] });
             // a crown of coral
-            rows(['.2...2..2...2.', '.21.12.12.21..', '..1111111111..', '..0000000000..'], 9, 3 + Y, { 0: '#8a1a2a', 1: '#e0404a', 2: '#ff8a8a' });
+            rows(['.2...2..2...2.', '.21.12.12.21..', '..1111111111..', '..0000000000..'], 9, 3 + Y, { 0: CROWN[0], 1: CROWN[1], 2: CROWN[2] });
             fput(15, 5 + Y, '#ffffff'); fput(16, 5 + Y, '#ffd040');
             // the face: wide sea eyes, a few scales at the brow, a small smile
             const blink = ((t + 1) % 4.4) < 0.15;
@@ -667,8 +711,9 @@ Proto.add({
             }
             for (const [a, b] of [[13, 9], [15, 8], [17, 9], [19, 10], [11, 10]]) fput(a, b + Y, SKIN[3]);
             fput(15, 15 + Y, SKIN[1]); fput(16, 16 + Y, SKIN[1]);
-            for (let x = 14; x <= 17; x++) fput(x, 17 + Y + (x === 14 || x === 17 ? -1 : 0), '#0a3a30');
+            for (let x = 14; x <= 17; x++) fput(x, 17 + Y + (x === 14 || x === 17 ? -1 : 0), MOUTH);
             fput(12, 15 + Y, '#ff8aa0'); fput(19, 15 + Y, '#ff8aa0');
+            for (const [mx, my, mc] of cells) fput(mx, my + Y, mc);
             // the trident, held up at the right
             const glint = Math.floor(t * 2) % 5 === 0 || called;
             for (let y = 6; y < N; y++) { fput(26, y + Y, y % 5 === 0 ? '#ffe070' : '#c8901a'); fput(27, y + Y, '#8a5a10'); }
