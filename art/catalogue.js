@@ -6402,6 +6402,16 @@ window.PrintsCatalogue = {
    "rt": "drop04",
    "touch": 1,
    "music": 1
+  },
+  {
+   "key": "game:pyx",
+   "game": "pyx",
+   "species": []
+  },
+  {
+   "key": "game:pyxlings",
+   "game": "pyxlings",
+   "species": []
   }
  ],
  "runtimes": {
