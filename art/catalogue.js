@@ -58,6 +58,17 @@ window.PrintsCatalogue = {
     "premium": 0,
     "randomSerials": true
    }
+  },
+  {
+   "id": 5,
+   "num": "05",
+   "title": "Daily issue",
+   "kind": "house",
+   "isNew": false,
+   "mark": "Daily issue",
+   "noBonus": [
+    "Daily issue"
+   ]
   }
  ],
  "daily": "1009",
@@ -6412,6 +6423,205 @@ window.PrintsCatalogue = {
    "key": "game:pyxlings",
    "game": "pyxlings",
    "species": []
+  },
+  {
+   "key": "h5-342",
+   "name": "Sky Lanterns",
+   "fam": "Lamps",
+   "set": "Daily issue",
+   "brief": "Paper lanterns lift off a dark shore one after another and drift up into a banded night sky, swaying, shrinking with distance to single glowing cells, and doubled in the water below. Click to let one go.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     342,
+     "Sky Lanterns",
+     ""
+    ]
+   ],
+   "touch": 1
+  },
+  {
+   "key": "h5-339",
+   "name": "Sunflowers",
+   "fam": "Garden",
+   "set": "Daily issue",
+   "brief": "A row of sunflowers over one day, big heads of petals round a seed-spiral centre, broad leaves on tall stems, a field of smaller ones behind. The heads follow the sun across the sky, foreshortening as they turn. Move the pointer and you are the sun.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     339,
+     "Sunflowers",
+     ""
+    ]
+   ],
+   "touch": 1
+  },
+  {
+   "key": "h5-312",
+   "name": "Morning Coffee",
+   "fam": "Still Life",
+   "set": "Daily issue",
+   "brief": "A cup of coffee seen from the side or from above, drawn big in flat tones: mugs, tea cups, espresso cups and glasses of latte, patterned or plain, with spoon, sugar and a biscuit. Steam curls up in pixels, and a click stirs it.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     312,
+     "Morning Coffee",
+     ""
+    ]
+   ],
+   "touch": 1
+  },
+  {
+   "key": "h5-355",
+   "name": "Puzzle Cube",
+   "fam": "Toys",
+   "set": "Daily issue",
+   "brief": "A six-colour cube turns its layers, one quarter turn at a time, until it is thoroughly scrambled, then plays every move backwards until it is whole again, while it slowly revolves.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     355,
+     "Puzzle Cube",
+     ""
+    ]
+   ],
+   "touch": 1
+  },
+  {
+   "key": "h5-227",
+   "name": "Suspension",
+   "fam": "Architecture",
+   "set": "Daily issue",
+   "brief": "A suspension bridge strung across a bay at dusk: the main cable sags between two towers, hangers drop to the deck, and the whole span shivers in the water beneath.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     227,
+     "Suspension",
+     ""
+    ]
+   ]
+  },
+  {
+   "key": "h5-102",
+   "name": "Fleet",
+   "fam": "Sprites",
+   "set": "Daily issue",
+   "brief": "Ships drawn by the dice: tapered hulls, swept wings, fins and canopies, each shaded from one palette and lit from above, crossing three depths of stars. A convoy, a patrol turning at the edges, or two squadrons trading fire.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     102,
+     "Fleet",
+     ""
+    ]
+   ]
+  },
+  {
+   "key": "h5-120",
+   "name": "Aurora",
+   "fam": "Terrain",
+   "set": "Daily issue",
+   "brief": "Curtains of light over snowy peaks: each column of sky glows by a slowly folding noise, from the hem to a different crown, with the stars showing through and the curtains mirrored in a lake or falling on a frozen plain.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     120,
+     "Aurora",
+     ""
+    ]
+   ]
+  },
+  {
+   "key": "h5-258",
+   "name": "Tape Deck",
+   "fam": "Instruments",
+   "set": "Daily issue",
+   "brief": "A cassette seen through its window: the tape winds from one hub to the other, the reels changing size and speed as it goes, and auto-reverses at the end of the side.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     258,
+     "Tape Deck",
+     ""
+    ]
+   ]
+  },
+  {
+   "key": "h5-302",
+   "name": "Treasure Map",
+   "fam": "Cartography",
+   "set": "Daily issue",
+   "brief": "A treasure map in chunky pixels: one to three islands in flat sand and jungle with mountains, palms and a skull rock, inked coastlines and wave marks on a scorched parchment border, a compass rose and a sea serpent or a ship. A dotted red route walks from the boat to the X. Click the island to move the X.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     302,
+     "Treasure Map",
+     ""
+    ]
+   ],
+   "touch": 1
+  },
+  {
+   "key": "h5-145",
+   "name": "Synthwave",
+   "fam": "Raster",
+   "set": "Daily issue",
+   "brief": "A striped sun setting behind wireframe mountains, and a glowing grid floor rushing toward you, every line of it laid down cell by cell.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     145,
+     "Synthwave",
+     ""
+    ]
+   ]
+  },
+  {
+   "key": "h5-243",
+   "name": "Prism",
+   "fam": "Optics",
+   "set": "Daily issue",
+   "brief": "A thin white beam enters a slowly turning glass prism and leaves it fanned out into a spectrum, the fan sweeping across the wall as the prism turns. Prism size, the wall, the number of bands and a second prism that folds the colours back to white change with every variation; move the pointer to aim the beam.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     243,
+     "Prism",
+     ""
+    ]
+   ],
+   "touch": 1
+  },
+  {
+   "key": "h5-169",
+   "name": "Fireworks",
+   "fam": "Physics",
+   "set": "Daily issue",
+   "brief": "Rockets climb from behind the rooftops and burst into sparks that fall under gravity and drag: rings, peonies, willows and double shells, each a colour of its own.",
+   "drop": 5,
+   "supply": null,
+   "species": [
+    [
+     169,
+     "Fireworks",
+     ""
+    ]
+   ],
+   "touch": 1
   }
  ],
  "runtimes": {
