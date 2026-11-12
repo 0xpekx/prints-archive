@@ -6622,11 +6622,31 @@ window.PrintsCatalogue = {
     ]
    ],
    "touch": 1
+  },
+  {
+   "key": "cs-702",
+   "name": "Maquettes",
+   "fam": "Maquettes",
+   "set": "Maquettes",
+   "drop": 0,
+   "supply": null,
+   "brief": "Unit cubes in the corner of a room, seen down its diagonal: each Maquette builds a thing of its own kind, a cube at a time, lit and moving. Tap to knock cubes out; hold to open a spring.",
+   "species": [
+    [
+     702,
+     "Corner Stack",
+     ""
+    ]
+   ],
+   "rt": "drop70",
+   "touch": 1,
+   "music": 1
   }
  ],
  "runtimes": {
   "drop03": "ProtoD03",
-  "drop04": "ProtoD04"
+  "drop04": "ProtoD04",
+  "drop70": "ProtoMaq"
  },
  "grids": {
   "pfp1": {
