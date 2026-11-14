@@ -183,8 +183,15 @@
   // separate scripts, grouped by name. art/adopt.js (all at once) is for the engine, which runs every script; the page
   // leaves it out.
   const D1 = /^p\d\d-[\w-]+$/;
+  // (a drop whose catalogue art says split (Worlds, P8: 9.75 MB in all): a piece at a time. Its runtime's group is the
+  //  drop's (dir: its pre and post scripts and runtime.js), each piece its own, <dir>-NNN, which needs the runtime's
+  //  first; the importer wraps such a piece to find its runtime at window.PrintsRtReal. Every other drop as before)
+  const PIECE = /^((?:pfp|drop)\d+)-(\d{3})$/;
+  const splitOf = dir => !!((((window.PrintsCatalogue || {}).art || {})[dir]) || {}).split;
   function groupOf(s) {
-    const g = s.getAttribute('data-g'), m = !g && (/art\/((?:pfp|drop)\d+)[-/]/.exec(s.getAttribute('src')) || /art\/(p\d\d-[\w-]+)\.js/.exec(s.getAttribute('src')));
+    const g = s.getAttribute('data-g'), src = s.getAttribute('src'), pc = !g && /art\/((?:pfp|drop)\d+)\/(\d{3})\.js/.exec(src);
+    if (pc && splitOf(pc[1])) return pc[1] + '-' + pc[2];
+    const m = !g && (/art\/((?:pfp|drop)\d+)[-/]/.exec(src) || /art\/(p\d\d-[\w-]+)\.js/.exec(src));
     return g || (m ? m[1] : 'lib');   // (art/lib.js and art/px.js)
   }
   const scripts = () => { const t = document.getElementById('art'); return t ? [...t.content.querySelectorAll('script')].filter(s => !/art\/adopt\.js/.test(s.getAttribute('src'))) : []; };
@@ -200,7 +207,7 @@
     const x = grp(g);
     if (x.ready || typeof document === 'undefined' || !document.getElementById('art')) return x.p;
     // (a family needs Drop 01's library, and the families whose helpers it uses (art/facts.js); main is all of them)
-    for (const y of g === 'main' ? d1Groups() : D1.test(g) ? ['lib', ...withNeeds(g)] : [g]) { const z = grp(y); if (!z.ready && !z.asked) { z.asked = true; waiting.push(y); } }
+    for (const y of g === 'main' ? d1Groups() : D1.test(g) ? ['lib', ...withNeeds(g)] : PIECE.test(g) ? [PIECE.exec(g)[1], g] : [g]) { const z = grp(y); if (!z.ready && !z.asked) { z.asked = true; waiting.push(y); } }
     // (what's asked for in the same moment, a page's few pieces, goes in as one)
     if (!soon) { soon = true; Promise.resolve().then(() => { soon = false; next(); }); }
     return x.p;
@@ -255,6 +262,14 @@
         return false;
       }
       for (const d of defs) { Object.assign(main.list[d.index], d); taken.add(d); }
+      return true;
+    }
+    // a split drop's piece: onto its stand-in, if it registered with the runtime (its group's post script kept it)
+    const pc = PIECE.exec(g);
+    if (pc) {
+      const gl = ((window.PrintsCatalogue || {}).runtimes || {})[pc[1]], real = (window.PrintsRtReal || {})[pc[1]];
+      if (!gl || !real || !real.list || !real.list.some(d => d.num === +pc[2])) return false;
+      take(extra[gl], real, 'num'); window[gl] = extra[gl];
       return true;
     }
     if (g === 'pfp1') { const real = window.ProtoPFP; if (real && real !== pfp) take(pfp, real, 'num'); window.ProtoPFP = pfp; }
