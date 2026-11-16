@@ -9412,6 +9412,11 @@ window.PrintsCatalogue = {
    "rt": "drop06",
    "touch": 1,
    "music": 1
+  },
+  {
+   "key": "game:pyxcards",
+   "game": "pyxcards",
+   "species": []
   }
  ],
  "runtimes": {
