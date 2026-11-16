@@ -559,3 +559,97 @@
     // dispose (DISPOSE): counts so far, and the worlds it was switched off for after a deleted object was used again
     dispose: { on: DISPOSE, stat: dStat, off: dNo } };
 })();
+
+// ProtoRolls: the Worlds pieces' own traits (drop rolls.js, scratch/traits): the header is loot's rolls-header.js byte for byte, as prints' importer wants it
+// ProtoRolls: a Loot piece's own traits, rolled from written tables before anything is drawn (roll first, then draw).
+// The same header opens public/drop07/rolls.js (the site's copy: tables and rolls, no drawing; tools/build-rolls.cjs)
+// and runtime.js (the lab). Plain code only: no canvas, no DOM, no Math.random, no Date, so it runs in Node and a Worker.
+//   ProtoRolls.add(num, { traits, roll(hash) -> [[trait, value], ...], ...the piece's own tables for its art })
+//   traits: { 'Grade': { values: { value: weight, ... } }    counted: rolled so its chance is exactly weight / sum
+//             'Bag':   { look: true, values: { ... } }        shown with its exact chance, never counted
+//             a trait some prints don't have: its values include '' (empty), the weight of the prints without it
+//             'Packed': { list: true }                         a haul: each thing shown with its chance (items/NNN.js) and tier, never counted
+//             joint: 'g1' on counted traits picked together from one joint table: each one's values are still its exact
+//             chance, but two traits of one joint group are not independent (never multiply them) }
+//   roll rows: the traits in the order the page lists them, then ['__tier|Trait|Thing', tier] for every haul thing
+//   (Common, Core, Chase, Legend or Unique), then ['__pick', json]: the picks the art draws, so a print keeps drawing
+//   its own traits. A host hides the rows that start with '__'.
+var ProtoRolls = ProtoRolls || (function (Math, String) {   // the two as locals: a bare context looks globals up slowly
+  'use strict';
+  const R = {};
+  // a stream of its own: sfc32 seeded from the hash and a salt ('roll' for the traits; a piece's art never uses it)
+  function rng(hash, salt) {
+    const s = String(hash) + '|' + String(salt), st = [];
+    let h = 0x811c9dc5;
+    for (let k = 0; k < 4; k++) {
+      for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+      h = Math.imul(h ^ (k + 1) * 0x9e3779b1, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+      st.push(h >>> 0);
+    }
+    let [a, b, c, d] = st;
+    const next = () => {
+      const t = (a + b | 0) + d | 0;
+      d = d + 1 | 0; a = b ^ b >>> 9; b = c + (c << 3) | 0; c = c << 21 | c >>> 11; c = c + t | 0;
+      return (t >>> 0) / 4294967296;
+    };
+    for (let i = 0; i < 16; i++) next();
+    return next;
+  }
+  // a weighted pick from { value: weight }: weight / sum exactly (to 1 in 2^32)
+  // (each table's keys and weights are kept the first time, in for...in order: a joint of thousands of cells is slow to walk with for...in)
+  const WP = new WeakMap();
+  function wpick(r, values) {
+    let c = WP.get(values);
+    if (!c) { const ks = [], ws = []; let t = 0; for (const k in values) { ks.push(k); ws.push(values[k]); t += values[k]; } c = { ks, ws, t }; WP.set(values, c); }
+    let x = r() * c.t, last = null;
+    for (let i = 0; i < c.ks.length; i++) { const w = c.ws[i]; if (w > 0) last = c.ks[i]; if ((x -= w) < 0 && w > 0) return c.ks[i]; }
+    return last;
+  }
+  // The usual roll (docs/ROLL-07.md). o = { natural(r, fix) -> { rows, ... }, direct: { trait: values }, joint: { 'a|b': w },
+  // keys: [the joint's traits], fixOf(cell, fix) -> more fixes }. Each direct trait is picked from its own table and the
+  // joint traits' cell from the joint table, on the roll's stream; then natural runs on fresh streams (hash|0, hash|1, ...)
+  // with those fixed, until it rolls exactly that cell. The print keeps the stream that did it in __pick: { s, fix }.
+  function byCell(hash, o) {
+    const r = rng(hash, 'roll'), fix = {}, direct = o.direct || {}, keys = o.keys || [];
+    for (const k in direct) fix[k] = wpick(r, direct[k]);
+    const want = o.joint ? wpick(r, o.joint).split('|') : [];
+    if (o.fixOf) Object.assign(fix, o.fixOf(want, fix));
+    let n = null, s = '';
+    for (let a = 0; a < 200000; a++) {
+      s = hash + '|' + a; n = o.natural(rng(s, 'roll'), fix);
+      const v = {}; for (const [k, x] of n.rows) v[k] = x;
+      if (keys.every((k, i) => (v[k] || '') === want[i]) && Object.keys(direct).every(k => (v[k] || '') === fix[k])) return n.rows.concat([['__pick', JSON.stringify({ s, fix })]]);
+    }
+    return n.rows.concat([['__pick', JSON.stringify({ s, fix, capped: 1 })]]);   // never at 1 in 1000 or commoner: roll-check fails a capped roll
+  }
+  // trait i's own table from a joint table { 'a|b': w }: its exact chances
+  function marginal(joint, i) { const o = {}; for (const k in joint) { const v = k.split('|')[i]; o[v] = (o[v] || 0) + joint[k]; } return o; }
+  // the picks a piece's art draws: from the traits it was handed, or rolled from the hash when it was handed none
+  function picks(c, num) {
+    let rows = c.traits;
+    if (!rows && num != null && R[num]) rows = c.traits = R[num].roll(c.hash);
+    const row = rows && rows.find(t => t[0] === '__pick');
+    return row ? JSON.parse(row[1]) : null;
+  }
+  // what natural rolled for the print it was handed (or rolled now from the hash): the state the art draws. Re-running a
+  // piece's simulation in another browser engine can come out a last bit differently (Math.sin and the like), and so can
+  // miss the handed traits or stop early with no state: then look for a stream that gives them as byCell would, and at
+  // worst draw a whole plain roll rather than nothing (the trait list always shows the handed traits)
+  const same = (rows, handed) => { const a = rows.filter(t => !t[0].startsWith('__')), b = handed.filter(t => !t[0].startsWith('__')); return a.length === b.length && a.every((t, i) => t[0] === b[i][0] && t[1] === b[i][1]); };
+  function state(c, num) {
+    const p = picks(c, num), d = R[num], n = d.natural(rng(p.s, 'roll'), p.fix);
+    if (n && n.rows && same(n.rows, c.traits)) return n;
+    const base = p.s.slice(0, p.s.lastIndexOf('|'));
+    for (let a = 0; a < 300; a++) { const m = d.natural(rng(base + '|redraw' + a, 'roll'), p.fix); if (m && m.rows && same(m.rows, c.traits)) return m; }
+    return d.natural(rng(p.s, 'roll'), {});
+  }
+  // the rows a piece names with c.trait: the shown traits, in order (not the '__' rows)
+  const shown = c => (c.traits || []).filter(t => !t[0].startsWith('__'));
+  return {
+    add(num, def) { R[num] = def; },
+    has: num => !!R[num],
+    def: num => R[num],
+    roll: (num, hash, deal) => R[num].roll(hash, deal),   // deal: what the site dealt this print, for a piece that deals (071: { card })
+    rng, wpick, byCell, marginal, picks, state, shown,
+  };
+})(Math, String);

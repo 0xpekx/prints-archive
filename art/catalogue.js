@@ -76,6 +76,7 @@ window.PrintsCatalogue = {
    "title": "Worlds",
    "price": 200,
    "noSetPick": true,
+   "ownTraits": true,
    "kind": "limited",
    "isNew": true,
    "noBonus": [
