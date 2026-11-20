@@ -180,27 +180,64 @@
     }
     // raw samples (-1..1) queued end to end, for pieces that compute their own
     // waveform (bytebeat): call it each frame with the next chunk
-    let pcmAt = 0;
-    function pcm(data, rate = 8000, o = {}) {
-      if (!ac || !data.length) return;
+    // (t325, "audio stutters on Worlds prints": a world streams a step's worth of samples each step (dt * rate), by its own
+    //  clock, so a Slow print's steps make half a second of sound a second and a Fast one's two: queued end to end at their
+    //  own rate, a Slow print's stream broke up many times a second and a Fast one's piled up to a second ahead and then
+    //  overlapped itself. The host now says how fast the print's world runs (pace: 0.5 Slow, 2 Fast, else 1) and how long
+    //  a step is in world seconds (step: pace / fps), and a stream's chunk (a step's worth) plays at pace: whole, and an
+    //  octave lower on a Slow print, as its world is. Rate is never measured. Only a slow drift of the lead it's queued
+    //  ahead by (a piece that rounds its sample count; a coarse audio clock that left it short at the start) is nudged
+    //  back, by a few tenths of a percent (at most 0.5%, Slow and Fast only), once the lead is 60 ms off the mark and till it's within 20 ms
+    //  again: a Normal print on a normal screen plays at exactly 1, as before. The lead is the least of the recent ones
+    //  (one a chunk, let rise 1 ms a chunk), as a clock that moves in steps reads late. A device too slow for 30 steps a
+    //  second gets gaps, not a pitch drop. A one-off clip plays at 1 and, into an idle queue, starts 50 ms out, as
+    //  before; a stream starts at its 80 ms lead (a coarse clock left a Normal print, uncorrected, short at the start))
+    let pcmAt = 0, pcmLow = Infinity, pcmFix = false;
+    const PCM_LEAD = 0.08, pcmSrcs = new Set();
+    function pcmReset() { pcmAt = 0; pcmLow = Infinity; pcmFix = false; }
+    function pcm(data, rate = 8000, o = {}, pace = 1, step = 0) {
+      // (a context suspended (muted) or still resuming queues nothing: chunks piled up there and chirped on resume)
+      if (!ac || !data.length || ac.state !== 'running') return;
+      const now = ac.currentTime, len = data.length / rate;
+      // a stream's chunk is a step's worth of samples (some pieces cap it a little short); with no step known, any
+      // chunk under 0.2 s, as before
+      const stream = step > 0 ? len <= 0.2 && Math.abs(len - step) <= step * 0.15 + 2 / rate : len < 0.2;
+      let r = stream ? pace : 1;
+      if (pcmAt < now + (stream ? 0.005 : 0.02) || pcmAt > now + 1) { pcmAt = now + (stream ? PCM_LEAD : 0.05); pcmLow = Infinity; pcmFix = false; }
+      // (a Normal print's stream is never corrected: it plays at exactly 1, as before. A Slow or Fast one by at most 0.5%,
+      //  enough for the pieces that round a step's samples (0.375% at most), under 9 cents; t325 review 2)
+      else if (stream && pace !== 1) {
+        pcmLow = Math.min(pcmAt - now, pcmLow + 0.001);
+        const err = pcmLow - PCM_LEAD;
+        if (pcmFix ? Math.abs(err) < 0.02 : Math.abs(err) > 0.06) pcmFix = !pcmFix;
+        if (pcmFix) r *= 1 + Math.max(-0.005, Math.min(0.005, err * 0.1));
+      }
       const buf = ac.createBuffer(1, data.length, rate), src = ac.createBufferSource(), gain = ac.createGain();
       buf.copyToChannel(data instanceof Float32Array ? data : Float32Array.from(data), 0);
       src.buffer = buf; gain.gain.value = Math.min(1, o.vel ?? 0.5) * 0.4;
       src.connect(gain); gain.connect(out(o.pan));
-      const now = ac.currentTime;
-      if (pcmAt < now + 0.02 || pcmAt > now + 1) pcmAt = now + 0.05;
-      src.start(pcmAt); pcmAt += data.length / rate;
+      src.playbackRate.value = r;
+      src.start(pcmAt); pcmAt += len / r;
+      pcmSrcs.add(src); src.onended = () => pcmSrcs.delete(src);
     }
-    return { init, note, hit, pcm, get ready() { return !!ac; }, resume() { if (ac && ac.state === 'suspended') ac.resume(); }, suspend() { if (ac && ac.state === 'running') ac.suspend(); } };
+    // (muting stops what's queued, so the next print, or this one unmuted, starts clean: suspend froze the clock with
+    //  the queue still ahead of it)
+    return {
+      init, note, hit, pcm, get ready() { return !!ac; },
+      resume() { pcmReset(); if (ac && ac.state === 'suspended') ac.resume(); },
+      suspend() { pcmReset(); for (const s of pcmSrcs) try { s.stop(); } catch (e) { /* not started */ } pcmSrcs.clear(); if (ac && ac.state === 'running') ac.suspend(); },
+    };
   })();
   const SILENT = { on: false, note() {}, hit() {}, pcm() {} };
-  // A live sound for the large view: plays only while `isOn()` says so.
-  function makeSound(isOn) {
+  // A live sound for the large view: plays only while `isOn()` says so. pace: how fast the print's world runs (its tempo:
+  // 0.5 Slow, 2 Fast, else 1), and fps its steps a second, so its streamed sound plays at that speed (t325)
+  function makeSound(isOn, pace = 1, fps = 0) {
+    const step = fps > 0 ? pace / fps : 0;
     return {
       get on() { return isOn() && Audio.ready; },
       note(m, o) { if (this.on) Audio.note(m, o); },
       hit(k, v, o) { if (this.on) Audio.hit(k, v, o); },
-      pcm(d, r, o) { if (this.on) Audio.pcm(d, r, o); },
+      pcm(d, r, o) { if (this.on) Audio.pcm(d, r, o, pace, step); },
     };
   }
 
