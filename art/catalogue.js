@@ -9419,6 +9419,12 @@ window.PrintsCatalogue = {
    "game": "pyxcards",
    "species": []
   }
+,
+  {
+   "key": "game:humdrum",
+   "game": "humdrum",
+   "species": []
+  }
  ],
  "runtimes": {
   "drop03": "ProtoD03",
