@@ -111,6 +111,20 @@ window.PrintsCatalogue = {
     "premium": 0,
     "randomSerials": true
    }
+  },
+  {
+   "id": 7,
+   "num": "06",
+   "title": "Humwhere Over the Rainbow",
+   "noSetPick": true,
+   "ownTraits": true,
+   "baseTraits": true,
+   "ownProduct": true,
+   "kind": "omni",
+   "isNew": false,
+   "noBonus": [
+    "Humwhere"
+   ]
   }
  ],
  "daily": "1009",
@@ -9418,8 +9432,7 @@ window.PrintsCatalogue = {
    "key": "game:pyxcards",
    "game": "pyxcards",
    "species": []
-  }
-,
+  },
   {
    "key": "game:humdrum",
    "game": "humdrum",
@@ -9429,13 +9442,36 @@ window.PrintsCatalogue = {
    "key": "pyx:secrets",
    "award": "secrets",
    "species": []
+  },
+  {
+   "key": "drop07-001",
+   "name": "Humwhere Polaroid",
+   "fam": "Hello, Humdrum!",
+   "set": "Humwhere",
+   "drop": 7,
+   "brief": "A polaroid someone took in Humdrum during launch week: a real spot in the town, at some hour, in some weather, with whoever wandered into frame. Now and then something odd wanders in too.",
+   "species": [
+    [
+     1,
+     "Humwhere Polaroid",
+     ""
+    ]
+   ],
+   "rt": "drop07",
+   "touch": 1,
+   "inkless": true,
+   "omniPiece": "humwhere-polaroid",
+   "traitsOff": [
+    "Mirrored"
+   ]
   }
  ],
  "runtimes": {
   "drop03": "ProtoD03",
   "drop04": "ProtoD04",
   "drop70": "ProtoMaq",
-  "drop06": "ProtoD06"
+  "drop06": "ProtoD06",
+  "drop07": "ProtoHum"
  },
  "grids": {
   "pfp1": {
@@ -9854,6 +9890,9 @@ window.PrintsCatalogue = {
    "632": 0,
    "633": 0,
    "639": 0
+  },
+  "drop07": {
+   "1": 200
   }
  },
  "art": {
