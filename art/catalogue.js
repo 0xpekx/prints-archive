@@ -9424,6 +9424,11 @@ window.PrintsCatalogue = {
    "key": "game:humdrum",
    "game": "humdrum",
    "species": []
+  },
+  {
+   "key": "pyx:secrets",
+   "award": "secrets",
+   "species": []
   }
  ],
  "runtimes": {
