@@ -188,6 +188,10 @@ vec3 palStep(float t){ t = fract(t); if (u_native > 0.5) return hsb(floor(t * 12
     return p;
   }
   function glDraw(def, res, t, uniforms) {
+    // (a lost context (a tab keeps about 16 WebGL contexts and drops the oldest, often this one, made with the first gl
+    //  piece drawn; or the GPU reset) reads back nothing, so every gl piece started after it drew black over its
+    //  thumbnail: #472, a binder's Voxel Residue pocket. Made again, with its programs)
+    if (gl && gl.isContextLost()) { gl = null; glc = null; programs.clear(); }
     if (!gl && !glInit()) return null;
     const p = glProgram(def), loc = n => { if (!p.loc.has(n)) p.loc.set(n, gl.getUniformLocation(p.prog, n)); return p.loc.get(n); };
     gl.viewport(0, 0, res, res);
