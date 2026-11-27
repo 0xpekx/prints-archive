@@ -188,17 +188,37 @@
   }
 
   // ---------- WebGL: one shared context for every gl piece ----------
-  let glc = null, gl = null;
+  // The context can be lost (phones drop it when the page is put away or the GPU is short of memory). A lost context is
+  // never reused: the pieces keep their programs per gl object (061's and 069's WeakMaps), so a fresh one starts clean.
+  // While it's lost, live instances keep their last picture and create() refuses ({ lost }); once a new context exists
+  // (reviveGl, or the browser's restore), the old instances are lost (inst.lost) and the page makes them again. The
+  // same protocol as drop06's runtime, which app.js live() drives. Before, a lost context was used on for good: every
+  // Clay Folk and Peg Folk after it drew black with no traits until a reload (#490)
+  let glc = null, gl = null, glGen = 0, glLost = false, noGl = false;
+  const lostErr = () => Object.assign(new Error('the WebGL context is lost'), { lost: true });
+  function newGl(size) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = Math.max(256, size);
+    const g = cv.getContext('webgl2', { preserveDrawingBuffer: true, antialias: true, premultipliedAlpha: false });
+    if (!g || g.isContextLost()) return false;
+    cv.addEventListener('webglcontextlost', e => { e.preventDefault(); if (cv === glc) glLost = true; });
+    // restored: drop the old object (its programs are dead); the next sharedGl() makes a clean one
+    cv.addEventListener('webglcontextrestored', () => { if (cv === glc) { gl = glc = null; glLost = false; glGen++; } });
+    glc = cv; gl = g; glGen++; glLost = false;
+    return true;
+  }
   function sharedGl(size) {
-    if (!gl) {
-      glc = document.createElement('canvas');
-      glc.width = glc.height = Math.max(256, size);
-      gl = glc.getContext('webgl2', { preserveDrawingBuffer: true, antialias: true, premultipliedAlpha: false });
-      if (!gl) throw new Error('this browser has no WebGL2');
+    if (glLost || (gl && gl.isContextLost())) { glLost = true; throw lostErr(); }
+    if (!gl && (noGl || !newGl(size))) {
+      // had a context before: the GPU is away for now (lost); never had one: no WebGL2 on this device
+      if (glGen) { glLost = true; throw lostErr(); }
+      noGl = true; throw Object.assign(new Error('this browser has no WebGL2'), { unsupported: 'no WebGL2' });
     }
     if (glc.width < size) glc.width = glc.height = size;
     return gl;
   }
+  // try a fresh context while the old one stays lost (some browsers never send webglcontextrestored)
+  function reviveGl() { if (!glLost) return true; const was = [glc, gl]; if (newGl(was[0] ? was[0].width : 256)) return true; [glc, gl] = was; return false; }
 
   // opts (gallery only): { input, sound } for the large view; tiles and GIFs get still ones
   function create(def, canvas, hash, opts) {
@@ -224,23 +244,30 @@
         return value;
       },
     };
-    let copy = () => {};
+    let copy = () => {}, gen = glGen;
+    // a gl instance whose context was lost or replaced: it can't draw any more (the page makes it again)
+    const lost = () => !!def.gl && (glLost || gen !== glGen || !!(c.gl && c.gl.isContextLost()));
     if (def.gl) {
-      const g = sharedGl(S);
-      c.gl = g;
+      const g = sharedGl(S), cv = glc;
+      c.gl = g; gen = glGen;
       g.viewport(0, 0, S, S);
       g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT);
-      // the piece drew into the bottom-left S x S of the shared canvas
-      copy = () => { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'copy'; ctx.drawImage(glc, 0, glc.height - S, S, S, 0, 0, S, S); ctx.globalCompositeOperation = 'source-over'; };
+      // the piece drew into the bottom-left S x S of its context's canvas; never copied from a lost context (it would
+      // paint the view black): the last good picture stays
+      copy = () => { if (g.isContextLost()) return; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'copy'; ctx.drawImage(cv, 0, cv.height - S, S, S, 0, 0, S, S); ctx.globalCompositeOperation = 'source-over'; };
     } else c.ctx = ctx;
-    let time = 0, f = 0;
-    const frame = def.make(c);
+    let time = 0, f = 0, frame;
+    // (a piece's shaders fail to build on a lost context: said as lost, so the page can make it again on a fresh one)
+    try { frame = def.make(c); } catch (e) { if (lost()) throw lostErr(); throw e; }
+    if (lost()) throw lostErr();
     copy();
     return {
       def, hash, canvas, traits,
       // a frame function may say it repeats exactly after `period` seconds
       period: frame && frame.period || 0, periodSteps: frame && frame.periodSteps || 0,
+      get lost() { return lost(); },
       step(dt) {
+        if (lost()) return;
         time += dt; f++;
         if (!frame) return;
         if (def.gl) sharedGl(S);
@@ -254,5 +281,5 @@
   const fpsOf = def => def.fps || 30;
   const groups = [];
   const group = gr => groups.push(gr);
-  window.Proto = { list, add, create, fpsOf, randomHash, hashFor, groups, group, Audio, makeInput, makeSound };
+  window.Proto = { list, add, create, fpsOf, randomHash, hashFor, groups, group, Audio, makeInput, makeSound, reviveGl };
 })();
